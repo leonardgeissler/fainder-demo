@@ -9,12 +9,9 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from fainder.custom_typing import Histogram
+from fainder.typing import Histogram
 from fainder.utils import ROUNDING_PRECISION, configure_run, save_output
 from loguru import logger
-from matplotlib import pyplot as plt
-from mpld3 import save_html
-
 
 def parse_args() -> argparse.Namespace:
     timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
@@ -86,7 +83,6 @@ def compute_histogram(
     bin_range: tuple[int, int] | None,
     scaling_factor: float = 1,
     density: bool = True,
-    save: bool = False,
 ) -> tuple[list[Histogram], int, list[str]] | str:
     try:
         np.seterr(all="raise")
@@ -132,29 +128,6 @@ def compute_histogram(
                     hists.append(hist)
 
                     probability -= 1
-
-                    # plot histogram with matplotlib and save it as a jpg file
-                    plt.hist(values, bins=bins, density=density)
-                    # plt.title(f"{input_file.stem} {values.name}")
-
-                    # save the plot in the same directory as the input file
-
-                    if save:
-                        plt.savefig(
-                            input_file.parent.parent
-                            / "hists"
-                            / f"{input_file.stem}&{column_name}.jpg"
-                        )
-                        save_html(
-                            plt.gcf(),
-                            str(
-                                input_file.parent.parent
-                                / "hists"
-                                / f"{input_file.stem}&{column_name}.html"
-                            ),
-                        )
-                        plt.close()
-
         return hists, bin_counter, column_names
     except AssertionError as e:
         print(f"{input_file}: {e}")
