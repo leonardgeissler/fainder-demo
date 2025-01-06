@@ -21,6 +21,10 @@ classifiers = [
 ]
 dependencies = [
     "fainder@git+https://github.com/lbhm/fainder@main",
+    "lark",
+    "fastapi[standard]",
+    "parameterized",
+    "kaggle",
 ]
 
 [project.optional-dependencies]

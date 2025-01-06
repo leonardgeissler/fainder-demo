@@ -42,3 +42,7 @@ venv/
 
 # Local project folders
 data/
+
+# Lucene
+/lucene_index
+/out
