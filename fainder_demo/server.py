@@ -1,21 +1,20 @@
 import json
 import os
-import time
 from typing import Any, Literal
 
-import requests
 from fainder.execution.runner import run
 from fainder.typing import PercentileQuery
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-from numpy import uint32
 
-from fainder_demo.config import DICT_FILE_ID_TO_HISTS, INDEX, LIST_OF_DOCS, PATH_TO_METADATA
+from fainder_demo.config import INDEX, LIST_OF_DOCS, PATH_TO_METADATA
 from fainder_demo.percentile_grammar import (
+    call_lucene_server,
     evaluate_query,
     number_of_matching_histograms_to_doc_number,
 )
+from fainder_demo.utils import get_hists_for_doc_ids
 
 app = FastAPI()
 origins = [
@@ -65,35 +64,6 @@ def query(payload: dict[str, Any]) -> dict[str, Any]:
     return {"query": percentile, "bit_array": bit_array}
 
 
-def call_lucene_server(keywords: str) -> list[int]:
-    start = time.perf_counter()
-
-    # POST request to lucene server at port 8001
-    request = "http://localhost:8001/search"
-    headers = {"Content-Type": "application/json"}
-    try:
-        response = requests.post(request, json={"keywords": keywords}, headers=headers)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        data = response.json()
-
-        logger.debug(f"Raw Lucene response: {response.text}")
-        array: list[int] = data["results"]
-
-        # verify is array of integers
-        assert all(isinstance(x, int) for x in array)
-
-        logger.info(f"Lucene server took {time.perf_counter() - start} seconds")
-        logger.debug(f"Lucene results: {array}")
-
-        return array
-    except Exception as e:
-        logger.error(f"Error calling Lucene server: {e}")
-        logger.error(
-            f"Response content: {response.text if 'response' in locals() else 'No response'}"
-        )
-        return []
-
-
 def get_metadata(doc_ids: list[int]) -> list[dict[str, Any]]:
     list_of_metadata_files = os.listdir(PATH_TO_METADATA)
 
@@ -118,18 +88,6 @@ def combine_results(lucene_results: list[int], fainder_results: list[int]) -> li
             result.append(i)
 
     return result
-
-
-def get_hists_for_doc_ids(doc_ids: list[int]) -> set[uint32]:
-    hists_int = []
-
-    for i in doc_ids:
-        try:
-            hists_int.extend(DICT_FILE_ID_TO_HISTS[str(i)])
-        except KeyError:
-            logger.error(f"Could not find histogram for doc id: {i}")
-
-    return {uint32(i) for i in hists_int}
 
 
 @app.post("/search")

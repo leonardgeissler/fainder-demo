@@ -1,5 +1,6 @@
 import unittest
 
+from lark import exceptions
 from parameterized import parameterized
 
 from fainder_demo.percentile_grammar import evaluate_query
@@ -23,14 +24,22 @@ testcases_expect_reject = [
 
 
 class TestQuery(unittest.TestCase):
-    @parameterized.expand(testcases)
+    @parameterized.expand(testcases)  # type: ignore[misc]
     def test_query_evaluation_success(self, query: str) -> None:
         r = evaluate_query(query)
         self.assertNotIsInstance(r, Exception)
 
-    @parameterized.expand(testcases_expect_reject)
+    @parameterized.expand(testcases_expect_reject)  # type: ignore[misc]
     def test_query_evaluation_fail(self, query: str) -> None:
-        with self.assertRaises(SyntaxError):
+        with self.assertRaises(
+            (
+                exceptions.UnexpectedCharacters,
+                exceptions.UnexpectedToken,
+                exceptions.UnexpectedInput,
+                exceptions.UnexpectedEOF,
+                SyntaxError,
+            )
+        ):
             evaluate_query(query)
 
 

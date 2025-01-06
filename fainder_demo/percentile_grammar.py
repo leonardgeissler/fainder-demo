@@ -1,44 +1,61 @@
 # type: ignore
 # Description: This file contains the grammer for the percentile query language.
-
-
+import time
 from typing import Literal
 
+import requests
 from fainder.execution.runner import run
 from fainder.typing import PercentileQuery
 from lark import Lark, Token, Transformer, Tree
 from loguru import logger
 from numpy import uint32
 
-from fainder_demo.config import INDEX, LIST_OF_DOCS, LIST_OF_HIST, METADATA
+from fainder_demo.config import INDEX, LIST_OF_DOCS
+from fainder_demo.utils import (
+    get_histogram_ids_from_identifer,
+    get_hists_for_doc_ids,
+    number_of_matching_histograms_to_doc_number,
+)
 
 
-def number_of_matching_histograms_to_doc_number(matching_histograms: set[uint32]) -> list[int]:
+def call_lucene_server(keywords: str) -> list[int]:
     """
-    This function will take a set of histogram ids and return a list of document ids.
+    This function will call the lucene server and return the results.
     """
+    start = time.perf_counter()
 
-    doc_ids = set()
-    for i in matching_histograms:
-        split = LIST_OF_HIST[i].split("&")
-        doc_id = split[2]
-        doc_ids.add(LIST_OF_DOCS.index(doc_id))
-    return list(doc_ids)
-
-
-def get_histogram_ids_from_identifer(identifer: str) -> set[uint32]:
-    """
-    This function will take a column name and return a set of histogram ids.
-    """
-    column_names: dict[str, list[str]] = METADATA["column_names"]
-    histogram_ids = set()
+    # POST request to lucene server at port 8001
+    request = "http://localhost:8001/search"
+    headers = {"Content-Type": "application/json"}
     try:
-        histogram_strings = column_names[identifer]
-    except KeyError:
-        return histogram_ids
-    for hist_str in histogram_strings:
-        histogram_ids.add(LIST_OF_HIST.index(hist_str))
-    return histogram_ids
+        response = requests.post(request, json={"keywords": keywords}, headers=headers)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        data = response.json()
+
+        logger.debug(f"Raw Lucene response: {response.text}")
+        array: list[int] = data["results"]
+
+        # verify is array of integers
+        assert all(isinstance(x, int) for x in array)
+
+        logger.info(f"Lucene server took {time.perf_counter() - start} seconds")
+        logger.debug(f"Lucene results: {array}")
+
+        return array
+    except Exception as e:
+        logger.error(f"Error calling Lucene server: {e}")
+        logger.error(
+            f"Response content: {response.text if 'response' in locals() else 'No response'}"
+        )
+        return []
+
+
+def run_keyword(query: str) -> list[int]:
+    """
+    This function will run the keyword query on the lucene server.
+    """
+    doc_ids = call_lucene_server(query)
+    return get_hists_for_doc_ids(doc_ids)
 
 
 def run_percentile(query: str, filter_hist: set[uint32] | None = None) -> list[int]:
@@ -47,7 +64,7 @@ def run_percentile(query: str, filter_hist: set[uint32] | None = None) -> list[i
     Example input: 0.5;ge;20.2;age
     Example output: set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     """
-    if len(filter_hist) == 0:
+    if filter_hist and len(filter_hist) == 0:
         return []
 
     split_query = query.split(";")
@@ -78,8 +95,6 @@ def run_percentile(query: str, filter_hist: set[uint32] | None = None) -> list[i
 
     print(f"Filter histograms: {filter_histograms}")
 
-    print(f"Filter length: {len(filter_histograms)}")
-
     result = run(INDEX, [q], "index", hist_filter=filter_histograms)
 
     matching_histograms = result[0]
@@ -108,6 +123,10 @@ class QueryEvaluator(Transformer):
     def __init__(self):
         self.filter_hist: set[uint32] | None = None
 
+    def get_all_doc_ids(self) -> set[int]:
+        """Returns a set of all possible document IDs"""
+        return set(range(len(LIST_OF_DOCS)))
+
     def term(self, items: list[Token]) -> set[int]:
         term_str = ";".join(item.value for item in items)
         return set(run_percentile(term_str, self.filter_hist))
@@ -115,7 +134,10 @@ class QueryEvaluator(Transformer):
     def expression(self, items: list[set[int] | Tree]) -> set[int]:
         if len(items) == 1:
             return items[0]
-        return items[0]  # Single expressions are passed as-is.
+        if isinstance(items[0], Token) and items[0].value == "NOT":
+            # Handle NOT by returning the complement of the expression
+            return self.get_all_doc_ids() - items[1]
+        return items[0]  # Single expressions are passed as-is
 
     def query(self, items: list[set[int] | Token]) -> set[int]:
         left = items[0]
@@ -144,3 +166,77 @@ def evaluate_query(query: str, filter_hist: set[uint32] | None = None) -> set[in
     EVALUATOR.filter_hist = filter_hist
     tree = GRAMMAR.parse(query)
     return EVALUATOR.transform(tree)
+
+
+def build_new_grammer() -> Lark:
+    grammar = """
+    start: query
+    query: expression (OPERATOR query)?
+    expression: ("pp(" | "percentile(") percentileterm ")"| "NOT" expression
+        | "(" query ")" | ("kw(" | "keyword(") keywordterm ")"
+    percentileterm: NUMBER ";" COMPARISON ";" NUMBER ";" IDENTIFIER
+        | NUMBER ";" COMPARISON ";" NUMBER
+    keywordterm: KEYWORD
+    OPERATOR: "AND" | "OR" | "XOR"
+    COMPARISON: "ge" | "gt" | "le" | "lt"
+    NUMBER: /[0-9]+(\\.[0-9]+)?/
+    IDENTIFIER: /[a-zA-Z0-9_]+/
+    KEYWORD: /[^;)]+/
+    %ignore " "
+    """
+    return Lark(grammar, start="start")
+
+
+class NewQueryEvaluator(Transformer):
+    def __init__(self):
+        self.filter_hist: set[uint32] | None = None
+
+    def get_all_doc_ids(self) -> set[int]:
+        """Returns a set of all possible document IDs"""
+        return set(range(len(LIST_OF_DOCS)))
+
+    def percentileterm(self, items: list[Token]) -> set[int]:
+        term_str = ";".join(item.value for item in items)
+        return set(run_percentile(term_str, self.filter_hist))
+
+    def keywordterm(self, items: list[Token]) -> set[int]:
+        # Extract the keyword search term
+        keyword = items[0].value.strip()
+        return set(run_keyword(keyword))
+
+    def expression(self, items: list[set[int] | Tree | Token]) -> set[int]:
+        if len(items) == 1:
+            return items[0]
+        if isinstance(items[0], Token):
+            if items[0].value == "NOT":
+                return self.get_all_doc_ids() - items[1]
+            if items[0].value in ["pp(", "percentile(", "kw(", "keyword("]:
+                return items[1]
+        return items[0]
+
+    def query(self, items: list[set[int] | Token]) -> set[int]:
+        left = items[0]
+        if len(items) == 3:
+            operator = items[1].value.strip()
+            right = items[2]
+
+            if operator == "AND":
+                return left & right
+            if operator == "OR":
+                return left | right
+            if operator == "XOR":
+                return left ^ right
+        return left
+
+    def start(self, items: list[set[int]]) -> set[int]:
+        return items[0]
+
+
+NEW_GRAMMAR = build_new_grammer()
+NEW_EVALUATOR = NewQueryEvaluator()
+
+
+def evaluate_new_query(query: str, filter_hist: set[uint32] | None = None) -> set[int]:
+    NEW_EVALUATOR.filter_hist = filter_hist
+    tree = NEW_GRAMMAR.parse(query)
+    return NEW_EVALUATOR.transform(tree)

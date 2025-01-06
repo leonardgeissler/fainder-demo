@@ -8,7 +8,6 @@ PATH_TO_METADATA = "../data/kaggle/metadata"
 
 INDEX = load_input(PATH_TO_INDEX, "index")
 
-METADATA = None
 with open("../data/kaggle/metadata.json") as f:
     METADATA = json.load(f)
 

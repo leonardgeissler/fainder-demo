@@ -6,12 +6,12 @@ add kaggle.json to ~/.kaggle/ folder for downloading data from kaggle
 Download example data from kaggle
 
 ```bash
-python fainder/setupKaggleData.py
+python fainder_demo/setupKaggleData.py
 ```
 
 Run tests for the grammar:
 ```bash
-pytest fainder/grammar_tests
+pytest fainder_demo/tests
 ```
 
 Start fastapi dev server

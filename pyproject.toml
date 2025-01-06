@@ -25,6 +25,7 @@ dependencies = [
     "fastapi[standard]",
     "parameterized",
     "kaggle",
+    "pytest",
 ]
 
 [project.optional-dependencies]
