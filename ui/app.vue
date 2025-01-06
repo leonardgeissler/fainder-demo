@@ -6,7 +6,7 @@
       <v-btn @click="gotoHome" prepend-icon="mdi-home">
         Home
       </v-btn>
-      
+
       <v-spacer></v-spacer>
 
       <v-btn value="theme" @click="toggleTheme">
@@ -15,7 +15,7 @@
           {{ "Light Mode" }}
         </div>
         <div v-else>
-          <v-icon icon="mdi-weather-night" color="indigo"></v-icon> 
+          <v-icon icon="mdi-weather-night" color="indigo"></v-icon>
           {{ "Dark Mode" }}
         </div>
       </v-btn>
@@ -30,7 +30,7 @@
   import { useTheme } from 'vuetify'
   import { useRoute } from 'vue-router'
   import Logo from '~/components/Logo.vue'
-  
+
   function gotoHome() {
     console.log('go to home')
     return navigateTo({path:'/'})
@@ -42,11 +42,11 @@
 
   let currentTheme = route.query.theme || colorMode.value;
   theme.global.name.value = currentTheme === "dark" ? "dark" : "light";
-  
+
   function toggleTheme() {
     theme.global.name.value = theme.global.name.value === 'dark' ? "light" : "dark";
-    
-    
+
+
     navigateTo({
       path: route.path,
       query: {

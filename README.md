@@ -30,6 +30,14 @@ fainder/
 
 ## Getting Started
 
+JAVA Installation:
+
+Download: (extract to lib folder)
+https://dlcdn.apache.org/lucene/java/10.0.0/lucene-10.0.0.tgz
+https://search.maven.org/artifact/com.google.code.gson/gson/2.11.0/jar?eh=
+
+Add to lib folder and add to classpath in your IDE
+
 TODO
 
 ### Developer Setup

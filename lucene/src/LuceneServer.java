@@ -50,7 +50,7 @@ public class LuceneServer {
             headers.add("Access-Control-Allow-Origin", "*");
             headers.add("Access-Control-Allow-Methods", "POST, OPTIONS");
             headers.add("Access-Control-Allow-Headers", "Content-Type");
-            
+
             String requestMethod = exchange.getRequestMethod();
 
             if (requestMethod.equalsIgnoreCase("OPTIONS")) {
@@ -70,7 +70,7 @@ public class LuceneServer {
                 while ((line = br.readLine()) != null) {
                     requestBody.append(line);
                 }
-                
+
                 // Parse JSON body
                 JsonObject jsonRequest = JsonParser.parseString(requestBody.toString()).getAsJsonObject();
                 String keyword_query = jsonRequest.get("keywords").getAsString();

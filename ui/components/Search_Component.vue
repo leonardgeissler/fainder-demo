@@ -26,7 +26,7 @@
         </v-col>
 
         <v-col :cols="inline ? 2 : 12">
-          <v-btn 
+          <v-btn
             @click="searchData"
             :block="!inline"
             :class="{ 'search-btn': inline }"

@@ -1,7 +1,8 @@
-from fainder_demo.percentile_grammar import evaluate_query
+import unittest
 
 from parameterized import parameterized
-import unittest 
+
+from fainder_demo.percentile_grammar import evaluate_query
 
 testcases = [
     "0.5;ge;20.2;age",
@@ -20,17 +21,18 @@ testcases_expect_reject = [
     "0.5;ge;20 AND 0.5;le;5;Month OR NOT (0.5;ge;200",
 ]
 
-class TestQuery(unittest.TestCase):
 
+class TestQuery(unittest.TestCase):
     @parameterized.expand(testcases)
-    def testExsampleWorks(self, query: str) -> None:
+    def test_query_evaluation_success(self, query: str) -> None:
         r = evaluate_query(query)
         self.assertNotIsInstance(r, Exception)
 
     @parameterized.expand(testcases_expect_reject)
-    def testFail(self, query) -> None:
-        with self.assertRaises(Exception):
+    def test_query_evaluation_fail(self, query: str) -> None:
+        with self.assertRaises(SyntaxError):
             evaluate_query(query)
+
 
 if __name__ == "__main__":
     unittest.main()

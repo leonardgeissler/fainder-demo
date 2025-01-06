@@ -2,10 +2,10 @@
   <v-main class="d-flex align-center justify-center">
     <div class="search-wrapper text-center">
       <Logo size="large" class="mb-8"/>
-      <Search_Component 
-        :searchPercentilePrecentile="percentile" 
-        :searchKeywords="keywords" 
-        @searchData="searchData" 
+      <Search_Component
+        :searchPercentilePrecentile="percentile"
+        :searchKeywords="keywords"
+        @searchData="searchData"
       />
     </div>
   </v-main>

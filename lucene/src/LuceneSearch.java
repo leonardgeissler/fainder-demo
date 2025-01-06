@@ -39,7 +39,7 @@ public class LuceneSearch {
         // Add wildcard after the term, not before
         String wildcardQuery = escaped + "*";
         Query parsed_query = parser.parse(wildcardQuery);
-        
+
         try {
             System.out.println("Search Results");
 

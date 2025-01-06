@@ -8,11 +8,11 @@ page
     <div class="app-container pa-10">
       <!-- Inline Search Component -->
       <div class="search-container">
-        <Search_Component 
-          :searchPercentilePrecentile="percentile" 
-          :searchKeywords="keywords" 
+        <Search_Component
+          :searchPercentilePrecentile="percentile"
+          :searchKeywords="keywords"
           :inline="true"
-          @searchData="searchData" 
+          @searchData="searchData"
         />
       </div>
 
@@ -20,7 +20,7 @@ page
       <div class="results-wrapper">
         <div class="list-container">
           <!-- Remove the Modify Search button since we have inline search now -->
-          
+
           <!-- Loading state -->
           <v-progress-circular
             v-if="isLoading"
@@ -69,7 +69,7 @@ page
             <v-card v-if="selectedResult">
               <v-card-title>{{ selectedResult.name }}</v-card-title>
               <v-card-subtitle>{{ selectedResult.alternateName }}</v-card-subtitle>
-              
+
               <v-expansion-panels v-model="descriptionPanel">
                 <v-expansion-panel>
                   <v-expansion-panel-title class="panel-title">Description</v-expansion-panel-title>
@@ -104,7 +104,7 @@ page
                             />
                           </td>
                         </tr>
-                      </tbody>  
+                      </tbody>
                     </v-table>
                   </v-expansion-panel-text>
                 </v-expansion-panel>
@@ -142,7 +142,7 @@ const selectedIndex = ref(parseInt(q.value.index) || 0);
 const descriptionPanel = ref([0]); // Array with 0 means first panel is open
 const recordSetPanels = ref([]); // Array of arrays for each file panel
 
-// reset recordSetPanels and descriptionPanel when selectedResult changes 
+// reset recordSetPanels and descriptionPanel when selectedResult changes
 
 console.log(keywords.value);
 console.log(percentile.value);
@@ -157,12 +157,12 @@ const selectResult = (result) => {
     recordSetPanels.value = result.recordSet.map(() => [0]); // Initialize each file panel with an array containing 0
     console.log(recordSetPanels.value);
   }
-  
+
   // Update URL with new index
   navigateTo({
-    path: '/results', 
+    path: '/results',
     query: {
-      percentile: percentile.value, 
+      percentile: percentile.value,
       keywords: keywords.value,
       index: index,
       theme: theme.global.name.value // Add theme to query
@@ -175,7 +175,7 @@ await loadResults(keywords.value, percentile.value);
 async function loadResults(keywords, percentile) {
   isLoading.value = true;
   error.value = null;
-  
+
   try {
     const response = await fetch(`http://127.0.0.1:8000/search`, {
       method: 'POST',
@@ -191,14 +191,14 @@ async function loadResults(keywords, percentile) {
         keywords: keywords
       })
     });
-    
+
     if (!response.ok) {
       throw new Error(`Search failed with status: ${response.status}`);
     }
-    
+
     const r = await response.json();
     results.value = r.results;
-    
+
     if (results.value && results.value.length > 0) {
       if (results.value[selectedIndex.value]){
         selectResult(results.value[selectedIndex.value]);
@@ -284,7 +284,7 @@ const getChartData = (field, index) => {
 
   const binEdges = field.histogram.bin_edges;
   const counts = field.histogram.histogram;
-  
+
   // Create array of bar objects with correct positioning and width
   const bars = counts.map((count, i) => ({
     x0: binEdges[i],         // Start of bin
@@ -322,21 +322,21 @@ async function searchData({searchPercentilePrecentile, searchKeywords}) {
   console.log(searchKeywords);
   showSearchModal.value = false;
 
-  // TODO: make this a little more better 
+  // TODO: make this a little more better
   await loadResults(searchKeywords, searchPercentilePrecentile);
   keywords.value = searchKeywords;
   percentile.value = searchPercentilePrecentile;
 
   return await navigateTo({
-    path: '/results', 
+    path: '/results',
     query: {
-      percentile: searchPercentilePrecentile, 
+      percentile: searchPercentilePrecentile,
       keywords: searchKeywords,
       index: 0, // Reset index to 0 on new search
       theme: theme.global.name.value // Add theme to query
     }
   });
-  
+
 }
 
 </script>

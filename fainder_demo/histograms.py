@@ -5,16 +5,15 @@ import time
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
-from matplotlib import pyplot as plt
-from mpld3 import save_html
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from loguru import logger
-from typing import Any
-
 from fainder.custom_typing import Histogram
 from fainder.utils import ROUNDING_PRECISION, configure_run, save_output
+from loguru import logger
+from matplotlib import pyplot as plt
+from mpld3 import save_html
 
 
 def parse_args() -> argparse.Namespace:
@@ -95,7 +94,7 @@ def compute_histogram(
         rng = np.random.default_rng(seed)
         df = pd.read_parquet(input_file, engine="pyarrow").select_dtypes(include="number")
         bin_counter = 0
-        column_names = [column for column in df.columns]
+        column_names = list(df.columns)
         for column_name, values in df.items():
             values.dropna(inplace=True)
             # We filter out huge values to prevent overflows in the index (and since they
@@ -134,18 +133,28 @@ def compute_histogram(
 
                     probability -= 1
 
-                    # plot histogram with matplotlib and save it as a jpg file 
+                    # plot histogram with matplotlib and save it as a jpg file
                     plt.hist(values, bins=bins, density=density)
-                    #plt.title(f"{input_file.stem} {values.name}")
+                    # plt.title(f"{input_file.stem} {values.name}")
 
                     # save the plot in the same directory as the input file
 
                     if save:
-                        plt.savefig(input_file.parent.parent / "hists"/ f"{input_file.stem}&{column_name}.jpg")
-                        save_html(plt.gcf(), str(input_file.parent.parent / "hists"/ f"{input_file.stem}&{column_name}.html"))
+                        plt.savefig(
+                            input_file.parent.parent
+                            / "hists"
+                            / f"{input_file.stem}&{column_name}.jpg"
+                        )
+                        save_html(
+                            plt.gcf(),
+                            str(
+                                input_file.parent.parent
+                                / "hists"
+                                / f"{input_file.stem}&{column_name}.html"
+                            ),
+                        )
                         plt.close()
 
-                    
         return hists, bin_counter, column_names
     except AssertionError as e:
         print(f"{input_file}: {e}")
@@ -162,28 +171,23 @@ def load_archive(path: Path) -> tuple[str, Histogram]:
     return path.stem, hist
 
 
-def get_indexes(metadata: dict[str, Any], id: str, column: str) -> tuple[int, int]:
+def get_indexes(metadata: dict[str, Any], file_id: str, column: str) -> tuple[int, int]:
     """
     Get the indexes of the id and column in the metadata
-    
+
     Args:
     metadata: dict: metadata of the dataset
     id: str: id of the file
     column: str: column name
     """
-    i = 0
-    for file in metadata["recordSet"]:
-        if file["@id"] == id:
-            i2 = 0
-            for field in file["field"]:
+    for i, file in enumerate(metadata["recordSet"]):
+        if file["@id"] == file_id:
+            for i2, field in enumerate(file["field"]):
                 if field["name"] == column:
                     return i, i2
-                i2 += 1
-        i += 1
-    if not column == "":
-        return get_indexes(metadata, id, "")
-    else:
-        raise ValueError("The id or column was not found in the metadata")
+    if column != "":
+        return get_indexes(metadata, file_id, "")
+    raise ValueError("The id or column was not found in the metadata")
 
 
 def main() -> None:
@@ -203,15 +207,14 @@ def main() -> None:
         )
         results = pool.starmap(fn, zip(sorted(args.input.iterdir()), seeds, strict=True))
 
-
-    # histid: column name + file name 
+    # histid: column name + file name
     list_of_hist: list[str] = []
 
     dict_file_id_to_hists: dict[int, list[int]] = {}
 
     dict_doc_id_to_file_ids: dict[int, list[int]] = {}
 
-    column_names: dict[str,list[str]]= {}
+    column_names: dict[str, list[str]] = {}
 
     # make directory for the histograms
     os.makedirs(args.input.parent / "hists", exist_ok=True)
@@ -224,9 +227,7 @@ def main() -> None:
 
     print(file_paths)
 
-
-
-    metadata_path = args.input.parent / "metadata" 
+    metadata_path = args.input.parent / "metadata"
 
     errors: list[str] = []
     hists: list[tuple[np.uint32, Histogram]] = []
@@ -241,31 +242,32 @@ def main() -> None:
         else:
             spilt = file_paths[filenumber].split("&")
             name = spilt[0] + "&" + spilt[1]
-            metadata = json.load(open(metadata_path / f"{name}.json"))
+            metadata = None
+            with open(metadata_path / f"{name}.json") as f:
+                metadata = json.load(f)
             dataset_name = spilt[1]
-            if not dataset_name in list_of_docs:
+            if dataset_name not in list_of_docs:
                 doc_id = doc_id + 1
                 list_of_docs.append(dataset_name)
                 dict_doc_id_to_file_ids[doc_id] = [filenumber]
             else:
                 dict_doc_id_to_file_ids[doc_id].append(filenumber)
-            
-        
+
             for histnumber, hist in enumerate(result[0]):
                 hists.append((np.uint32(i), hist))
                 column_name = result[2][histnumber]
 
                 # get the indexes of the id and column in the metadata
-                id, id2  = get_indexes(metadata, spilt[2] + ".csv", column_name)
+                file_id, id2 = get_indexes(metadata, spilt[2] + ".csv", column_name)
 
                 h = {
                     "histogram": hist[0].tolist(),
                     "bin_edges": hist[1].tolist(),
                 }
 
-                metadata["recordSet"][id]["field"][id2]["histogram"] = h
+                metadata["recordSet"][file_id]["field"][id2]["histogram"] = h
 
-                filepath = file_paths[filenumber]                
+                filepath = file_paths[filenumber]
                 histid = f"{column_name}&{filepath}"
                 list_of_hist.append(histid)
 
@@ -282,18 +284,24 @@ def main() -> None:
                     dict_file_id_to_hists[filenumber] = [i]
                 i += 1
 
-            json.dump(metadata, open(metadata_path / f"{name}.json", "w"))
+            with open(metadata_path / f"{name}.json", "w") as f:
+                json.dump(metadata, f)
 
             bin_counter += result[1]
 
+    metadata = {
+        "list_of_hist": list_of_hist,
+        "column_names": column_names,
+        "list_of_docs": list_of_docs,
+        "dict_file_id_to_hists": dict_file_id_to_hists,
+        "dict_doc_id_to_file_ids": dict_doc_id_to_file_ids,
+    }
 
-    metadata = {"list_of_hist": list_of_hist, "column_names": column_names, "list_of_docs": list_of_docs, "dict_file_id_to_hists": dict_file_id_to_hists, "dict_doc_id_to_file_ids": dict_doc_id_to_file_ids}
-
-    # save in parent of input directory 
+    # save in parent of input directory
 
     json_path = args.input.parent / "metadata.json"
     with open(json_path, "w") as f:
-        json.dump(metadata, f) 
+        json.dump(metadata, f)
 
     save_output(args.output, hists, name="histograms")
 
