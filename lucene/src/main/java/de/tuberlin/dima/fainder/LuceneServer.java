@@ -21,7 +21,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.BitSet;
 import java.util.Properties;
+
 
 public class LuceneServer {
     private static final Logger logger = LoggerFactory.getLogger(LuceneServer.class);
@@ -128,9 +130,19 @@ public class LuceneServer {
 
                     // Read and parse the request body
                     String keywordQuery;
+                    BitSet filter = null;
                     try (InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8)) {
                         JsonObject json = JsonParser.parseReader(isr).getAsJsonObject();
                         keywordQuery = json.get("keywords").getAsString();
+
+                        // Parse optional filter array
+                        if (json.has("filter")) {
+                            JsonArray filterArray = json.getAsJsonArray("filter");
+                            filter = new BitSet();
+                            for (int i = 0; i < filterArray.size(); i++) {
+                                filter.set(filterArray.get(i).getAsInt());
+                            }
+                        }
                     } catch (JsonParseException e) {
                         sendJson(exchange, 400, "{\"error\": \"Invalid JSON format\"}");
                         return;
@@ -145,7 +157,7 @@ public class LuceneServer {
                     }
 
                     try {
-                        JsonArray results = luceneSearch.search(keywordQuery, maxResults);
+                        JsonArray results = luceneSearch.search(keywordQuery, maxResults, filter);
                         JsonObject responseObject = new JsonObject();
                         responseObject.add("results", results);
                         sendJson(exchange, 200, responseObject.toString());

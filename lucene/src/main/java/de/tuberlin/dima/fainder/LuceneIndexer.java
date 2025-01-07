@@ -47,12 +47,18 @@ public class LuceneIndexer {
             IndexWriterConfig config = new IndexWriterConfig(analyzer);
             IndexWriter writer = new IndexWriter(directory, config);
             Gson gson = new Gson();
+            int fileCounter = 0;
             for (Path filePath : jsonFiles) {
                 // Read the content of the file
                 String jsonContent = new String(Files.readAllBytes(filePath));
 
                 // Parse the JSON content into a JsonObject
                 JsonObject jsonObject = gson.fromJson(jsonContent, JsonObject.class);
+
+                // Add id field if it doesn't exist
+                if (!jsonObject.has("id")) {
+                    jsonObject.addProperty("id", fileCounter);
+                }
 
                 // Create a new Lucene Document
                 Document document = new Document();
@@ -89,6 +95,7 @@ public class LuceneIndexer {
 
                 // Add the document to the index
                 writer.addDocument(document);
+                fileCounter++;
             }
             writer.commit();
             writer.close();

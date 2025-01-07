@@ -12,11 +12,12 @@ from numpy import uint32
 from backend.config import INDEX, LIST_OF_DOCS
 from backend.utils import (
     get_histogram_ids_from_identifer,
+    get_hists_for_doc_ids,
     number_of_matching_histograms_to_doc_number,
 )
 
 
-def call_lucene_server(keywords: str) -> list[int]:
+def call_lucene_server(keywords: str, filter_doc_ids: list[int] | None = None) -> list[int]:
     """
     This function will call the lucene server and return the results.
     """
@@ -27,7 +28,10 @@ def call_lucene_server(keywords: str) -> list[int]:
     url = f"http://{lucene_host}:{lucene_port}/search"
     headers = {"Content-Type": "application/json"}
     try:
-        response = requests.post(url, json={"keywords": keywords}, headers=headers)
+        json_data = {"keywords": keywords}
+        if filter_doc_ids:
+            json_data["filter"] = filter_doc_ids
+        response = requests.post(url, json=json_data, headers=headers)
         response.raise_for_status()  # Raise an exception for bad status codes
         data = response.json()
 
@@ -49,11 +53,11 @@ def call_lucene_server(keywords: str) -> list[int]:
         return []
 
 
-def run_keyword(query: str) -> list[int]:
+def run_keyword(query: str, filter_doc_ids: list[int]) -> list[int]:
     """
     This function will run the keyword query on the lucene server.
     """
-    return call_lucene_server(query)
+    return call_lucene_server(query, filter_doc_ids)
 
 
 def run_percentile(query: str, filter_hist: set[uint32] | None = None) -> list[int]:
@@ -186,8 +190,9 @@ def build_new_grammar() -> Lark:
 
 
 class NewQueryEvaluator(Transformer):
-    def __init__(self):
-        self.filter_hist: set[uint32] | None = None
+    def __init__(self, enable_result_caching: bool = True):
+        self.current_result: set[int] = set()
+        self.enable_result_caching = enable_result_caching
 
     def get_all_doc_ids(self) -> set[int]:
         """Returns a set of all possible document IDs"""
@@ -195,22 +200,32 @@ class NewQueryEvaluator(Transformer):
 
     def percentileterm(self, items: list[Token]) -> set[int]:
         term_str = ";".join(item.value for item in items)
-        return set(run_percentile(term_str, self.filter_hist))
+        if self.enable_result_caching:
+            filter_hist = get_hists_for_doc_ids(self.current_result)
+        else:
+            filter_hist = None
+        return set(run_percentile(term_str, filter_hist))
 
     def keywordterm(self, items: list[Token]) -> set[int]:
-        # Extract the keyword search term
         keyword = items[0].value.strip()
-        return set(run_keyword(keyword))
+        filter_doc_ids = list(self.current_result) if self.enable_result_caching else []
+        return set(run_keyword(keyword, filter_doc_ids))
 
     def expression(self, items: list[set[int] | Tree | Token]) -> set[int]:
         if len(items) == 1:
-            return items[0]
-        if isinstance(items[0], Token):
+            result = items[0]
+        elif isinstance(items[0], Token):
             if items[0].value == "NOT":
-                return self.get_all_doc_ids() - items[1]
-            if items[0].value in ["pp(", "percentile(", "kw(", "keyword("]:
-                return items[1]
-        return items[0]
+                result = self.get_all_doc_ids() - items[1]
+            elif items[0].value in ["pp(", "percentile(", "kw(", "keyword("]:
+                result = items[1]
+            else:
+                result = items[0]
+        else:
+            result = items[0]
+
+        self.current_result = result
+        return result
 
     def query(self, items: list[set[int] | Token]) -> set[int]:
         left = items[0]
@@ -219,12 +234,18 @@ class NewQueryEvaluator(Transformer):
             right = items[2]
 
             if operator == "AND":
-                return left & right
-            if operator == "OR":
-                return left | right
-            if operator == "XOR":
-                return left ^ right
-        return left
+                result = left & right
+            elif operator == "OR":
+                result = left | right
+            elif operator == "XOR":
+                result = left ^ right
+            else:
+                result = left
+        else:
+            result = left
+
+        self.current_result = result
+        return result
 
     def start(self, items: list[set[int]]) -> set[int]:
         return items[0]
@@ -234,7 +255,9 @@ NEW_GRAMMAR = build_new_grammar()
 NEW_EVALUATOR = NewQueryEvaluator()
 
 
-def evaluate_new_query(query: str, filter_hist: set[uint32] | None = None) -> set[int]:
-    NEW_EVALUATOR.filter_hist = filter_hist
+def evaluate_new_query(query: str, enable_result_caching: bool = True) -> set[int]:
+    global NEW_EVALUATOR
+    NEW_EVALUATOR = NewQueryEvaluator(enable_result_caching)
+    NEW_EVALUATOR.current_result = NEW_EVALUATOR.get_all_doc_ids()
     tree = NEW_GRAMMAR.parse(query)
     return NEW_EVALUATOR.transform(tree)
