@@ -24,6 +24,7 @@
             prepend-icon="mdi-magnify"
             variant="elevated"
             size="large"
+            @keyup.enter="searchData"
           >
             Search
           </v-btn>
