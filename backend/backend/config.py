@@ -1,14 +1,16 @@
 import json
+import os
+from pathlib import Path
 
 from fainder.utils import load_input
 
-PATH_TO_INDEX = "../data/kaggle/indices/rebinning.zst"
+PATH_TO_INDEX = Path(os.getenv("FAINDER_DEMO_HOME", ".")) / "data/kaggle/indices/rebinning.zst"
 
-PATH_TO_METADATA = "../data/kaggle/metadata"
+PATH_TO_METADATA = Path(os.getenv("FAINDER_DEMO_HOME", ".")) / "data/kaggle/metadata"
 
 INDEX = load_input(PATH_TO_INDEX, "index")
 
-with open("../data/kaggle/metadata.json") as f:
+with open(Path(os.getenv("FAINDER_DEMO_HOME", ".")) / "data/kaggle/metadata.json") as f:
     METADATA = json.load(f)
 
 LIST_OF_HIST: list[str] = METADATA["list_of_hist"]

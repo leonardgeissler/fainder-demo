@@ -1,4 +1,4 @@
-# type: ignore
+import os
 import time
 from typing import Literal
 
@@ -22,8 +22,9 @@ def call_lucene_server(keywords: str) -> list[int]:
     """
     start = time.perf_counter()
 
-    # POST request to lucene server at port 8001
-    url = "http://localhost:8001/search"
+    lucene_host = os.getenv("LUCENE_HOST", "127.0.0.1")
+    lucene_port = os.getenv("LUCENE_PORT", "8001")
+    url = f"http://{lucene_host}:{lucene_port}/search"
     headers = {"Content-Type": "application/json"}
     try:
         response = requests.post(url, json={"keywords": keywords}, headers=headers)

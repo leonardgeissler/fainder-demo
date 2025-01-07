@@ -20,6 +20,11 @@ export default defineNuxtConfig({
     '@nuxtjs/mdc', '@nuxtjs/color-mode'
     //...
   ],
+  runtimeConfig: {
+    public: {
+      apiBase: process.env.NUXT_API_BASE || 'http://localhost:3000',
+    },
+  },
   vite: {
     vue: {
       template: {

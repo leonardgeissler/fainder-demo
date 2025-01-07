@@ -31,7 +31,25 @@ fainder/
 
 ## Getting Started
 
-### Prerequisites
+### Docker Setup
+
+You need a recent version of Docker including `docker compose` to run the demo.
+
+Build and start the demo:
+
+```bash
+docker compose up --build
+```
+
+Stop the container:
+
+```bash
+docker compose down
+```
+
+### Local Setup
+
+#### Prerequisites
 
 - Python 3.11 or greater
 - Java 21 or greater
@@ -40,11 +58,11 @@ fainder/
 - `npm` (Node.js package manager)
 - `pip` (Python package manager)
 
-### Installation
+#### Installation
 
 TODO
 
-### Developer Setup
+#### Developer Setup
 
 ```bash
 # Follow the steps above until you have activated your virtual environment

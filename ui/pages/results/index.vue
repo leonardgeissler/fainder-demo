@@ -121,6 +121,7 @@ page
 import { Bar } from 'vue-chartjs'
 import { useTheme } from 'vuetify'
 
+const runtimeConfig = useRuntimeConfig();
 
 const results = ref(null);
 const selectedResult = ref(null);
@@ -173,7 +174,7 @@ async function loadResults(queryStr) {
   error.value = null;
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/query`, {
+    const response = await fetch(`${runtimeConfig.public.apiBase}/query`, {
       method: 'POST',
       mode: 'cors',
       credentials: 'include',

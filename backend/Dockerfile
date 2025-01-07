@@ -1,0 +1,18 @@
+FROM python:3.11-slim-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml .
+COPY backend ./backend
+
+RUN pip install -U pip setuptools \
+    && pip install .
+
+ENV FAINDER_DEMO_HOME=/app
+EXPOSE 8000
+
+CMD ["fastapi", "dev", "backend/server.py", "--host", "0.0.0.0", "--port", "8000"]
