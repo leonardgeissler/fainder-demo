@@ -3,8 +3,7 @@
     <div class="search-wrapper text-center">
       <Logo size="large" class="mb-8"/>
       <Search_Component
-        :searchPercentilePrecentile="percentile"
-        :searchKeywords="keywords"
+        :searchQuery="query"
         @searchData="searchData"
       />
     </div>
@@ -17,16 +16,15 @@ import Logo from '~/components/Logo.vue'
 const route = useRoute();
 const q = route.query;
 
-const keywords = ref(q.keywords);
-const percentile = ref(q.percentile);
+const query = ref(q.query);
 
-
-async function searchData({searchPercentilePrecentile, searchKeywords}) {
-  console.log('searchData');
-  console.log(searchPercentilePrecentile);
-  console.log(searchKeywords);
-
-  return await navigateTo({path: '/results', query: {percentile: searchPercentilePrecentile, keywords: searchKeywords}});
+async function searchData({query: searchQuery}) {
+  return await navigateTo({
+    path: '/results',
+    query: {
+      query: searchQuery
+    }
+  });
 }
 
 </script>

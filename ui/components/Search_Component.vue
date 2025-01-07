@@ -5,20 +5,10 @@
   <v-main :class="['search-main', { 'pa-3': inline }]">
     <v-container :class="{ 'pa-2': inline }">
       <v-row :class="{ 'inline-layout': inline }">
-        <v-col :cols="inline ? 5 : 12">
+        <v-col :cols="inline ? 10 : 12">
           <v-text-field
-            v-model="searchPercentilePrecentile"
-            label="Search by precentile predicates"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-        </v-col>
-
-        <v-col :cols="inline ? 5 : 12">
-          <v-text-field
-            v-model="searchKeywords"
-            label="Search by Keywords"
+            v-model="searchQuery"
+            label="Search by percentile predicates and keywords"
             variant="outlined"
             density="comfortable"
             hide-details
@@ -46,8 +36,7 @@
 
 <script setup>
 const props = defineProps({
-  searchPercentilePrecentile: String,
-  searchKeywords: String,
+  searchQuery: String,
   inline: {
     type: Boolean,
     default: false
@@ -55,20 +44,11 @@ const props = defineProps({
 });
 const emit = defineEmits(['searchData']);
 
-// search bar 1 (search by precentile precentile)
-const searchPercentilePrecentile = ref(props.searchPercentilePrecentile);
-
-// search bar 2 (search by Keywords)
-const searchKeywords = ref(props.searchKeywords);
+const searchQuery = ref(props.searchQuery);
 
 async function searchData() {
-  console.log(searchPercentilePrecentile.value);
-  console.log(searchKeywords.value);
-
-  // emit search data to parent component
   emit('searchData', {
-    searchPercentilePrecentile: searchPercentilePrecentile.value,
-    searchKeywords: searchKeywords.value
+    query: searchQuery.value
   });
 }
 </script>

@@ -9,8 +9,7 @@ page
       <!-- Inline Search Component -->
       <div class="search-container">
         <Search_Component
-          :searchPercentilePrecentile="percentile"
-          :searchKeywords="keywords"
+          :searchQuery="query"
           :inline="true"
           @searchData="searchData"
         />
@@ -133,9 +132,8 @@ const theme = useTheme();
 const route = useRoute();
 const q = ref(route.query);
 
-// read keywords, percentile and theme from query params
-const keywords = ref(q.value.keywords);
-const percentile = ref(q.value.percentile);
+// read query and theme from query params
+const query = ref(q.value.query);
 const selectedIndex = ref(parseInt(q.value.index) || 0);
 
 
@@ -144,8 +142,7 @@ const recordSetPanels = ref([]); // Array of arrays for each file panel
 
 // reset recordSetPanels and descriptionPanel when selectedResult changes
 
-console.log(keywords.value);
-console.log(percentile.value);
+console.log(query.value);
 
 const selectResult = (result) => {
   const index = results.value.indexOf(result);
@@ -162,22 +159,21 @@ const selectResult = (result) => {
   navigateTo({
     path: '/results',
     query: {
-      percentile: percentile.value,
-      keywords: keywords.value,
+      query: query.value,
       index: index,
       theme: theme.global.name.value // Add theme to query
     }
   });
 };
 
-await loadResults(keywords.value, percentile.value);
+await loadResults(query.value);
 
-async function loadResults(keywords, percentile) {
+async function loadResults(queryStr) {
   isLoading.value = true;
   error.value = null;
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/search`, {
+    const response = await fetch(`http://127.0.0.1:8000/query`, {
       method: 'POST',
       mode: 'cors',
       credentials: 'include',
@@ -187,8 +183,7 @@ async function loadResults(keywords, percentile) {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        percentile: percentile,
-        keywords: keywords
+        query: queryStr
       })
     });
 
@@ -316,24 +311,17 @@ const getChartData = (field, index) => {
 
 
 
-async function searchData({searchPercentilePrecentile, searchKeywords}) {
-  console.log('searchData');
-  console.log(searchPercentilePrecentile);
-  console.log(searchKeywords);
+async function searchData({query: searchQuery}) {
   showSearchModal.value = false;
-
-  // TODO: make this a little more better
-  await loadResults(searchKeywords, searchPercentilePrecentile);
-  keywords.value = searchKeywords;
-  percentile.value = searchPercentilePrecentile;
+  await loadResults(searchQuery);
+  query.value = searchQuery;
 
   return await navigateTo({
     path: '/results',
     query: {
-      percentile: searchPercentilePrecentile,
-      keywords: searchKeywords,
-      index: 0, // Reset index to 0 on new search
-      theme: theme.global.name.value // Add theme to query
+      query: searchQuery,
+      index: 0,
+      theme: theme.global.name.value
     }
   });
 

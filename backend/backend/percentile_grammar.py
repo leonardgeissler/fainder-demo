@@ -1,3 +1,4 @@
+# type: ignore
 import time
 from typing import Literal
 
@@ -11,7 +12,6 @@ from numpy import uint32
 from backend.config import INDEX, LIST_OF_DOCS
 from backend.utils import (
     get_histogram_ids_from_identifer,
-    get_hists_for_doc_ids,
     number_of_matching_histograms_to_doc_number,
 )
 
@@ -52,8 +52,7 @@ def run_keyword(query: str) -> list[int]:
     """
     This function will run the keyword query on the lucene server.
     """
-    doc_ids = call_lucene_server(query)
-    return get_hists_for_doc_ids(doc_ids)
+    return call_lucene_server(query)
 
 
 def run_percentile(query: str, filter_hist: set[uint32] | None = None) -> list[int]:
