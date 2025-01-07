@@ -1,11 +1,9 @@
-import unittest
-
+import pytest
 from lark import exceptions
-from parameterized import parameterized
 
-from fainder_demo.percentile_grammar import evaluate_new_query
+from backend.percentile_grammar import evaluate_new_query
 
-testcases = [
+correct_queries = [
     # Basic keyword queries
     "keyword(test)",
     "kw(hello world)",
@@ -25,7 +23,7 @@ testcases = [
     "NOT (kw(test) AND pp(0.5;ge;20.0))",
 ]
 
-testcases_expect_reject = [
+wrong_queries = [
     # Invalid syntax
     "keyword()",
     "pp()",
@@ -50,25 +48,21 @@ testcases_expect_reject = [
 ]
 
 
-class TestQuery(unittest.TestCase):
-    @parameterized.expand(testcases)  # type: ignore[misc]
-    def test_query_evaluation_success(self, query: str) -> None:
-        r = evaluate_new_query(query)
-        self.assertNotIsInstance(r, Exception)
-
-    @parameterized.expand(testcases_expect_reject)  # type: ignore[misc]
-    def test_query_evaluation_fail(self, query: str) -> None:
-        with self.assertRaises(
-            (
-                exceptions.UnexpectedCharacters,
-                exceptions.UnexpectedToken,
-                exceptions.UnexpectedInput,
-                exceptions.UnexpectedEOF,
-                SyntaxError,
-            )
-        ):
-            evaluate_new_query(query)
+@pytest.mark.parametrize("query", correct_queries)
+def test_query_evaluation_success(query: str) -> None:
+    r = evaluate_new_query(query)
+    assert not isinstance(r, Exception)
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.parametrize("query", wrong_queries)
+def test_query_evaluation_fail(query: str) -> None:
+    with pytest.raises(
+        (
+            exceptions.UnexpectedCharacters,
+            exceptions.UnexpectedToken,
+            exceptions.UnexpectedInput,
+            exceptions.UnexpectedEOF,
+            SyntaxError,
+        )
+    ):
+        evaluate_new_query(query)

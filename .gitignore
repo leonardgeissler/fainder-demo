@@ -34,15 +34,13 @@ MANIFEST
 venv/
 .venv/
 
-# mypy
+# Cache folder
 .mypy_cache/
-
-# pytest
 .pytest_cache/
+.ruff_cache/
 
 # Local project folders
 data/
 
 # Lucene
-/lucene_index
-/out
+target/

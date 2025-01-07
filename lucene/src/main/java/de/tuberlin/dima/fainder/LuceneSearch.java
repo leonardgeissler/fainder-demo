@@ -1,3 +1,5 @@
+package de.tuberlin.dima.fainder;
+
 import com.google.gson.JsonArray;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -6,23 +8,29 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.*;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.Paths;
+import java.nio.file.Path;
+import java.util.Arrays;
 
 public class LuceneSearch {
-    private IndexSearcher searcher;
-    private IndexReader reader;
-    private Directory directory;
-    private StandardAnalyzer analyzer;
-    private QueryParser parser;
+    private static final Logger logger = LoggerFactory.getLogger(LuceneSearch.class);
+    private final Directory indexDir;
+    private final IndexReader reader;
+    private final IndexSearcher searcher;
+    private final StandardAnalyzer analyzer;
+    private final QueryParser parser;
 
-    public LuceneSearch(String pathIndex) throws IOException {
-        directory = FSDirectory.open(Paths.get(pathIndex));
-        reader = DirectoryReader.open(directory);
+    public LuceneSearch(Path indexPath) throws IOException {
+        indexDir = FSDirectory.open(indexPath);
+        reader = DirectoryReader.open(indexDir);
         searcher = new IndexSearcher(reader);
         analyzer = new StandardAnalyzer();
         parser = new QueryParser("all", analyzer);
@@ -30,7 +38,8 @@ public class LuceneSearch {
     }
 
     /**
-     * @param query  The query string
+     * @param query     The query string
+     * @param maxNumber The number of documents to return
      * @return An ArrayList of Documents that match the query
      */
     public JsonArray search(String query, int maxNumber) throws ParseException {
@@ -41,7 +50,7 @@ public class LuceneSearch {
         Query parsed_query = parser.parse(wildcardQuery);
 
         try {
-            System.out.println("Search Results");
+            logger.debug("Executing query {}", parsed_query);
 
             ScoreDoc[] hits = searcher.search(parsed_query, maxNumber).scoreDocs;
             StoredFields storedFields = searcher.storedFields();
@@ -49,17 +58,14 @@ public class LuceneSearch {
             for (ScoreDoc scoreDoc : hits) {
                 int hit = scoreDoc.doc;
                 Document hitDoc = storedFields.document(hit);
-                System.out.println("Hit nr:" + hit);
-                System.out.println("Hit: " + hitDoc.get("name") + " Score: " + scoreDoc.score);
+                logger.debug("Hit {}: {} (Score: {})", hit, hitDoc.get("name"), scoreDoc.score);
                 jsonArray.add(hit);
             }
             return jsonArray;
-
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error(Arrays.toString(e.getStackTrace()));
+            return null;
         }
-
-        return null;
     }
 
 }

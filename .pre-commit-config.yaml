@@ -37,3 +37,4 @@ repos:
         name: shellcheck
         args:
           - '--severity=style'
+          - '-x'

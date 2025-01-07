@@ -7,6 +7,9 @@ export default defineNuxtConfig({
   build: {
     transpile: ['vuetify'],
   },
+  alias: {
+    '#app-manifest': 'node_modules/nuxt/dist/app/composables/manifest.js'
+  },
   modules: [
     (_options, nuxt) => {
       nuxt.hooks.hook('vite:extendConfig', (config) => {
@@ -14,7 +17,7 @@ export default defineNuxtConfig({
         config.plugins.push(vuetify({ autoImport: true }))
       })
     },
-    '@nuxtjs/mdc','@nuxtjs/color-mode'
+    '@nuxtjs/mdc', '@nuxtjs/color-mode'
     //...
   ],
   vite: {

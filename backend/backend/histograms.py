@@ -13,6 +13,7 @@ from fainder.typing import Histogram
 from fainder.utils import ROUNDING_PRECISION, configure_run, save_output
 from loguru import logger
 
+
 def parse_args() -> argparse.Namespace:
     timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
     parser = argparse.ArgumentParser(
@@ -91,7 +92,7 @@ def compute_histogram(
         df = pd.read_parquet(input_file, engine="pyarrow").select_dtypes(include="number")
         bin_counter = 0
         column_names = list(df.columns)
-        for column_name, values in df.items():
+        for _, values in df.items():
             values.dropna(inplace=True)
             # We filter out huge values to prevent overflows in the index (and since they
             # are unrealistic for percentile queries). Since multiple large integer values are
@@ -101,6 +102,7 @@ def compute_histogram(
             if values.nunique() > 1 and values.min() != values.max():
                 probability = scaling_factor
                 while probability > rng.random():
+                    bins: int | str
                     if bin_range:
                         bins = min(
                             values.nunique() - 1,

@@ -3,10 +3,10 @@ requires = ["setuptools >= 61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fainder-demo"
+name = "backend"
 dynamic = ["version", "readme"]
 description = " A search engine for text and distribution-aware dataset search."
-requires-python = ">=3.10, <3.13"
+requires-python = ">=3.11"
 license = {file = "LICENSE"}
 authors = [
     {name = "Lennart Behme", email = "lennart.behme@tu-berlin.de"},
@@ -15,34 +15,40 @@ authors = [
 keywords = ["data discovery", "dataset search", "distribution-aware", "percentile predicate"]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "fainder@git+https://github.com/lbhm/fainder@main",
-    "lark",
-    "fastapi[standard]",
-    "parameterized",
-    "kaggle",
-    "pytest",
+    "fastapi[standard]~=0.115.6",
+    "lark~=1.2",
+    "loguru~=0.7.3",
+    "numpy~=1.26",
+    "requests~=2.32",
 ]
 
 [project.optional-dependencies]
 dev = [
     "mypy~=1.13",
     "pre-commit~=4.0",
+    "pytest~=8.3",
+    "types-requests~=2.32",
+    "pandas",  # potentially remove later
+    "pandas-stubs",
 ]
 
 [project.urls]
 Repository = "https://github.com/lbhm/fainder-demo"
 
-[tool.setuptools.package-dir]
-fainder-demo = "fainder_demo"
-
 [tool.setuptools.dynamic]
-version = {attr = "fainder_demo.__version__"}
+version = {attr = "backend.__version__"}
 readme = {file = ["README.md"], content-type = "text/markdown"}
+
+[tool.setuptools.package-data]
+backend = ["py.typed"]
+
+[tool.setuptools.package-dir]
+backend = "backend"
 
 [tool.ruff]
 line-length = 99

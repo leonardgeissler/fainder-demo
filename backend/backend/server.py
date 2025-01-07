@@ -8,13 +8,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from fainder_demo.config import INDEX, LIST_OF_DOCS, PATH_TO_METADATA
-from fainder_demo.percentile_grammar import (
+from backend.config import INDEX, LIST_OF_DOCS, PATH_TO_METADATA
+from backend.percentile_grammar import (
     call_lucene_server,
     evaluate_query,
     number_of_matching_histograms_to_doc_number,
 )
-from fainder_demo.utils import get_hists_for_doc_ids
+from backend.utils import get_hists_for_doc_ids
 
 app = FastAPI()
 origins = [

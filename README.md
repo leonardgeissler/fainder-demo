@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD033 -->
 <p align="center">
   <picture>
     <img alt="Fainder logo" src="https://github.com/user-attachments/assets/41686649-f1c1-4b60-824e-80c322c5da85" width="300">
@@ -30,13 +31,16 @@ fainder/
 
 ## Getting Started
 
-JAVA Installation:
+### Prerequisites
 
-Download: (extract to lib folder)
-https://dlcdn.apache.org/lucene/java/10.0.0/lucene-10.0.0.tgz
-https://search.maven.org/artifact/com.google.code.gson/gson/2.11.0/jar?eh=
+- Python 3.11 or greater
+- Java 21 or greater
+- Node.js 18 or greater
+- `maven` (Java build tool)
+- `npm` (Node.js package manager)
+- `pip` (Python package manager)
 
-Add to lib folder and add to classpath in your IDE
+### Installation
 
 TODO
 

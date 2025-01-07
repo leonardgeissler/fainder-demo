@@ -1,10 +1,10 @@
+import numpy as np
 from loguru import logger
-from numpy import uint32
 
-from fainder_demo.config import DICT_FILE_ID_TO_HISTS, LIST_OF_DOCS, LIST_OF_HIST, METADATA
+from backend.config import DICT_FILE_ID_TO_HISTS, LIST_OF_DOCS, LIST_OF_HIST, METADATA
 
 
-def get_hists_for_doc_ids(doc_ids: list[int]) -> set[uint32]:
+def get_hists_for_doc_ids(doc_ids: list[int]) -> set[np.uint32]:
     hists_int = []
 
     for i in doc_ids:
@@ -13,10 +13,10 @@ def get_hists_for_doc_ids(doc_ids: list[int]) -> set[uint32]:
         except KeyError:
             logger.error(f"Could not find histogram for doc id: {i}")
 
-    return {uint32(i) for i in hists_int}
+    return {np.uint32(i) for i in hists_int}
 
 
-def number_of_matching_histograms_to_doc_number(matching_histograms: set[uint32]) -> list[int]:
+def number_of_matching_histograms_to_doc_number(matching_histograms: set[np.uint32]) -> list[int]:
     """
     This function will take a set of histogram ids and return a list of document ids.
     """
@@ -29,7 +29,7 @@ def number_of_matching_histograms_to_doc_number(matching_histograms: set[uint32]
     return list(doc_ids)
 
 
-def get_histogram_ids_from_identifer(identifer: str) -> set[uint32]:
+def get_histogram_ids_from_identifer(identifer: str) -> set[np.uint32]:
     """
     This function will take a column name and return a set of histogram ids.
     """
@@ -37,11 +37,11 @@ def get_histogram_ids_from_identifer(identifer: str) -> set[uint32]:
         logger.error("Metadata is not loaded")
         return set()
     column_names: dict[str, list[str]] = METADATA["column_names"]
-    histogram_ids: set[uint32] = set()
+    histogram_ids: set[np.uint32] = set()
     try:
         histogram_strings = column_names[identifer]
     except KeyError:
         return histogram_ids
     for hist_str in histogram_strings:
-        histogram_ids.add(uint32(LIST_OF_HIST.index(hist_str)))
+        histogram_ids.add(np.uint32(LIST_OF_HIST.index(hist_str)))
     return histogram_ids

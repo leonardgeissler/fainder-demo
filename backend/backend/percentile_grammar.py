@@ -1,5 +1,3 @@
-# type: ignore
-# Description: This file contains the grammer for the percentile query language.
 import time
 from typing import Literal
 
@@ -10,8 +8,8 @@ from lark import Lark, Token, Transformer, Tree
 from loguru import logger
 from numpy import uint32
 
-from fainder_demo.config import INDEX, LIST_OF_DOCS
-from fainder_demo.utils import (
+from backend.config import INDEX, LIST_OF_DOCS
+from backend.utils import (
     get_histogram_ids_from_identifer,
     get_hists_for_doc_ids,
     number_of_matching_histograms_to_doc_number,
@@ -25,10 +23,10 @@ def call_lucene_server(keywords: str) -> list[int]:
     start = time.perf_counter()
 
     # POST request to lucene server at port 8001
-    request = "http://localhost:8001/search"
+    url = "http://localhost:8001/search"
     headers = {"Content-Type": "application/json"}
     try:
-        response = requests.post(request, json={"keywords": keywords}, headers=headers)
+        response = requests.post(url, json={"keywords": keywords}, headers=headers)
         response.raise_for_status()  # Raise an exception for bad status codes
         data = response.json()
 
@@ -168,7 +166,7 @@ def evaluate_query(query: str, filter_hist: set[uint32] | None = None) -> set[in
     return EVALUATOR.transform(tree)
 
 
-def build_new_grammer() -> Lark:
+def build_new_grammar() -> Lark:
     grammar = """
     start: query
     query: expression (OPERATOR query)?
@@ -232,7 +230,7 @@ class NewQueryEvaluator(Transformer):
         return items[0]
 
 
-NEW_GRAMMAR = build_new_grammer()
+NEW_GRAMMAR = build_new_grammar()
 NEW_EVALUATOR = NewQueryEvaluator()
 
 
