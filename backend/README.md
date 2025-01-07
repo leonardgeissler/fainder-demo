@@ -11,11 +11,11 @@ pytest tests
 Start fastapi dev server:
 
 ```bash
-fastapi dev backend/server.py
+fastapi dev backend/backend/server.py
 ```
 
 Start fastapi production server:
 
 ```bash
-fastapi run backend/server.py
+fastapi run backend/backend/server.py
 ```
