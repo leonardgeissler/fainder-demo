@@ -191,73 +191,90 @@ def build_new_grammar() -> Lark:
 
 class NewQueryEvaluator(Transformer):
     def __init__(self, enable_result_caching: bool = True):
-        self.current_result: set[int] = set()
         self.enable_result_caching = enable_result_caching
+        self.filter_stack: list[set[int]] = []
+        self.parent_results: list[set[int]] = []
 
-    def get_all_doc_ids(self) -> set[int]:
-        """Returns a set of all possible document IDs"""
-        return set(range(len(LIST_OF_DOCS)))
+    def push_filter(self, filter_set: set[int] | None) -> None:
+        self.filter_stack.append(filter_set if filter_set is not None else self.get_all_doc_ids())
+
+    def pop_filter(self) -> set[int] | None:
+        return self.filter_stack.pop() if self.filter_stack else None
+
+    def get_current_filter(self) -> set[int] | None:
+        return self.filter_stack[-1] if self.filter_stack else None
 
     def percentileterm(self, items: list[Token]) -> set[int]:
         term_str = ";".join(item.value for item in items)
-        if self.enable_result_caching:
-            filter_hist = get_hists_for_doc_ids(self.current_result)
+        current_filter = self.get_current_filter()
+        if self.enable_result_caching and current_filter:
+            filter_hist = get_hists_for_doc_ids(current_filter)
         else:
             filter_hist = None
         return set(run_percentile(term_str, filter_hist))
 
     def keywordterm(self, items: list[Token]) -> set[int]:
         keyword = items[0].value.strip()
-        filter_doc_ids = list(self.current_result) if self.enable_result_caching else []
+        current_filter = self.get_current_filter()
+        filter_doc_ids = (
+            list(current_filter) if current_filter and self.enable_result_caching else []
+        )
         return set(run_keyword(keyword, filter_doc_ids))
 
     def expression(self, items: list[set[int] | Tree | Token]) -> set[int]:
         if len(items) == 1:
-            result = items[0]
-        elif isinstance(items[0], Token):
-            if items[0].value == "NOT":
-                result = self.get_all_doc_ids() - items[1]
-            elif items[0].value in ["pp(", "percentile(", "kw(", "keyword("]:
-                result = items[1]
-            else:
-                result = items[0]
-        else:
-            result = items[0]
+            return items[0]
 
-        self.current_result = result
-        return result
+        if isinstance(items[0], Token):
+            if items[0].value == "NOT":
+                # For NOT, we need all possible docs as the filter
+                self.push_filter(self.get_all_doc_ids())
+                result = self.get_all_doc_ids() - items[1]
+                self.pop_filter()
+                return result
+
+            if items[0].value in ["pp(", "percentile(", "kw(", "keyword("]:
+                return items[1]
+
+        return items[0]
 
     def query(self, items: list[set[int] | Token]) -> set[int]:
+        if len(items) == 1:
+            return items[0]
+
         left = items[0]
-        if len(items) == 3:
-            operator = items[1].value.strip()
-            right = items[2]
+        operator = items[1].value.strip()
 
-            if operator == "AND":
-                result = left & right
-            elif operator == "OR":
-                result = left | right
-            elif operator == "XOR":
-                result = left ^ right
-            else:
-                result = left
-        else:
-            result = left
+        # Set appropriate filter for right side evaluation
+        if operator == "AND":
+            self.push_filter(left)
+        else:  # OR, XOR
+            self.push_filter(None)  # No filtering for OR/XOR
 
-        self.current_result = result
-        return result
+        right = items[2]
+        self.pop_filter()
+
+        if operator == "AND":
+            return left & right
+        if operator == "OR":
+            return left | right
+        # XOR
+        return left ^ right
 
     def start(self, items: list[set[int]]) -> set[int]:
-        return items[0]
+        self.push_filter(self.get_all_doc_ids())
+        result = items[0]
+        self.pop_filter()
+        return result
+
+    def get_all_doc_ids(self) -> set[int]:
+        return set(range(len(LIST_OF_DOCS)))
 
 
 NEW_GRAMMAR = build_new_grammar()
-NEW_EVALUATOR = NewQueryEvaluator()
 
 
 def evaluate_new_query(query: str, enable_result_caching: bool = True) -> set[int]:
-    global NEW_EVALUATOR
-    NEW_EVALUATOR = NewQueryEvaluator(enable_result_caching)
-    NEW_EVALUATOR.current_result = NEW_EVALUATOR.get_all_doc_ids()
+    evaluator = NewQueryEvaluator(enable_result_caching)
     tree = NEW_GRAMMAR.parse(query)
-    return NEW_EVALUATOR.transform(tree)
+    return evaluator.transform(tree)
