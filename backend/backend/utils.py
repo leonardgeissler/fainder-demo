@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from fainder.typing import PercentileQuery
@@ -44,6 +44,7 @@ def get_histogram_ids_from_identifer(identifer: str) -> set[np.uint32]:
     """
     This function will take a column name and return a set of histogram ids.
     """
+    # TODO: Add fuzzy search functionality to this function
     if not isinstance(METADATA, dict) or "column_names" not in METADATA:
         logger.error("Metadata is not loaded")
         return set()
@@ -68,7 +69,7 @@ def parse_precentile_query(query: str) -> PercentileQuery:
     reference = float(split_query[2])
 
     assert split_query[1] in ["ge", "gt", "le", "lt"]
-    comparison: Literal[le, lt, ge, gt] = split_query[1]  # type: ignore
+    comparison: Literal["le", "lt", "ge", "gt"] = split_query[1]
 
     return percentile, comparison, reference
 

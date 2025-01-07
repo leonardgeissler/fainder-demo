@@ -62,9 +62,3 @@ def full_search(payload: dict[str, Any]) -> dict[str, Any]:
     logger.info(f"Query: {query}")
     results = search(query)
     return {"query": query, "results": results}
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8001)

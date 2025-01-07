@@ -21,13 +21,13 @@ wrong_queries = [
 ]
 
 
-@pytest.mark.parametrize("query: str", correct_queries)
+@pytest.mark.parametrize("query", correct_queries)
 def test_query_evaluation_success(query: str) -> None:
     r = evaluate_query(query)
     assert not isinstance(r, Exception)
 
 
-@pytest.mark.parametrize("query: str", wrong_queries)
+@pytest.mark.parametrize("query", wrong_queries)
 def test_query_evaluation_fail(query: str) -> None:
     with pytest.raises(
         (
