@@ -1,8 +1,9 @@
 import os
 import time
-from typing import Any, Literal
+from collections.abc import Sequence
+from typing import Literal
 
-import requests
+import grpc
 from fainder.execution.runner import run
 from fainder.typing import PercentileQuery
 from lark import Lark, Token, Transformer, Tree, Visitor
@@ -10,6 +11,8 @@ from loguru import logger
 from numpy import uint32
 
 from backend.config import INDEX, LIST_OF_DOCS
+from backend.proto.keyword_query_pb2 import QueryRequest  # type: ignore
+from backend.proto.keyword_query_pb2_grpc import KeywordQueryStub
 from backend.utils import (
     get_histogram_ids_from_identifer,
     number_of_matching_histograms_to_doc_number,
@@ -20,52 +23,49 @@ from backend.utils import (
 
 
 def call_lucene_server(
-    keywords: str, filter_doc_ids: list[int] | None = None
-) -> tuple[list[int], list[float] | None]:
+    query: str, doc_ids: list[int] | None = None
+) -> tuple[Sequence[int], Sequence[float] | None]:
     """
-    This function will call the lucene server and return the results.
+    Calls the Lucene server to evaluate a keyword query and retrieve document IDs.
+
+    Args:
+        query: The query string to be evaluated by Lucene.
+        doc_ids: A list of document IDs to consider as a filter (none by default).
+
+    Returns:
+        list[int]: A list of document IDs that match the query.
+        list[float]: A list of scores for each document ID (if available).
+
+    Raises:
+        grpc.RpcError: If there is an error while calling the Lucene server.
     """
-    # TODO: Redesign this function with gRPC and implement a LuceneConnector class so that we do
+    # TODO: Redesign this function with a LuceneConnector class so that we do
     # not have to reinitialize the connection every time we want to evaluate a Lucene query
     # TODO: Use the ranking returned by Lucene to sort the results
     # TODO: This functionality should be moved to a separate module outside of the grammar
-    logger.debug(f"Calling Lucene server with keywords: {keywords} and filter: {filter_doc_ids}")
     start = time.perf_counter()
 
     lucene_host = os.getenv("LUCENE_HOST", "127.0.0.1")
     lucene_port = os.getenv("LUCENE_PORT", "8001")
-    url = f"http://{lucene_host}:{lucene_port}/search"
-    headers = {"Content-Type": "application/json"}
     try:
-        json_data: dict[str, Any] = {"keywords": keywords}
-        if filter_doc_ids:
-            json_data["filter"] = filter_doc_ids
-        response = requests.post(url, json=json_data, headers=headers)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        data = response.json()
+        logger.debug(f"Executing query: '{query}' with filter: {doc_ids}")
+        with grpc.insecure_channel(f"{lucene_host}:{lucene_port}") as channel:
+            stub = KeywordQueryStub(channel)
+            response = stub.Evaluate(QueryRequest(query=query, doc_ids=doc_ids or []))
+            result = response.results
 
-        logger.debug(f"Raw Lucene response: {response.text}")
-        array: list[int] = data["results"]
-        scores: list[float] | None = None
-        if "scores" in data:
-            scores = data["scores"]
+        logger.debug(f"Lucene query execution took {time.perf_counter() - start:.3f} seconds")
+        logger.debug(f"Keyword query result: {result}")
 
-        # verify is array of integers
-        # NOTE: This part is irrevelant once we move to protobuf since it has a guaranteed schema
-        assert all(isinstance(x, int) for x in array)
-
-        logger.info(f"Lucene server took {time.perf_counter() - start} seconds")
-        logger.debug(f"Lucene results: {array}")
-
-        return array, scores
-    except requests.RequestException as e:
-        logger.error(f"Calling Lucene server failed: {e}")
-        return ([], [])
+        return response.results, response.scores
+    except grpc.RpcError as e:
+        logger.error(f"Calling Lucene raised an error: {e}")
+        return [], []
 
 
 def run_keyword(
-    query: str, filter_doc_ids: list[int] | None
-) -> tuple[list[int], list[float] | None]:
+    query: str, filter_doc_ids: list[int]
+) -> tuple[Sequence[int], Sequence[float] | None]:
     """
     This function will run the keyword query on the lucene server.
     """

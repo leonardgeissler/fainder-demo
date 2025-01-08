@@ -69,3 +69,8 @@ TODO
 pip install -e ".[dev]"
 pre-commit install
 ```
+
+## Generating gRPC Code
+
+The Fainder backend uses gRPC to communicate with the Lucene service. To generate the necessary
+code, install the development dependencies in `backend/` and run `scripts/gen_proto.sh`.

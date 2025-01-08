@@ -21,20 +21,19 @@ classifiers = [
 dependencies = [
     "fainder@git+https://github.com/lbhm/fainder@main",
     "fastapi[standard]~=0.115.6",
+    "grpcio~=1.69",
+    "grpcio-tools~=1.69",
     "lark~=1.2",
     "loguru~=0.7.3",
     "numpy~=1.26",
-    "requests~=2.32",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "grpc-stubs~=1.53",
     "mypy~=1.13",
     "pre-commit~=4.0",
     "pytest~=8.3",
-    "types-requests~=2.32",
-    "pandas",  # potentially remove later
-    "pandas-stubs",
 ]
 
 [project.urls]
@@ -53,6 +52,9 @@ backend = "backend"
 [tool.ruff]
 line-length = 99
 target-version = "py310"
+exclude = [
+    "proto",
+]
 
 [tool.ruff.lint]
 select = [

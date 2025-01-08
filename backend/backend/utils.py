@@ -1,5 +1,6 @@
 import json
 import os
+from collections.abc import Sequence
 from typing import Any, Literal
 
 import numpy as np
@@ -15,7 +16,7 @@ from backend.config import (
 )
 
 
-def get_hists_for_doc_ids(doc_ids: list[int]) -> set[np.uint32]:
+def get_hists_for_doc_ids(doc_ids: Sequence[int]) -> set[np.uint32]:
     hists_int = []
 
     for i in doc_ids:
@@ -69,7 +70,7 @@ def parse_precentile_query(query: str) -> PercentileQuery:
     reference = float(split_query[2])
 
     assert split_query[1] in ["ge", "gt", "le", "lt"]
-    comparison: Literal["le", "lt", "ge", "gt"] = split_query[1]
+    comparison: Literal["le", "lt", "ge", "gt"] = split_query[1]  # type: ignore
 
     return percentile, comparison, reference
 
