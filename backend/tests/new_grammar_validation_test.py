@@ -1,7 +1,7 @@
 import pytest
 from lark import exceptions
 
-from backend.percentile_grammar import evaluate_new_query
+from backend.grammar import evaluate_new_query
 
 correct_queries = [
     # Basic keyword queries

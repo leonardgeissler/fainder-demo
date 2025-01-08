@@ -3,7 +3,7 @@ import time
 import pytest
 from loguru import logger
 
-from backend.percentile_grammar import evaluate_new_query
+from backend.grammar import evaluate_new_query
 
 # TODO: Add more test cases and complex queries
 

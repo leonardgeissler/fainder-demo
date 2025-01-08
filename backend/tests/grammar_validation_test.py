@@ -1,7 +1,7 @@
 import pytest
 from lark import exceptions
 
-from backend.percentile_grammar import evaluate_query
+from backend.grammar import evaluate_query
 
 correct_queries = [
     "0.5;ge;20.2;age",

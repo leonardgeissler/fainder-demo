@@ -4,7 +4,7 @@ from fainder.execution.runner import run
 from loguru import logger
 
 from backend.config import INDEX, LIST_OF_DOCS
-from backend.percentile_grammar import call_lucene_server, evaluate_new_query, evaluate_query
+from backend.grammar import call_lucene_server, evaluate_new_query, evaluate_query
 from backend.utils import (
     get_hists_for_doc_ids,
     get_metadata,
