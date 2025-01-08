@@ -2,6 +2,7 @@ package de.tuberlin.dima.fainder;
 
 import com.google.gson.JsonArray;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -32,9 +33,10 @@ public class LuceneSearch {
         indexDir = FSDirectory.open(indexPath);
         reader = DirectoryReader.open(indexDir);
         searcher = new IndexSearcher(reader);
-        analyzer = new StandardAnalyzer();
+        // Configure analyzer to keep stop words
+        analyzer = new StandardAnalyzer(CharArraySet.EMPTY_SET);
         parser = new QueryParser("all", analyzer);
-        parser.setDefaultOperator(QueryParser.Operator.OR); // Make parser more lenient
+        //parser.setAllowLeadingWildcard(true);  // Allow wildcards at start of term
     }
 
     /**
@@ -42,60 +44,58 @@ public class LuceneSearch {
      * @param maxNumber The number of documents to return
      * @return An ArrayList of Documents that match the query
      */
-    public JsonArray search(String query, int maxNumber, BitSet filter) throws ParseException {
+    public JsonArray search(String query, int maxNumber, BitSet filter, Float minScore) throws ParseException {
         // Escape special characters
         String escaped = QueryParser.escape(query);
-        // Add wildcard after the term, not before
-        String wildcardQuery = escaped + "*";
-        Query parsed_query = parser.parse(wildcardQuery);
+
+        // Create a boolean query combining exact and fuzzy matching
+        BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
+        // Exact match gets highest boost
+        queryBuilder.add(parser.parse(escaped), BooleanClause.Occur.SHOULD);
+        // Fuzzy match for typos
+        queryBuilder.add(parser.parse(escaped + "~"), BooleanClause.Occur.SHOULD);
+        // Prefix match for partial words
+        queryBuilder.add(parser.parse(escaped + "*"), BooleanClause.Occur.SHOULD);
+
+        Query parsed_query = queryBuilder.build();
 
         // If no filter is provided, just use the parsed query
-        if (filter == null) {
-            try {
-                logger.debug("Executing query without filter: {}", parsed_query);
-                ScoreDoc[] hits = searcher.search(parsed_query, maxNumber).scoreDocs;
-                StoredFields storedFields = searcher.storedFields();
-                JsonArray jsonArray = new JsonArray();
-                for (ScoreDoc scoreDoc : hits) {
-                    int hit = scoreDoc.doc;
-                    Document hitDoc = storedFields.document(hit);
-                    logger.debug("Hit {}: {} (Score: {})", hit, hitDoc.get("name"), scoreDoc.score);
-                    jsonArray.add(hit);
-                }
-                return jsonArray;
-            } catch (IOException e) {
-                logger.error(Arrays.toString(e.getStackTrace()));
-                return null;
-            }
+        if (filter != null) {
+            // create filter for allowed ids
+            Query idFilter = createFilter(filter);
+            queryBuilder.add(idFilter, BooleanClause.Occur.FILTER);
         }
 
-        // create filter for allowed ids
-        Query idFilter = createFilter(filter);
-
-        // combine query and filter
-        BooleanQuery.Builder builder = new BooleanQuery.Builder();
-        builder.add(parsed_query, BooleanClause.Occur.MUST);
-        builder.add(idFilter, BooleanClause.Occur.FILTER);
-
-        BooleanQuery combinedQuery = builder.build();
-
         try {
-            logger.debug("Executing query {}", combinedQuery);
-
+            BooleanQuery.Builder builder = new BooleanQuery.Builder();
+            builder.add(parsed_query, BooleanClause.Occur.MUST);
+            BooleanQuery combinedQuery = builder.build();
+            if (filter != null){
+                logger.debug("Executing query with filter: {}", combinedQuery + " " + filter);
+            }
+            else {
+                logger.debug("Executing query without filter: {}", parsed_query);
+            }
             ScoreDoc[] hits = searcher.search(combinedQuery, maxNumber).scoreDocs;
             StoredFields storedFields = searcher.storedFields();
             JsonArray jsonArray = new JsonArray();
             for (ScoreDoc scoreDoc : hits) {
+                // For debuging
+                // Explanation explain = searcher.explain(combinedQuery, scoreDoc.doc);
+                // logger.debug(explain.toString());
                 int hit = scoreDoc.doc;
                 Document hitDoc = storedFields.document(hit);
                 logger.debug("Hit {}: {} (Score: {})", hit, hitDoc.get("name"), scoreDoc.score);
-                jsonArray.add(hit);
+                if (minScore == null || scoreDoc.score >= minScore) {
+                    jsonArray.add(hit);
+                }
             }
             return jsonArray;
         } catch (IOException e) {
             logger.error(Arrays.toString(e.getStackTrace()));
             return null;
         }
+
     }
 
     private Query createFilter(BitSet filter) {

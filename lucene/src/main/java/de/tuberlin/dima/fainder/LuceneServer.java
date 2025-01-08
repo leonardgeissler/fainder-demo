@@ -32,6 +32,7 @@ public class LuceneServer {
     static Path dataPath;
     static int port;
     static int maxResults;
+    static float minScore;
 
     public LuceneServer() throws IOException {
         logger.info("Starting Lucene Server");
@@ -51,6 +52,7 @@ public class LuceneServer {
             dataPath = Paths.get(fainderHome, properties.getProperty("dataPath"));
             maxResults = Integer.parseInt(properties.getProperty("maxResults"));
             port = Integer.parseInt(properties.getProperty("port"));
+            minScore = Float.parseFloat(properties.getProperty("minScore"));
         } catch (IOException e) {
             logger.error("Failed to load properties: {}", e.getMessage());
             System.exit(1);
@@ -157,7 +159,7 @@ public class LuceneServer {
                     }
 
                     try {
-                        JsonArray results = luceneSearch.search(keywordQuery, maxResults, filter);
+                        JsonArray results = luceneSearch.search(keywordQuery, maxResults, filter, minScore);
                         JsonObject responseObject = new JsonObject();
                         responseObject.add("results", results);
                         sendJson(exchange, 200, responseObject.toString());
