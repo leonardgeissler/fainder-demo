@@ -1,30 +1,60 @@
 import time
-
 import pytest
 from loguru import logger
-
 from backend.grammar import evaluate_new_query
 
-# TODO: Add more test cases and complex queries
+TEST_CASES = {
+    "simple_keyword": {
+        "query": "kw(germany)",
+        "expected": [0]
+    },
+    "keyword_and_percentile": {
+        "query": "kw(germany) AND pp(0.5;ge;20.0)",
+        "expected": [0]
+    },
+    "keyword_or": {
+        "query": "kw(germany OR TMDB)",
+        "expected": [2, 0]
+    },
+    "simple_percentile": {
+        "query": "pp(0.5;ge;5000)",
+        "expected": [1, 2]
+    },
+    "high_percentile": {
+        "query": "pp(0.9;ge;1000000)",
+        "expected": [1, 2]
+    },
+    "high_percentile_and_keyword": {
+        "query": "pp(0.9;ge;1000000) AND kw(germany)",
+        "expected": []
+    },
+    "high_percentile_or_keyword": {
+        "query": "pp(0.9;ge;1000000) OR kw(germany)",
+        "expected": [0, 1, 2]
+    },
+    "high_percentile_and_simple_keyword": {
+        "query": "pp(0.9;ge;1000000) AND kw(a)",
+        "expected": [2, 1]
+    },
+    "simple_keyword_a": {
+        "query": "kw(a)",
+        "expected": [2, 1, 0]
+    },
+    "high_percentile_xor_simple_keyword_a":{
+        "query": "pp(0.9;ge;1000000) XOR kw(a)",
+        "expected": [0]
+    },
+    "not_keyword": {
+        "query": "NOT kw(a)",
+        "expected": []
+    },
+}
 
-queries = [
-    "kw(germany)",
-    "kw(germany) AND pp(0.5;ge;20.0)",
-    "kw(germany OR TMDB)",
-    "pp(0.5;ge;5000)",
-    "pp(0.9;ge;1000000)",
-    "pp(0.9;ge;1000000) AND kw(germany)",
-    "pp(0.9;ge;1000000) OR kw(germany)",
-    "pp(0.9;ge;1000000) AND kw(a)",
-    "kw(a)",
-]
+@pytest.mark.parametrize("test_name,test_case", TEST_CASES.items())
+def test_new_grammar_correctness(test_name: str, test_case: dict) -> None:
+    query = test_case["query"]
+    expected_result = test_case["expected"]
 
-expected_results = [[0], [0], [2, 0], [1, 2], [1, 2], [], [0, 1, 2], [2, 1], [2, 1, 0]]
-
-
-# Test the new grammar correctness
-@pytest.mark.parametrize("query, expected_result", zip(queries, expected_results, strict=False))
-def test_new_grammar_correctness(query: str, expected_result: list[int]) -> None:
     start = time.perf_counter()
     result1 = evaluate_new_query(query)
     end = time.perf_counter()

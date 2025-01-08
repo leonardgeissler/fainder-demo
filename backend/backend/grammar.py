@@ -5,7 +5,7 @@ from typing import Any, Literal
 import requests
 from fainder.execution.runner import run
 from fainder.typing import PercentileQuery
-from lark import Lark, Token, Transformer, Tree
+from lark import Lark, Token, Transformer, Tree, v_args
 from loguru import logger
 from numpy import uint32
 
@@ -30,6 +30,7 @@ def call_lucene_server(
     # not have to reinitialize the connection every time we want to evaluate a Lucene query
     # TODO: Use the ranking returned by Lucene to sort the results
     # TODO: This functionality should be moved to a separate module outside of the grammar
+    logger.debug(f"Calling Lucene server with keywords: {keywords} and filter: {filter_doc_ids}")
     start = time.perf_counter()
 
     lucene_host = os.getenv("LUCENE_HOST", "127.0.0.1")
@@ -118,7 +119,8 @@ def build_grammar() -> Lark:
     grammar = """
     start: query
     query: expression (OPERATOR query)?
-    expression: term | "NOT" expression | "(" query ")"
+    expression: not_expr | term | "(" query ")"
+    not_expr: "NOT" term | "NOT" "(" query ")"
     term: NUMBER ";" COMPARISON ";" NUMBER ";" IDENTIFIER
         | NUMBER ";" COMPARISON ";" NUMBER
     OPERATOR: "AND" | "OR" | "XOR"
@@ -142,13 +144,16 @@ class QueryEvaluator(Transformer):
         term_str = ";".join(item.value for item in items)
         return set(run_percentile(term_str, self.filter_hist))
 
+    def not_expr(self, items: list[set[int] | Tree | Token]) -> set[int]:
+        logger.debug("Evaluating NOT expression")
+        # Get the result to negate (could be a term or query result)
+        to_negate = items[0] if isinstance(items[0], set) else items[1]
+        result = self.get_all_doc_ids() - to_negate
+        logger.debug(f"NOT result size: {len(result)}")
+        return result
+
     def expression(self, items: list[set[int] | Tree]) -> set[int]:
-        if len(items) == 1:
-            return items[0]
-        if isinstance(items[0], Token) and items[0].value == "NOT":
-            # Handle NOT by returning the complement of the expression
-            return self.get_all_doc_ids() - items[1]
-        return items[0]  # Single expressions are passed as-is
+        return items[0]  # Simply return the result, NOT is handled in not_expr
 
     def query(self, items: list[set[int] | Token]) -> set[int]:
         left = items[0]
@@ -183,8 +188,9 @@ def build_new_grammar() -> Lark:
     grammar = """
     start: query
     query: expression (OPERATOR query)?
-    expression: ("pp(" | "percentile(") percentileterm ")"| "NOT" expression
-        | "(" query ")" | ("kw(" | "keyword(") keywordterm ")"
+    expression: not_expr | term | "(" query ")"
+    not_expr: "NOT" term | "NOT" "(" query ")"
+    term: ("pp(" | "percentile(") percentileterm ")" | ("kw(" | "keyword(") keywordterm ")"
     percentileterm: NUMBER ";" COMPARISON ";" NUMBER ";" IDENTIFIER
         | NUMBER ";" COMPARISON ";" NUMBER
     keywordterm: KEYWORD
@@ -200,21 +206,11 @@ def build_new_grammar() -> Lark:
 
 class NewQueryEvaluator(Transformer):
     def __init__(self, enable_result_caching: bool = True):
-        self.enable_result_caching = enable_result_caching
-        self.filter_stack: list[set[int]] = []
-        self.parent_results: list[set[int]] = []
+        logger.debug("Initializing NewQueryEvaluator")
         self.scores: dict[int, float] = {}
 
-    def push_filter(self, filter_set: set[int] | None) -> None:
-        self.filter_stack.append(filter_set if filter_set is not None else self.get_all_doc_ids())
-
-    def pop_filter(self) -> set[int] | None:
-        return self.filter_stack.pop() if self.filter_stack else None
-
-    def get_current_filter(self) -> set[int] | None:
-        return self.filter_stack[-1] if self.filter_stack else None
-
-    def add_scores(self, doc_ids: list[int], scores: list[float]) -> None:
+    def add_scores(self, doc_ids: list[int], scores: list[float] | None) -> None:
+        logger.debug(f"Adding scores for {len(doc_ids) if doc_ids else 0} documents")
         if not scores:
             return
         for i, doc_id in enumerate(doc_ids):
@@ -222,70 +218,70 @@ class NewQueryEvaluator(Transformer):
 
     def percentileterm(self, items: list[Token]) -> set[int]:
         term_str = ";".join(item.value for item in items)
-        current_filter = self.get_current_filter()
-        if self.enable_result_caching and current_filter:
-            filter_hist = get_hists_for_doc_ids(current_filter)
-        else:
-            filter_hist = None
-        return set(run_percentile(term_str, filter_hist))
+        logger.debug(f"Evaluating percentile term: {term_str}")
+        result = set(run_percentile(term_str, None))
+        logger.debug(f"Percentile term result: {result}")
+        return result
 
     def keywordterm(self, items: list[Token]) -> set[int]:
         keyword = items[0].value.strip()
-        current_filter = self.get_current_filter()
-        filter_doc_ids = (
-            list(current_filter) if current_filter and self.enable_result_caching else []
-        )
-        result, scores = run_keyword(keyword, filter_doc_ids)
+        logger.debug(f"Evaluating keyword term: {keyword}")
+        result, scores = run_keyword(keyword, [])
         self.add_scores(result, scores)
+        logger.debug(f"Keyword term result: {result}")
         return set(result)
 
-    def expression(self, items: list[set[int] | Tree | Token]) -> set[int]:
-        if len(items) == 1:
-            return items[0]
-
+    def term(self, items: list[set[int] | Tree | Token]) -> set[int]:
+        logger.debug(f"Evaluating term with items: {items}")
         if isinstance(items[0], Token):
-            if items[0].value == "NOT":
-                # For NOT, we need all possible docs as the filter
-                self.push_filter(self.get_all_doc_ids())
-                result = self.get_all_doc_ids() - items[1]
-                self.pop_filter()
-                return result
-
-            if items[0].value in ["pp(", "percentile(", "kw(", "keyword("]:
+            if items[0].value in ["pp(", "percentile("]:
                 return items[1]
+            if items[0].value in ["kw(", "keyword("]:
+                return items[1]
+        return items[0]
 
+    def not_expr(self, items: list[set[int] | Tree | Token]) -> set[int]:
+        logger.debug(f"Evaluating NOT expression with {len(items)} items")
+        # Get the result to negate (could be a term or query result)
+        to_negate = items[0] if isinstance(items[0], set) else items[1]
+        all_docs = self.get_all_doc_ids()
+        result = all_docs - to_negate
+        logger.debug(f"NOT expression result size: {len(result)}")
+        return result
+
+    def expression(self, items: list[set[int] | Tree | Token]) -> set[int]:
+        logger.debug(f"Evaluating expression with {len(items)} items")
         return items[0]
 
     def query(self, items: list[set[int] | Token]) -> set[int]:
+        logger.debug(f"Evaluating query with {len(items)} items")
         if len(items) == 1:
             return items[0]
 
         left = items[0]
         operator = items[1].value.strip()
-
-        # Set appropriate filter for right side evaluation
-        if operator == "AND":
-            self.push_filter(left)
-        else:  # OR, XOR
-            self.push_filter(None)  # No filtering for OR/XOR
-
         right = items[2]
-        self.pop_filter()
+        logger.debug(f"Query operator: {operator}, left size: {len(left)}, right size: {len(right)}")
 
+        result = None
         if operator == "AND":
-            return left & right
-        if operator == "OR":
-            return left | right
-        # XOR
-        return left ^ right
+            result = left & right
+        elif operator == "OR":
+            result = left | right
+        else:  # XOR
+            result = left ^ right
+        
+        logger.debug(f"Query result size: {len(result)}")
+        return result
 
     def start(self, items: list[set[int]]) -> set[int]:
-        self.push_filter(self.get_all_doc_ids())
+        logger.debug("Starting query evaluation")
         result = items[0]
-        self.pop_filter()
+        logger.debug(f"Final result size: {len(result)}")
         return result
 
     def get_all_doc_ids(self) -> set[int]:
+        logger.debug("Getting all document IDs")
         return set(range(len(LIST_OF_DOCS)))
 
 
