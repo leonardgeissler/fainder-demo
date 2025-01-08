@@ -24,7 +24,6 @@
             prepend-icon="mdi-magnify"
             variant="elevated"
             size="large"
-            @keyup.enter="searchData"
           >
             Search
           </v-btn>
@@ -36,6 +35,8 @@
 
 
 <script setup>
+import { onMounted, onUnmounted, ref } from 'vue';
+
 const props = defineProps({
   searchQuery: String,
   inline: {
@@ -46,6 +47,20 @@ const props = defineProps({
 const emit = defineEmits(['searchData']);
 
 const searchQuery = ref(props.searchQuery);
+
+const handleKeyDown = (event) => {
+  if (event.key === 'Enter') {
+    searchData();
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
 
 async function searchData() {
   emit('searchData', {
