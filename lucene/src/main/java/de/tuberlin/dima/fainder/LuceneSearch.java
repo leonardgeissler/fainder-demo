@@ -1,6 +1,7 @@
 package de.tuberlin.dima.fainder;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.document.Document;
@@ -44,7 +45,7 @@ public class LuceneSearch {
      * @param maxNumber The number of documents to return
      * @return An ArrayList of Documents that match the query
      */
-    public JsonArray search(String query, int maxNumber, BitSet filter, Float minScore) throws ParseException {
+    public JsonObject search(String query, int maxNumber, BitSet filter, Float minScore) throws ParseException {
         // Escape special characters
         String escaped = QueryParser.escape(query);
 
@@ -78,19 +79,21 @@ public class LuceneSearch {
             }
             ScoreDoc[] hits = searcher.search(combinedQuery, maxNumber).scoreDocs;
             StoredFields storedFields = searcher.storedFields();
-            JsonArray jsonArray = new JsonArray();
+            JsonArray idArray = new JsonArray();
+            JsonArray scoreArray = new JsonArray();
             for (ScoreDoc scoreDoc : hits) {
-                // For debuging
-                // Explanation explain = searcher.explain(combinedQuery, scoreDoc.doc);
-                // logger.debug(explain.toString());
                 int hit = scoreDoc.doc;
                 Document hitDoc = storedFields.document(hit);
                 logger.debug("Hit {}: {} (Score: {})", hit, hitDoc.get("name"), scoreDoc.score);
                 if (minScore == null || scoreDoc.score >= minScore) {
-                    jsonArray.add(hit);
+                    idArray.add(hit);
+                    scoreArray.add(scoreDoc.score);
                 }
             }
-            return jsonArray;
+            JsonObject result = new JsonObject();
+            result.add("ids", idArray);
+            result.add("scores", scoreArray);
+            return result;
         } catch (IOException e) {
             logger.error(Arrays.toString(e.getStackTrace()));
             return null;

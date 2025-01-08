@@ -20,7 +20,9 @@ from backend.utils import (
 # QueryEvaluator class
 
 
-def call_lucene_server(keywords: str, filter_doc_ids: list[int] | None = None) -> list[int]:
+def call_lucene_server(
+    keywords: str, filter_doc_ids: list[int] | None = None
+) -> tuple[list[int], list[float] | None]:
     """
     This function will call the lucene server and return the results.
     """
@@ -44,6 +46,9 @@ def call_lucene_server(keywords: str, filter_doc_ids: list[int] | None = None) -
 
         logger.debug(f"Raw Lucene response: {response.text}")
         array: list[int] = data["results"]
+        scores: list[float] | None = None
+        if "scores" in data:
+            scores = data["scores"]
 
         # verify is array of integers
         # NOTE: This part is irrevelant once we move to protobuf since it has a guaranteed schema
@@ -52,13 +57,13 @@ def call_lucene_server(keywords: str, filter_doc_ids: list[int] | None = None) -
         logger.info(f"Lucene server took {time.perf_counter() - start} seconds")
         logger.debug(f"Lucene results: {array}")
 
-        return array
+        return array, scores
     except requests.RequestException as e:
         logger.error(f"Calling Lucene server failed: {e}")
-        return []
+        return ([], [])
 
 
-def run_keyword(query: str, filter_doc_ids: list[int]) -> list[int]:
+def run_keyword(query: str, filter_doc_ids: list[int]) -> tuple[list[int], list[float] | None]:
     """
     This function will run the keyword query on the lucene server.
     """
@@ -198,6 +203,7 @@ class NewQueryEvaluator(Transformer):
         self.enable_result_caching = enable_result_caching
         self.filter_stack: list[set[int]] = []
         self.parent_results: list[set[int]] = []
+        self.scores: dict[int, float] = {}
 
     def push_filter(self, filter_set: set[int] | None) -> None:
         self.filter_stack.append(filter_set if filter_set is not None else self.get_all_doc_ids())
@@ -207,6 +213,12 @@ class NewQueryEvaluator(Transformer):
 
     def get_current_filter(self) -> set[int] | None:
         return self.filter_stack[-1] if self.filter_stack else None
+
+    def add_scores(self, doc_ids: list[int], scores: list[float]) -> None:
+        if not scores:
+            return
+        for i, doc_id in enumerate(doc_ids):
+            self.scores[doc_id] = scores[i]
 
     def percentileterm(self, items: list[Token]) -> set[int]:
         term_str = ";".join(item.value for item in items)
@@ -223,7 +235,9 @@ class NewQueryEvaluator(Transformer):
         filter_doc_ids = (
             list(current_filter) if current_filter and self.enable_result_caching else []
         )
-        return set(run_keyword(keyword, filter_doc_ids))
+        result, scores = run_keyword(keyword, filter_doc_ids)
+        self.add_scores(result, scores)
+        return set(result)
 
     def expression(self, items: list[set[int] | Tree | Token]) -> set[int]:
         if len(items) == 1:
@@ -278,7 +292,13 @@ class NewQueryEvaluator(Transformer):
 NEW_GRAMMAR = build_new_grammar()
 
 
-def evaluate_new_query(query: str, enable_result_caching: bool = True) -> set[int]:
+def evaluate_new_query(query: str, enable_result_caching: bool = True) -> list[int]:
     evaluator = NewQueryEvaluator(enable_result_caching)
     tree = NEW_GRAMMAR.parse(query)
-    return evaluator.transform(tree)
+    result: list[int] = list(evaluator.transform(tree))
+
+    if evaluator.scores:
+        # Sort the results by score if scores are available. High scores first
+        # If a score is not available, then push it to the end
+        result.sort(key=lambda x: evaluator.scores.get(x, -1), reverse=True)
+    return result

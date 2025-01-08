@@ -19,7 +19,7 @@ queries = [
     "kw(a)",
 ]
 
-expected_results = [{0}, {0}, {0, 2}, {1, 2}, {1, 2}, set(), {0, 1, 2}, {1, 2}, {0, 1, 2}]
+expected_results = [[0], [0], [2, 0], [1, 2], [1, 2], [], [0, 1, 2], [2, 1], [2, 1, 0]]
 
 
 # Test the new grammar correctness

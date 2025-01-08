@@ -159,9 +159,10 @@ public class LuceneServer {
                     }
 
                     try {
-                        JsonArray results = luceneSearch.search(keywordQuery, maxResults, filter, minScore);
+                        JsonObject results = luceneSearch.search(keywordQuery, maxResults, filter, minScore);
                         JsonObject responseObject = new JsonObject();
-                        responseObject.add("results", results);
+                        responseObject.add("results", results.get("ids"));
+                        responseObject.add("scores", results.get("scores"));
                         sendJson(exchange, 200, responseObject.toString());
                     } catch (ParseException e) {
                         sendJson(exchange, 400, "{\"error\":\"Query parsing error: " + e.getMessage() + "\"}");

@@ -14,7 +14,7 @@ from backend.utils import (
 
 
 def search_basic(percentile: str, keywords: str) -> list[dict[str, Any]]:
-    results_keywords = call_lucene_server(keywords)
+    results_keywords, scores = call_lucene_server(keywords)
 
     if len(results_keywords) == 0:
         return []
@@ -25,14 +25,14 @@ def search_basic(percentile: str, keywords: str) -> list[dict[str, Any]]:
 
 
 def search_combined(percentile: str, keywords: str) -> list[dict[str, Any]]:
-    results_keywords = call_lucene_server(keywords)
+    results_keywords, scores = call_lucene_server(keywords)
     matching_docs = list(evaluate_query(percentile))
     combined_results = [i for i in results_keywords if i in matching_docs]
     return get_metadata(combined_results)
 
 
 def search_single(percentile: str, keywords: str) -> list[dict[str, Any]]:
-    results_keywords = call_lucene_server(keywords)
+    results_keywords, scores = call_lucene_server(keywords)
     query = parse_precentile_query(percentile)
     result = run(INDEX, [query], "index")
     matching_histograms = result[0]
