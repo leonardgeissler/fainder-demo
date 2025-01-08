@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Literal
+from typing import Any, Literal
 
 import requests
 from fainder.execution.runner import run
@@ -16,11 +16,18 @@ from backend.utils import (
     number_of_matching_histograms_to_doc_number,
 )
 
+# TODO: All the code in here should be class-based: We need a LuceneConnector class and a
+# QueryEvaluator class
+
 
 def call_lucene_server(keywords: str, filter_doc_ids: list[int] | None = None) -> list[int]:
     """
     This function will call the lucene server and return the results.
     """
+    # TODO: Redesign this function with gRPC and implement a LuceneConnector class so that we do
+    # not have to reinitialize the connection every time we want to evaluate a Lucene query
+    # TODO: Use the ranking returned by Lucene to sort the results
+    # TODO: This functionality should be moved to a separate module outside of the grammar
     start = time.perf_counter()
 
     lucene_host = os.getenv("LUCENE_HOST", "127.0.0.1")
@@ -28,7 +35,7 @@ def call_lucene_server(keywords: str, filter_doc_ids: list[int] | None = None) -
     url = f"http://{lucene_host}:{lucene_port}/search"
     headers = {"Content-Type": "application/json"}
     try:
-        json_data = {"keywords": keywords}
+        json_data: dict[str, Any] = {"keywords": keywords}
         if filter_doc_ids:
             json_data["filter"] = filter_doc_ids
         response = requests.post(url, json=json_data, headers=headers)
@@ -39,17 +46,15 @@ def call_lucene_server(keywords: str, filter_doc_ids: list[int] | None = None) -
         array: list[int] = data["results"]
 
         # verify is array of integers
+        # NOTE: This part is irrevelant once we move to protobuf since it has a guaranteed schema
         assert all(isinstance(x, int) for x in array)
 
         logger.info(f"Lucene server took {time.perf_counter() - start} seconds")
         logger.debug(f"Lucene results: {array}")
 
         return array
-    except Exception as e:
-        logger.error(f"Error calling Lucene server: {e}")
-        logger.error(
-            f"Response content: {response.text if 'response' in locals() else 'No response'}"
-        )
+    except requests.RequestException as e:
+        logger.error(f"Calling Lucene server failed: {e}")
         return []
 
 
@@ -57,14 +62,13 @@ def run_keyword(query: str, filter_doc_ids: list[int]) -> list[int]:
     """
     This function will run the keyword query on the lucene server.
     """
+    # TODO: Should be part of the LuceneConnector class
     return call_lucene_server(query, filter_doc_ids)
 
 
 def run_percentile(query: str, filter_hist: set[uint32] | None = None) -> list[int]:
     """
     This function will run the percentile query.
-    Example input: 0.5;ge;20.2;age
-    Example output: set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     """
     if filter_hist and len(filter_hist) == 0:
         return []
