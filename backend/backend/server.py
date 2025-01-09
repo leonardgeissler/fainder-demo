@@ -20,6 +20,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# TODO: configure logging
+# potentially move from loguru to standard logging to be compatible with FastAPI
+
 
 @app.post("/query_bit")
 def query(payload: dict[str, Any]) -> dict[str, Any]:

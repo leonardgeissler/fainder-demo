@@ -61,11 +61,13 @@ select = [
     "A",  # flake8-builtins
     "B",  # flake8-bugbear
     "C4",  # flake8-comprehensions
+    "C90",  # mccabe
     "E",  # pycodestyle errors
     "F",  # pyflakes
     "I",  # isort
     "ISC",  # flake8-implicit-str-concat
     "N",  # pep8-naming
+    "PT",  # flake8-pytest-style
     "Q",  # flake8-quotes
     "RET",  # flake8-return
     "RUF",  # ruff-specific rules
@@ -74,11 +76,9 @@ select = [
     "W",  # pycodestyle warnings
 ]
 ignore = [
-    "C90",  # mccabe
     "D",  # pydocstyle
     "ISC001",  # single-line-implicit-string-concatenation
     "PL",  # pylint
-    "PT",  # flake8-pytest-style
     "S",  # flake8-bandit
     "UP015",  # redundant-open-modes
 ]
@@ -88,3 +88,4 @@ ignore_missing_imports = true
 plugins = ["numpy.typing.mypy_plugin"]
 strict = true
 warn_unused_ignores = false
+files = ["backend", "tests"]

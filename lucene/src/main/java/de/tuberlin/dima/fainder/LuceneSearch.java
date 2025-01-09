@@ -44,7 +44,7 @@ public class LuceneSearch {
      */
     public Pair<List<Integer>, List<Float>> search(String query, List<Integer> docIds, Float minScore, int maxResults) {
         if (query == null || query.isEmpty()) {
-            return new Pair<List<Integer>, List<Float>>(List.of(), List.of());
+            return new Pair<>(List.of(), List.of());
         }
 
         try {
@@ -62,6 +62,7 @@ public class LuceneSearch {
 
             if (docIds != null && !docIds.isEmpty()) {
                 // Create filter for allowed document IDs
+                // TODO: Does the docFilter actually help to reduce query execution time?
                 Query docFilter = createDocFilter(docIds);
                 queryBuilder.add(docFilter, BooleanClause.Occur.FILTER);
             }
@@ -69,12 +70,7 @@ public class LuceneSearch {
             Query parsedQuery = queryBuilder.build();
             logger.debug("Executing query {}", parsedQuery);
 
-            // TODO: Is this block really necessary?
-            queryBuilder = new BooleanQuery.Builder();
-            queryBuilder.add(parsedQuery, BooleanClause.Occur.MUST);
-            BooleanQuery combinedQuery = queryBuilder.build();
-
-            ScoreDoc[] hits = searcher.search(combinedQuery, maxResults).scoreDocs;
+            ScoreDoc[] hits = searcher.search(parsedQuery, maxResults).scoreDocs;
             StoredFields storedFields = searcher.storedFields();
             List<Integer> results = new ArrayList<>();
             List<Float> scores = new ArrayList<>();
@@ -92,10 +88,10 @@ public class LuceneSearch {
             return new Pair<List<Integer>, List<Float>>(results, scores);
         } catch (ParseException e) {
             logger.error("Query parsing error: {}", e.getMessage());
-            return new Pair<List<Integer>, List<Float>>(List.of(), List.of());
+            return new Pair<>(List.of(), List.of());
         } catch (IOException e) {
             logger.error("Query IO error: {}", e.getMessage());
-            return new Pair<List<Integer>, List<Float>>(List.of(), List.of());
+            return new Pair<>(List.of(), List.of());
         }
 
     }

@@ -76,6 +76,8 @@ def parse_precentile_query(query: str) -> PercentileQuery:
 
 
 def get_metadata(doc_ids: list[int]) -> list[dict[str, Any]]:
+    # TODO: This function needs to be refactored into a class that does not load the metadata
+    # again every time
     list_of_metadata_files = os.listdir(PATH_TO_METADATA)
 
     metadata = []
