@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package fainder;
+option java_package = "de.tuberlin.dima.fainder";
+option java_multiple_files = true;
+
+service KeywordQuery {
+  rpc Evaluate (QueryRequest) returns (QueryResponse);
+}
+
+message QueryRequest {
+  // Query expression
+  string query = 1;
+  // List of document IDs to consider (if empty, all documents will be searched)
+  repeated int32 doc_ids = 2;
+}
+
+message QueryResponse {
+  // Document IDs that match the query sorted in order of relevance
+  repeated int32 results = 1;
+  // Relevance scores of documents
+  repeated float scores = 2;
+}

@@ -1,9 +1,7 @@
 package de.tuberlin.dima.fainder;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.CharArraySet;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -19,100 +17,91 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.BitSet;
+import java.util.ArrayList;
+import java.util.List;
 
 public class LuceneSearch {
     private static final Logger logger = LoggerFactory.getLogger(LuceneSearch.class);
-    private final Directory indexDir;
-    private final IndexReader reader;
     private final IndexSearcher searcher;
-    private final StandardAnalyzer analyzer;
     private final QueryParser parser;
 
     public LuceneSearch(Path indexPath) throws IOException {
-        indexDir = FSDirectory.open(indexPath);
-        reader = DirectoryReader.open(indexDir);
+        Directory indexDir = FSDirectory.open(indexPath);
+        IndexReader reader = DirectoryReader.open(indexDir);
         searcher = new IndexSearcher(reader);
         // Configure analyzer to keep stop words
-        analyzer = new StandardAnalyzer(CharArraySet.EMPTY_SET);
+        StandardAnalyzer analyzer = new StandardAnalyzer(CharArraySet.EMPTY_SET);
         parser = new QueryParser("all", analyzer);
-        //parser.setAllowLeadingWildcard(true);  // Allow wildcards at start of term
+        // parser.setAllowLeadingWildcard(true); // Allow wildcards at start of term
     }
 
     /**
-     * @param query     The query string
-     * @param maxNumber The number of documents to return
-     * @return An ArrayList of Documents that match the query
+     * @param query      The query string
+     * @param docIds     List of document IDs to filter (optional)
+     * @param minScore   The minimum score for a document to be included in the results
+     * @param maxResults The maximum number of documents to return
+     * @return A pair of lists: document IDs and their scores
      */
-    public JsonObject search(String query, int maxNumber, BitSet filter, Float minScore) throws ParseException {
-        // Escape special characters
-        String escaped = QueryParser.escape(query);
-
-        // Create a boolean query combining exact and fuzzy matching
-        BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
-
-
-        // If no filter is provided, just use the parsed query
-        if (filter != null) {
-            // create filter for allowed ids
-            Query idFilter = createFilter(filter);
-            queryBuilder.add(idFilter, BooleanClause.Occur.FILTER);
+    public Pair<List<Integer>, List<Float>> search(String query, List<Integer> docIds, Float minScore, int maxResults) {
+        if (query == null || query.isEmpty()) {
+            return new Pair<>(List.of(), List.of());
         }
-        // Exact match gets highest boost
-        queryBuilder.add(parser.parse(escaped), BooleanClause.Occur.SHOULD);
-        // Fuzzy match for typos
-        queryBuilder.add(parser.parse(escaped + "~"), BooleanClause.Occur.SHOULD);
-        // Prefix match for partial words
-        queryBuilder.add(parser.parse(escaped + "*"), BooleanClause.Occur.SHOULD);
-
-        Query parsed_query = queryBuilder.build();
 
         try {
-            BooleanQuery.Builder builder = new BooleanQuery.Builder();
-            builder.add(parsed_query, BooleanClause.Occur.MUST);
-            BooleanQuery combinedQuery = builder.build();
-            if (filter != null){
-                logger.debug("Executing query with filter: {}", combinedQuery + " " + filter);
+            // Escape special characters
+            String escapedQuery = QueryParser.escape(query);
+
+            // Create a boolean query combining exact and fuzzy matching
+            BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
+            // Exact match gets highest boost
+            queryBuilder.add(parser.parse(escapedQuery), BooleanClause.Occur.SHOULD);
+            // Fuzzy match for typos
+            queryBuilder.add(parser.parse(escapedQuery + "~"), BooleanClause.Occur.SHOULD);
+            // Prefix match for partial words
+            queryBuilder.add(parser.parse(escapedQuery + "*"), BooleanClause.Occur.SHOULD);
+
+            if (docIds != null && !docIds.isEmpty()) {
+                // Create filter for allowed document IDs
+                // TODO: Does the docFilter actually help to reduce query execution time?
+                Query docFilter = createDocFilter(docIds);
+                queryBuilder.add(docFilter, BooleanClause.Occur.FILTER);
             }
-            else {
-                logger.debug("Executing query without filter: {}", parsed_query);
-            }
-            ScoreDoc[] hits = searcher.search(combinedQuery, maxNumber).scoreDocs;
+
+            Query parsedQuery = queryBuilder.build();
+            logger.debug("Executing query {}", parsedQuery);
+
+            ScoreDoc[] hits = searcher.search(parsedQuery, maxResults).scoreDocs;
             StoredFields storedFields = searcher.storedFields();
-            JsonArray idArray = new JsonArray();
-            JsonArray scoreArray = new JsonArray();
+            List<Integer> results = new ArrayList<>();
+            List<Float> scores = new ArrayList<>();
             for (ScoreDoc scoreDoc : hits) {
-                int hit = scoreDoc.doc;
-                Document hitDoc = storedFields.document(hit);
-                logger.debug("Hit {}: {} (Score: {})", hit, hitDoc.get("name"), scoreDoc.score);
+                int docId = scoreDoc.doc;
+                Document doc = storedFields.document(docId);
+                logger.debug("Hit {}: {} (Score: {})", docId, doc.get("name"), scoreDoc.score);
+
                 if (minScore == null || scoreDoc.score >= minScore) {
-                    idArray.add(hit);
-                    scoreArray.add(scoreDoc.score);
+                    results.add(docId);
+                    scores.add(scoreDoc.score);
                 }
             }
-            JsonObject result = new JsonObject();
-            result.add("ids", idArray);
-            result.add("scores", scoreArray);
-            return result;
+
+            return new Pair<List<Integer>, List<Float>>(results, scores);
+        } catch (ParseException e) {
+            logger.error("Query parsing error: {}", e.getMessage());
+            return new Pair<>(List.of(), List.of());
         } catch (IOException e) {
-            logger.error(Arrays.toString(e.getStackTrace()));
-            return null;
+            logger.error("Query IO error: {}", e.getMessage());
+            return new Pair<>(List.of(), List.of());
         }
 
     }
 
-    private Query createFilter(BitSet filter) {
+    private Query createDocFilter(List<Integer> docIds) {
         // TODO: Improve efficiency off this
-        if (filter == null) {
-            return null;
-        }
         // just or TermQueries for id in filter
         BooleanQuery.Builder builder = new BooleanQuery.Builder();
-        for (int i = 0; i < filter.length(); i++) {
-            if (filter.get(i)) {
-                builder.add(new TermQuery(new Term("id", String.valueOf(i))), BooleanClause.Occur.SHOULD);
-            }
+        for (int docId : docIds) {
+            builder.add(new TermQuery(new Term("id", String.valueOf(docId))), BooleanClause.Occur.SHOULD);
         }
         BooleanQuery.Builder filterQuery = new BooleanQuery.Builder();
         filterQuery.add(builder.build(), BooleanClause.Occur.MUST);

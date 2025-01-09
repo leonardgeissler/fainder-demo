@@ -1,11 +1,12 @@
 import time
+from typing import Any
 
 import pytest
 from loguru import logger
 
 from backend.grammar import evaluate_new_query
 
-TEST_CASES = {
+TEST_CASES: dict[str, dict[str, str | list[int]]] = {
     "simple_keyword": {"query": "kw(germany)", "expected": [0]},
     "percentile_with_identifer": {"query": "pp(0.5;ge;50;Latitude)", "expected": [0]},
     "keyword_and_percentile": {"query": "kw(germany) AND pp(0.5;ge;20.0)", "expected": [0]},
@@ -39,8 +40,8 @@ TEST_CASES = {
 }
 
 
-@pytest.mark.parametrize("test_name,test_case", TEST_CASES.items())
-def test_new_grammar_correctness(test_name: str, test_case: dict) -> None:
+@pytest.mark.parametrize(("test_name", "test_case"), TEST_CASES.items())
+def test_new_grammar_correctness(test_name: str, test_case: dict[str, Any]) -> None:
     query = test_case["query"]
     expected_result = test_case["expected"]
 

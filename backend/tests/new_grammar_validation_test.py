@@ -1,5 +1,6 @@
 import pytest
 from lark import exceptions
+
 from backend.grammar import evaluate_new_query
 
 VALID_TEST_CASES = {
@@ -79,17 +80,19 @@ INVALID_TEST_CASES = {
     },
 }
 
+
 @pytest.mark.parametrize(
-    "category,query",
-    [(cat, q) for cat, data in VALID_TEST_CASES.items() for q in data["queries"]]
+    ("category", "query"),
+    [(cat, q) for cat, data in VALID_TEST_CASES.items() for q in data["queries"]],
 )
 def test_query_evaluation_success(category: str, query: str) -> None:
     r = evaluate_new_query(query)
     assert not isinstance(r, Exception)
 
+
 @pytest.mark.parametrize(
-    "category,query",
-    [(cat, q) for cat, data in INVALID_TEST_CASES.items() for q in data["queries"]]
+    ("category", "query"),
+    [(cat, q) for cat, data in INVALID_TEST_CASES.items() for q in data["queries"]],
 )
 def test_query_evaluation_fail(category: str, query: str) -> None:
     with pytest.raises(

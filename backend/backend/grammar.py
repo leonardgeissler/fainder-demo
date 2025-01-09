@@ -1,76 +1,19 @@
 import os
-import time
-from typing import Any, Literal
+from collections.abc import Sequence
+from typing import Literal
 
-import requests
-from fainder.execution.runner import run
+from fainder.execution.runner import run as run_fainder
 from fainder.typing import PercentileQuery
 from lark import Lark, Token, Transformer, Tree, Visitor
 from loguru import logger
 from numpy import uint32
 
 from backend.config import INDEX, LIST_OF_DOCS
+from backend.lucene_connector import LuceneConnector
 from backend.utils import (
     get_histogram_ids_from_identifer,
     number_of_matching_histograms_to_doc_number,
 )
-
-# TODO: All the code in here should be class-based: We need a LuceneConnector class and a
-# QueryEvaluator class
-
-
-def call_lucene_server(
-    keywords: str, filter_doc_ids: list[int] | None = None
-) -> tuple[list[int], list[float] | None]:
-    """
-    This function will call the lucene server and return the results.
-    """
-    # TODO: Redesign this function with gRPC and implement a LuceneConnector class so that we do
-    # not have to reinitialize the connection every time we want to evaluate a Lucene query
-    # TODO: Use the ranking returned by Lucene to sort the results
-    # TODO: This functionality should be moved to a separate module outside of the grammar
-    logger.debug(f"Calling Lucene server with keywords: {keywords} and filter: {filter_doc_ids}")
-    start = time.perf_counter()
-
-    lucene_host = os.getenv("LUCENE_HOST", "127.0.0.1")
-    lucene_port = os.getenv("LUCENE_PORT", "8001")
-    url = f"http://{lucene_host}:{lucene_port}/search"
-    headers = {"Content-Type": "application/json"}
-    try:
-        json_data: dict[str, Any] = {"keywords": keywords}
-        if filter_doc_ids:
-            json_data["filter"] = filter_doc_ids
-        response = requests.post(url, json=json_data, headers=headers)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        data = response.json()
-
-        logger.debug(f"Raw Lucene response: {response.text}")
-        array: list[int] = data["results"]
-        scores: list[float] | None = None
-        if "scores" in data:
-            scores = data["scores"]
-
-        # verify is array of integers
-        # NOTE: This part is irrevelant once we move to protobuf since it has a guaranteed schema
-        assert all(isinstance(x, int) for x in array)
-
-        logger.info(f"Lucene server took {time.perf_counter() - start} seconds")
-        logger.debug(f"Lucene results: {array}")
-
-        return array, scores
-    except requests.RequestException as e:
-        logger.error(f"Calling Lucene server failed: {e}")
-        return ([], [])
-
-
-def run_keyword(
-    query: str, filter_doc_ids: list[int] | None
-) -> tuple[list[int], list[float] | None]:
-    """
-    This function will run the keyword query on the lucene server.
-    """
-    # TODO: Should be part of the LuceneConnector class
-    return call_lucene_server(query, filter_doc_ids)
 
 
 def run_percentile(query: str, filter_hist: set[uint32] | None = None) -> list[int]:
@@ -108,7 +51,7 @@ def run_percentile(query: str, filter_hist: set[uint32] | None = None) -> list[i
 
     print(f"Filter histograms: {filter_histograms}")
 
-    result = run(INDEX, [q], "index", hist_filter=filter_histograms)
+    result = run_fainder(INDEX, [q], "index", hist_filter=filter_histograms)
 
     matching_histograms = result[0]
     logger.info(f"Matching histograms: {matching_histograms}")
@@ -134,7 +77,7 @@ def build_grammar() -> Lark:
 
 
 class QueryEvaluator(Transformer):
-    def __init__(self):
+    def __init__(self) -> None:
         self.filter_hist: set[uint32] | None = None
 
     def get_all_doc_ids(self) -> set[int]:
@@ -172,6 +115,10 @@ class QueryEvaluator(Transformer):
 
     def start(self, items: list[set[int]]) -> set[int]:
         return items[0]
+
+
+# TODO: All the code in here should be class-based and the QueryEvaluator class should persists
+# over multiple queries to reduce setup overhead
 
 
 GRAMMAR = build_grammar()
@@ -253,6 +200,9 @@ class NewQueryEvaluator(Transformer):
         self.last_result: set[int] | None = None
         self.current_side: str | None = None
         self.enable_result_caching = enable_result_caching
+        self.lucene_connector = LuceneConnector(
+            os.getenv("LUCENE_HOST", "127.0.0.1"), os.getenv("LUCENE_PORT", "8001")
+        )
 
     def _get_filter_docs(self, operator: str | None, side: str | None) -> list[int] | None:
         """
@@ -271,7 +221,7 @@ class NewQueryEvaluator(Transformer):
 
         return None
 
-    def add_scores(self, doc_ids: list[int], scores: list[float] | None) -> None:
+    def add_scores(self, doc_ids: Sequence[int], scores: Sequence[float] | None) -> None:
         logger.debug(f"Adding scores for {len(doc_ids) if doc_ids else 0} documents")
         if not scores:
             return
@@ -312,7 +262,7 @@ class NewQueryEvaluator(Transformer):
         logger.debug(f"Evaluating keyword term: {keyword} with operator {operator} on {side}")
         filter_docs = self._get_filter_docs(operator, side)
 
-        result, scores = run_keyword(keyword, filter_docs)
+        result, scores = self.lucene_connector.evaluate_query(keyword, filter_docs)
         self.add_scores(result, scores)
         result_set = set(result)
         self.last_result = result_set

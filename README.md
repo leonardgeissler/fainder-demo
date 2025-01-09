@@ -15,16 +15,16 @@ This repository contains the source code for our demonstration of Fainder, a fas
 index for distibution-aware dataset search. The demo consists of three components:
 
 - **Frontend**: Web-based user interface for interacting with the search engine.
-- **Fainder**: Backend service responsible for query parsing and processing [percentile predicates](https://doi.org/10.14778/3681954.3681999).
+- **Backend**: Responsible for query parsing and processing [percentile predicates](https://doi.org/10.14778/3681954.3681999).
 - **Lucene**: An extension of [Apache Lucene](https://lucene.apache.org/) for handling keyword predicates.
 
 The repository is structured as follows:
 
 ```bash
 fainder/
+├── backend  # main component for query parsing and execution (Python)
 ├── data  # placeholder for dataset profiles and index files
-├── fainder_demo  # main backend component (Python)
-├── lucene  # Lucene extension (Java)
+├── lucene  # Lucene extension for executing keyword queries (Java)
 ├── scripts  # scripts for installing and starting components (Bash)
 └── ui  # user interface (JavaScript)
 ```
@@ -41,7 +41,7 @@ Build and start the demo:
 docker compose up --build
 ```
 
-Stop the container:
+To stop the containers, hit `Ctrl+C` or run:
 
 ```bash
 docker compose down
@@ -69,3 +69,8 @@ TODO
 pip install -e ".[dev]"
 pre-commit install
 ```
+
+## Generating gRPC Code
+
+The Fainder backend uses gRPC to communicate with the Lucene service. To generate the necessary
+code, install the development dependencies in `backend/` and run `scripts/gen_proto.sh`.
