@@ -9,6 +9,8 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.document.NumericDocValuesField;
+import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
@@ -62,6 +64,10 @@ public class LuceneIndexer {
 
                 // Create a new Lucene Document
                 Document document = new Document();
+
+                // Store ID as both numeric and string field for efficient filtering
+                document.add(new NumericDocValuesField("id", fileCounter));
+                document.add(new StoredField("id", fileCounter));
 
                 // Iterate through all key-value pairs in the JSON object
                 for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {

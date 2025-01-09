@@ -5,14 +5,13 @@ from typing import Any, Literal
 import requests
 from fainder.execution.runner import run
 from fainder.typing import PercentileQuery
-from lark import Lark, Token, Transformer, Tree, v_args
+from lark import Lark, Token, Transformer, Tree, Visitor
 from loguru import logger
 from numpy import uint32
 
 from backend.config import INDEX, LIST_OF_DOCS
 from backend.utils import (
     get_histogram_ids_from_identifer,
-    get_hists_for_doc_ids,
     number_of_matching_histograms_to_doc_number,
 )
 
@@ -64,7 +63,9 @@ def call_lucene_server(
         return ([], [])
 
 
-def run_keyword(query: str, filter_doc_ids: list[int]) -> tuple[list[int], list[float] | None]:
+def run_keyword(
+    query: str, filter_doc_ids: list[int] | None
+) -> tuple[list[int], list[float] | None]:
     """
     This function will run the keyword query on the lucene server.
     """
@@ -204,10 +205,71 @@ def build_new_grammar() -> Lark:
     return Lark(grammar, start="start")
 
 
+class OperatorVisitor(Visitor):
+    def __init__(self):
+        self.current_operator = None
+        self.current_side = None
+
+    def query(self, tree):
+        if len(tree.children) == 3:  # Has operator
+            old_operator = self.current_operator
+            old_side = self.current_side
+
+            self.current_operator = tree.children[1].value
+
+            # Visit left side
+            self.current_side = "left"
+            self.visit(tree.children[0])
+
+            # Visit right side
+            self.current_side = "right"
+            self.visit(tree.children[2])
+
+            self.current_operator = old_operator
+            self.current_side = old_side
+        else:
+            self.visit(tree.children[0])
+
+    def percentileterm(self, tree):
+        if self.current_operator:
+            logger.debug(tree)
+            logger.debug(tree.children)
+
+            tree.children.append(self.current_operator)
+            tree.children.append(self.current_side)
+
+    def keywordterm(self, tree):
+        if self.current_operator:
+            logger.debug(tree)
+            logger.debug(tree.children)
+            tree.children.append(self.current_operator)
+            tree.children.append(self.current_side)
+
+
 class NewQueryEvaluator(Transformer):
     def __init__(self, enable_result_caching: bool = True):
         logger.debug("Initializing NewQueryEvaluator")
         self.scores: dict[int, float] = {}
+        self.last_result: set[int] | None = None
+        self.current_side: str | None = None
+        self.enable_result_caching = enable_result_caching
+
+    def _get_filter_docs(self, operator: str | None, side: str | None) -> list[int] | None:
+        """
+        Determine which documents to filter based on operator and evaluation side
+        Returns None if no filter is needed
+        """
+        if not self.enable_result_caching:
+            return None
+        if not operator or not self.last_result or not side:
+            return None
+
+        # Only apply filter for right side of AND operations
+        if operator == "AND" and side == "right":
+            logger.debug(f"Applying filter from previous result: {self.last_result}")
+            return list(self.last_result)
+
+        return None
 
     def add_scores(self, doc_ids: list[int], scores: list[float] | None) -> None:
         logger.debug(f"Adding scores for {len(doc_ids) if doc_ids else 0} documents")
@@ -217,19 +279,44 @@ class NewQueryEvaluator(Transformer):
             self.scores[doc_id] = scores[i]
 
     def percentileterm(self, items: list[Token]) -> set[int]:
-        term_str = ";".join(item.value for item in items)
-        logger.debug(f"Evaluating percentile term: {term_str}")
+        # Keep track of seen pairs to avoid duplicates
+        seen_operator_side = False
+        operator = None
+        side = None
+        term_items = []
+
+        # Process items to extract term components and first operator/side pair
+        for item in items:
+            if isinstance(item, Token):
+                term_items.append(item)
+            elif not seen_operator_side:
+                # First occurrence of operator/side pair
+                operator = items[len(term_items)]
+                side = items[len(term_items) + 1]
+                seen_operator_side = True
+                break
+
+        logger.debug(f"Term items: {term_items}")
+        term_str = ";".join(item.value for item in term_items)
+
+        logger.debug(f"Evaluating percentile term: {term_str} with operator {operator} on {side}")
         result = set(run_percentile(term_str, None))
-        logger.debug(f"Percentile term result: {result}")
+        self.last_result = result
         return result
 
     def keywordterm(self, items: list[Token]) -> set[int]:
         keyword = items[0].value.strip()
-        logger.debug(f"Evaluating keyword term: {keyword}")
-        result, scores = run_keyword(keyword, [])
+        operator = items[-2] if len(items) > 2 else None
+        side = items[-1] if len(items) > 2 else None
+
+        logger.debug(f"Evaluating keyword term: {keyword} with operator {operator} on {side}")
+        filter_docs = self._get_filter_docs(operator, side)
+
+        result, scores = run_keyword(keyword, filter_docs)
         self.add_scores(result, scores)
-        logger.debug(f"Keyword term result: {result}")
-        return set(result)
+        result_set = set(result)
+        self.last_result = result_set
+        return result_set
 
     def term(self, items: list[set[int] | Tree | Token]) -> set[int]:
         logger.debug(f"Evaluating term with items: {items}")
@@ -261,7 +348,9 @@ class NewQueryEvaluator(Transformer):
         left = items[0]
         operator = items[1].value.strip()
         right = items[2]
-        logger.debug(f"Query operator: {operator}, left size: {len(left)}, right size: {len(right)}")
+        logger.debug(
+            f"Query operator: {operator}, left size: {len(left)}, right size: {len(right)}"
+        )
 
         result = None
         if operator == "AND":
@@ -270,8 +359,7 @@ class NewQueryEvaluator(Transformer):
             result = left | right
         else:  # XOR
             result = left ^ right
-        
-        logger.debug(f"Query result size: {len(result)}")
+
         return result
 
     def start(self, items: list[set[int]]) -> set[int]:
@@ -289,8 +377,15 @@ NEW_GRAMMAR = build_new_grammar()
 
 
 def evaluate_new_query(query: str, enable_result_caching: bool = True) -> list[int]:
-    evaluator = NewQueryEvaluator(enable_result_caching)
     tree = NEW_GRAMMAR.parse(query)
+
+    operator_visitor = OperatorVisitor()
+    operator_visitor.visit(tree)
+
+    logger.debug(f"Tree: {tree.pretty()}")
+
+    evaluator = NewQueryEvaluator(enable_result_caching)
+
     result: list[int] = list(evaluator.transform(tree))
 
     if evaluator.scores:

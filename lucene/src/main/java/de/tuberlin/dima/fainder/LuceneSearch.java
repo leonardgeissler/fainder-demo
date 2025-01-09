@@ -51,6 +51,14 @@ public class LuceneSearch {
 
         // Create a boolean query combining exact and fuzzy matching
         BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
+
+
+        // If no filter is provided, just use the parsed query
+        if (filter != null) {
+            // create filter for allowed ids
+            Query idFilter = createFilter(filter);
+            queryBuilder.add(idFilter, BooleanClause.Occur.FILTER);
+        }
         // Exact match gets highest boost
         queryBuilder.add(parser.parse(escaped), BooleanClause.Occur.SHOULD);
         // Fuzzy match for typos
@@ -59,13 +67,6 @@ public class LuceneSearch {
         queryBuilder.add(parser.parse(escaped + "*"), BooleanClause.Occur.SHOULD);
 
         Query parsed_query = queryBuilder.build();
-
-        // If no filter is provided, just use the parsed query
-        if (filter != null) {
-            // create filter for allowed ids
-            Query idFilter = createFilter(filter);
-            queryBuilder.add(idFilter, BooleanClause.Occur.FILTER);
-        }
 
         try {
             BooleanQuery.Builder builder = new BooleanQuery.Builder();
@@ -113,6 +114,8 @@ public class LuceneSearch {
                 builder.add(new TermQuery(new Term("id", String.valueOf(i))), BooleanClause.Occur.SHOULD);
             }
         }
+        BooleanQuery.Builder filterQuery = new BooleanQuery.Builder();
+        filterQuery.add(builder.build(), BooleanClause.Occur.MUST);
         return builder.build();
     }
 

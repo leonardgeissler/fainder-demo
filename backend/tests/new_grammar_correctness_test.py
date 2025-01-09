@@ -1,54 +1,43 @@
 import time
+
 import pytest
 from loguru import logger
+
 from backend.grammar import evaluate_new_query
 
 TEST_CASES = {
-    "simple_keyword": {
-        "query": "kw(germany)",
-        "expected": [0]
-    },
-    "keyword_and_percentile": {
-        "query": "kw(germany) AND pp(0.5;ge;20.0)",
-        "expected": [0]
-    },
-    "keyword_or": {
-        "query": "kw(germany OR TMDB)",
-        "expected": [2, 0]
-    },
-    "simple_percentile": {
-        "query": "pp(0.5;ge;5000)",
-        "expected": [1, 2]
-    },
-    "high_percentile": {
-        "query": "pp(0.9;ge;1000000)",
-        "expected": [1, 2]
-    },
-    "high_percentile_and_keyword": {
-        "query": "pp(0.9;ge;1000000) AND kw(germany)",
-        "expected": []
-    },
+    "simple_keyword": {"query": "kw(germany)", "expected": [0]},
+    "percentile_with_identifer": {"query": "pp(0.5;ge;50;Latitude)", "expected": [0]},
+    "keyword_and_percentile": {"query": "kw(germany) AND pp(0.5;ge;20.0)", "expected": [0]},
+    "keyword_or": {"query": "kw(germany OR TMDB)", "expected": [2, 0]},
+    "simple_percentile": {"query": "pp(0.5;ge;5000)", "expected": [1, 2]},
+    "high_percentile": {"query": "pp(0.9;ge;1000000)", "expected": [1, 2]},
+    "high_percentile_and_keyword": {"query": "pp(0.9;ge;1000000) AND kw(germany)", "expected": []},
     "high_percentile_or_keyword": {
         "query": "pp(0.9;ge;1000000) OR kw(germany)",
-        "expected": [0, 1, 2]
+        "expected": [0, 1, 2],
     },
     "high_percentile_and_simple_keyword": {
         "query": "pp(0.9;ge;1000000) AND kw(a)",
-        "expected": [2, 1]
+        "expected": [2, 1],
     },
-    "simple_keyword_a": {
-        "query": "kw(a)",
-        "expected": [2, 1, 0]
-    },
-    "high_percentile_xor_simple_keyword_a":{
+    "simple_keyword_a": {"query": "kw(a)", "expected": [2, 1, 0]},
+    "high_percentile_xor_simple_keyword_a": {
         "query": "pp(0.9;ge;1000000) XOR kw(a)",
-        "expected": [0]
+        "expected": [0],
     },
-    "not_keyword": {
-        "query": "NOT kw(a)",
-        "expected": []
+    "not_keyword": {"query": "NOT kw(a)", "expected": []},
+    "nested_query_1": {
+        "query": "(kw(a) AND pp(0.9;ge;1000000)) OR kw(germany)",
+        "expected": [0, 2, 1],
     },
+    "nested_query_2": {
+        "query": "(kw(a) AND pp(0.9;ge;1000000)) XOR kw(germany)",
+        "expected": [0, 2, 1],
+    },
+    "nested_query_3": {"query": "(kw(a) AND pp(0.9;ge;1000000)) AND kw(germany)", "expected": []},
 }
+
 
 @pytest.mark.parametrize("test_name,test_case", TEST_CASES.items())
 def test_new_grammar_correctness(test_name: str, test_case: dict) -> None:
