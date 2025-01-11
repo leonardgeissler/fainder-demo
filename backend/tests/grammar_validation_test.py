@@ -1,42 +1,107 @@
 import pytest
-from lark import exceptions
+from lark import UnexpectedInput
 
-from backend.grammar import evaluate_query
+from backend.query_evaluator import QueryEvaluator
 
-test_queries = {
-    "valid": [
-        "0.5;ge;20.2;age",
-        "0.5;ge;20",
-        "(0.5;ge;20) AND (0.5;le;200 OR 0.5;ge;200)",
-        "0.5;ge;20 AND 0.5;le;200 OR 0.5;ge;200",
-        "0.5;ge;20 AND 0.5;le;5;Month OR NOT 0.5;ge;200",
-    ],
-    "invalid": [
-        "0.5;ge;age",
-        "0.5;20;20",
-        "(0.5;ge;20) AND",
-        "0.5;ge;20 AND 0.5;le;200 OR",
-        "0.5;ge;20 AND 0.5;le;5;Month OR NOT 0.5;ge;200 AND",
-        "0.5;ge;20 AND 0.5;le;5;Month OR NOT (0.5;ge;200",
-    ],
+VALID_TEST_CASES = {
+    "basic_keyword": {
+        "queries": [
+            "keyword(test)",
+            "kw(hello world)",
+        ]
+    },
+    "basic_percentile": {
+        "queries": [
+            "pp(0.5;ge;20.0)",
+            "percentile(0.5;ge;20.0;age)",
+        ]
+    },
+    "combined": {
+        "queries": [
+            "kw(test) AND pp(0.5;ge;20.0)",
+            "keyword(hello) OR percentile(0.5;ge;20.0)",
+            "kw(test) XOR pp(0.5;ge;20.0)",
+        ]
+    },
+    "nested": {
+        "queries": [
+            "(kw(test) AND pp(0.5;ge;20.0)) OR keyword(other)",
+            "(keyword(hello) OR kw(world)) AND pp(0.5;ge;20.0)",
+        ]
+    },
+    "not_operations": {
+        "queries": [
+            "NOT kw(test)",
+            "NOT pp(0.5;ge;20.0)",
+            "NOT (kw(test) AND pp(0.5;ge;20.0))",
+        ]
+    },
+    "optional_whitespaces": {
+        "queries": [
+            "kw(test) AND pp (0.5;ge;20.0)",
+            "kw(test) AND pp (0.5;ge;20.0)",
+            "keyword (test) AND pp  (0.5;ge;20.0)",
+            "keyword(test)ANDpp(0.5;ge;20.0)",
+        ]
+    },
+}
+
+INVALID_TEST_CASES = {
+    "invalid_syntax": {
+        "queries": [
+            "keyword()",
+            "pp()",
+            "kw()",
+        ]
+    },
+    "missing_parentheses": {
+        "queries": [
+            "keyword(test",
+            "pp(0.5;ge;20.0",
+        ]
+    },
+    "invalid_operators": {
+        "queries": [
+            "kw(test) INVALID pp(0.5;ge;20.0)",
+            "kw(test) AND OR pp(0.5;ge;20.0)",
+        ]
+    },
+    "incomplete_expressions": {
+        "queries": [
+            "kw(test) AND",
+            "NOT",
+        ]
+    },
+    "invalid_percentile": {
+        "queries": [
+            "pp(a;ge;20.0)",
+            "pp(0.5;invalid;20.0)",
+            "pp(0.5;ge;abc)",
+        ]
+    },
+    "malformed_compound": {
+        "queries": [
+            "(kw(test) AND",
+            "kw(test)) OR pp(0.5;ge;20.0)",
+            "AND kw(test)",
+        ]
+    },
 }
 
 
-@pytest.mark.parametrize("query", test_queries["valid"])
-def test_query_evaluation_success(query: str) -> None:
-    r = evaluate_query(query)
+@pytest.mark.parametrize(
+    ("category", "query"),
+    [(cat, q) for cat, data in VALID_TEST_CASES.items() for q in data["queries"]],
+)
+def test_query_evaluation_success(category: str, query: str, evaluator: QueryEvaluator) -> None:
+    r = evaluator.parse(query)
     assert not isinstance(r, Exception)
 
 
-@pytest.mark.parametrize("query", test_queries["invalid"])
-def test_query_evaluation_fail(query: str) -> None:
-    with pytest.raises(
-        (
-            exceptions.UnexpectedCharacters,
-            exceptions.UnexpectedToken,
-            exceptions.UnexpectedInput,
-            exceptions.UnexpectedEOF,
-            SyntaxError,
-        )
-    ):
-        evaluate_query(query)
+@pytest.mark.parametrize(
+    ("category", "query"),
+    [(cat, q) for cat, data in INVALID_TEST_CASES.items() for q in data["queries"]],
+)
+def test_query_evaluation_fail(category: str, query: str, evaluator: QueryEvaluator) -> None:
+    with pytest.raises((UnexpectedInput, SyntaxError)):
+        evaluator.parse(query)

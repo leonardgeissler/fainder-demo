@@ -15,4 +15,4 @@ RUN pip install -U pip setuptools \
 ENV FAINDER_DEMO_HOME=/app
 EXPOSE 8000
 
-CMD ["fastapi", "dev", "backend/server.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["fastapi", "dev", "backend/main.py", "--host", "0.0.0.0", "--port", "8000"]

@@ -34,6 +34,9 @@ MANIFEST
 venv/
 .venv/
 
+# Config files
+.env
+
 # Cache folder
 .mypy_cache/
 .pytest_cache/

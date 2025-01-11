@@ -15,8 +15,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      - LUCENE_HOST=lucene
-      - LUCENE_PORT=8001
+      - DATA_DIR=/app/data
+      - COLLECTION_NAME=${COLLECTION_NAME:?COLLECTION_NAME is missing}
+      - METADATA_FILE=${METADATA_FILE:-metadata.json}
+      - LUCENE_HOST=${LUCENE_HOST:-lucene}
+      - LUCENE_PORT=${LUCENE_PORT:-8001}
     volumes:
       - ./data:/app/data
     ports:

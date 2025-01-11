@@ -1,30 +1,24 @@
 import sys
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 
 import pytest
 from loguru import logger
 
-# NOTE: Not necessary yet but might be useful in the future
-# @pytest.fixture(scope="session")
-# def lucene_connector() -> Generator[LuceneConnector, Any, None]:
-#     """
-#     Fixture to create a LuceneConnector instance that can be used in tests.
-#     The scope is set to 'session' to ensure the connector is created once per test session.
-#     """
-#     connector = LuceneConnector(
-#         os.getenv("LUCENE_HOST", "127.0.0.1"), os.getenv("LUCENE_PORT", "8001")
-#     )
-#     yield connector
-#     del connector
+from backend.config import Settings
+from backend.fainder_index import FainderIndex
+from backend.lucene_connector import LuceneConnector
+from backend.query_evaluator import QueryEvaluator
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="module")
 def _setup_and_teardown() -> Generator[None, Any, None]:
     """
     Generic setup and teardown fixture that runs before and after each test.
     """
     # Setup code
+    # TODO: Set up logging properly
     logger.remove()
     logger.add(sys.stderr, level="INFO")
 
@@ -32,3 +26,20 @@ def _setup_and_teardown() -> Generator[None, Any, None]:
 
     # Teardown code
     pass
+
+
+@pytest.fixture(scope="module")
+def evaluator() -> QueryEvaluator:
+    settings = Settings(
+        data_dir=Path(__file__).parent / "assets", collection_name="toy_collection"
+    )
+    metadata = settings.metadata
+
+    lucene_connector = LuceneConnector(settings.lucene_host, settings.lucene_port)
+    rebinning_index = FainderIndex(
+        settings.rebinning_index_path, metadata.hist_to_doc, metadata.column_to_hists
+    )
+    conversion_index = FainderIndex(
+        settings.conversion_index_path, metadata.hist_to_doc, metadata.column_to_hists
+    )
+    return QueryEvaluator(metadata.doc_ids, lucene_connector, rebinning_index, conversion_index)

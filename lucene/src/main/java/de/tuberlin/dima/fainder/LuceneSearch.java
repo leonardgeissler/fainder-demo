@@ -78,9 +78,10 @@ public class LuceneSearch {
                 int docId = scoreDoc.doc;
                 Document doc = storedFields.document(docId);
                 logger.debug("Hit {}: {} (Score: {})", docId, doc.get("name"), scoreDoc.score);
+                int result = Integer.parseInt(doc.get("id"));
 
                 if (minScore == null || scoreDoc.score >= minScore) {
-                    results.add(docId);
+                    results.add(result);
                     scores.add(scoreDoc.score);
                 }
             }
