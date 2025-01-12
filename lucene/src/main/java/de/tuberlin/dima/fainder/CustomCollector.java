@@ -10,13 +10,13 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.index.LeafReaderContext;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Set;
 
 public class CustomCollector implements Collector {
-    private final List<Integer> filterDocIds;
+    private final Set<Integer> filterDocIds;
     private final TopScoreDocCollector topScoreDocCollector;
 
-    public CustomCollector(List<Integer> filterDocIds, int numHits) throws IOException {
+    public CustomCollector(Set<Integer> filterDocIds, int numHits) throws IOException {
         this.filterDocIds = filterDocIds;
         TopScoreDocCollectorManager topScoreDocCollectorManager = new TopScoreDocCollectorManager(numHits, Integer.MAX_VALUE);
         this.topScoreDocCollector = topScoreDocCollectorManager.newCollector();

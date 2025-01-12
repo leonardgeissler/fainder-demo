@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class LuceneSearch {
     private static final Logger logger = LoggerFactory.getLogger(LuceneSearch.class);
@@ -39,12 +40,12 @@ public class LuceneSearch {
 
     /**
      * @param query      The query string
-     * @param docIds     List of document IDs to filter (optional)
+     * @param docIds     Set of document IDs to filter (optional)
      * @param minScore   The minimum score for a document to be included in the results
      * @param maxResults The maximum number of documents to return
      * @return A pair of lists: document IDs and their scores
      */
-    public Pair<List<Integer>, List<Float>> search(String query, List<Integer> docIds, Float minScore, int maxResults) {
+    public Pair<List<Integer>, List<Float>> search(String query, Set<Integer> docIds, Float minScore, int maxResults) {
         if (query == null || query.isEmpty()) {
             return new Pair<>(List.of(), List.of());
         }
@@ -111,7 +112,7 @@ public class LuceneSearch {
 
     }
 
-    private Query createDocFilter(List<Integer> docIds) {
+    private Query createDocFilter(Set<Integer> docIds) {
         // TODO: Improve efficiency off this
         // just or TermQueries for id in filter
         BooleanQuery.Builder builder = new BooleanQuery.Builder();
