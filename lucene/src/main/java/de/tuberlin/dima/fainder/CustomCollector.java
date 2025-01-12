@@ -7,7 +7,10 @@ import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.search.TopScoreDocCollectorManager;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.document.Document;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.StoredFields;
 
 import java.io.IOException;
 import java.util.Set;
@@ -25,6 +28,7 @@ public class CustomCollector implements Collector {
     @Override
     public LeafCollector getLeafCollector(LeafReaderContext context) throws IOException {
         LeafCollector leafCollector = topScoreDocCollector.getLeafCollector(context);
+        final StoredFields storedFields = context.reader().storedFields();
 
         return new LeafCollector() {
             @Override
@@ -34,8 +38,13 @@ public class CustomCollector implements Collector {
 
             @Override
             public void collect(int doc) throws IOException {
-                if (filterDocIds.contains(doc)) {
-                    leafCollector.collect(doc);
+                Document document = storedFields.document(doc);
+                String idString = document.get("id");
+                if (idString != null) {
+                    int id = Integer.parseInt(idString);
+                    if (filterDocIds.contains(id)) {
+                        leafCollector.collect(doc);
+                    }
                 }
             }
         };
