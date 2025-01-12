@@ -24,6 +24,7 @@ public class LuceneSearch {
     private static final Logger logger = LoggerFactory.getLogger(LuceneSearch.class);
     private final IndexSearcher searcher;
     private final QueryParser parser;
+    private final Boolean boolfilter;
 
     public LuceneSearch(Path indexPath) throws IOException {
         Directory indexDir = FSDirectory.open(indexPath);
@@ -33,6 +34,7 @@ public class LuceneSearch {
         StandardAnalyzer analyzer = new StandardAnalyzer(CharArraySet.EMPTY_SET);
         parser = new QueryParser("all", analyzer);
         // parser.setAllowLeadingWildcard(true); // Allow wildcards at start of term
+        boolfilter = false;
     }
 
     /**
@@ -60,17 +62,29 @@ public class LuceneSearch {
             // Prefix match for partial words
             queryBuilder.add(parser.parse(escapedQuery + "*"), BooleanClause.Occur.SHOULD);
 
+            logger.debug("Executing query {}. With filter: {} ", queryBuilder.build(), docIds);
+            
+            ScoreDoc[] hits = null;
             if (docIds != null && !docIds.isEmpty()) {
                 // Create filter for allowed document IDs
                 // TODO: Does the docFilter actually help to reduce query execution time?
-                Query docFilter = createDocFilter(docIds);
-                queryBuilder.add(docFilter, BooleanClause.Occur.FILTER);
+                if(boolfilter){
+                    Query docFilter = createDocFilter(docIds);
+                    queryBuilder.add(docFilter, BooleanClause.Occur.FILTER);
+                    Query parsedQuery = queryBuilder.build();
+                    hits = searcher.search(parsedQuery, maxResults).scoreDocs;
+                }
+                else{
+                    Query parsedQuery = queryBuilder.build();
+                    CustomCollectorManager collectorManager = new CustomCollectorManager(maxResults, docIds);
+                    hits = searcher.search(parsedQuery, collectorManager).scoreDocs;
+                }
+            }
+            else {
+                Query parsedQuery = queryBuilder.build();
+                hits = searcher.search(parsedQuery, maxResults).scoreDocs;
             }
 
-            Query parsedQuery = queryBuilder.build();
-            logger.debug("Executing query {}", parsedQuery);
-
-            ScoreDoc[] hits = searcher.search(parsedQuery, maxResults).scoreDocs;
             StoredFields storedFields = searcher.storedFields();
             List<Integer> results = new ArrayList<>();
             List<Float> scores = new ArrayList<>();
