@@ -25,7 +25,9 @@ public class LuceneSearch {
     private static final Logger logger = LoggerFactory.getLogger(LuceneSearch.class);
     private final IndexSearcher searcher;
     private final QueryParser parser;
-    private final Boolean boolfilter;
+
+    // Constant flag for testing different implementations
+    private final Boolean BOOL_FILTER;
 
     public LuceneSearch(Path indexPath) throws IOException {
         Directory indexDir = FSDirectory.open(indexPath);
@@ -35,7 +37,7 @@ public class LuceneSearch {
         StandardAnalyzer analyzer = new StandardAnalyzer(CharArraySet.EMPTY_SET);
         parser = new QueryParser("all", analyzer);
         // parser.setAllowLeadingWildcard(true); // Allow wildcards at start of term
-        boolfilter = false;
+        BOOL_FILTER = false;
     }
 
     /**
@@ -64,12 +66,12 @@ public class LuceneSearch {
             queryBuilder.add(parser.parse(escapedQuery + "*"), BooleanClause.Occur.SHOULD);
 
             logger.debug("Executing query {}. With filter: {} ", queryBuilder.build(), docIds);
-            
+
             ScoreDoc[] hits = null;
             if (docIds != null && !docIds.isEmpty()) {
                 // Create filter for allowed document IDs
                 // TODO: Does the docFilter actually help to reduce query execution time?
-                if(boolfilter){
+                if(BOOL_FILTER){
                     Query docFilter = createDocFilter(docIds);
                     queryBuilder.add(docFilter, BooleanClause.Occur.FILTER);
                     Query parsedQuery = queryBuilder.build();

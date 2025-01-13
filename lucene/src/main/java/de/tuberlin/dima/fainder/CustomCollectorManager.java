@@ -1,13 +1,14 @@
 package de.tuberlin.dima.fainder;
+
 import org.apache.lucene.search.CollectorManager;
-import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TotalHits;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 public class CustomCollectorManager implements CollectorManager<CustomCollector, TopDocs> {

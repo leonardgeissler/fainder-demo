@@ -104,12 +104,14 @@ public class LuceneServer {
         @Override
         public void evaluate(QueryRequest queryRequest, StreamObserver<QueryResponse> responseObserver) {
             String query = queryRequest.getQuery();
-            List<Integer> docIds = queryRequest.getDocIdsList();
-            // convert docIds to set
-            Set<Integer> docIdsSet = new HashSet<>(docIds);
+            Set<Integer> docIds = new HashSet<>(queryRequest.getDocIdsList());
 
-            Pair<List<Integer>, List<Float>> searchResults = luceneSearch.search(query, docIdsSet, minScore, maxResults);
-            QueryResponse response = QueryResponse.newBuilder().addAllResults(searchResults.getFirst()).addAllScores(searchResults.getSecond()).build();
+            Pair<List<Integer>, List<Float>> searchResults = luceneSearch.search(query, docIds, minScore, maxResults);
+            QueryResponse response = QueryResponse
+                    .newBuilder()
+                    .addAllResults(searchResults.getFirst())
+                    .addAllScores(searchResults.getSecond())
+                    .build();
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();

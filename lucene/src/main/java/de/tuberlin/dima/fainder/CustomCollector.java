@@ -1,16 +1,9 @@
 package de.tuberlin.dima.fainder;
 
-import org.apache.lucene.search.Collector;
-import org.apache.lucene.search.LeafCollector;
-import org.apache.lucene.search.Scorable;
-import org.apache.lucene.search.ScoreMode;
-import org.apache.lucene.search.TopScoreDocCollector;
-import org.apache.lucene.search.TopScoreDocCollectorManager;
-import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.StoredFields;
+import org.apache.lucene.search.*;
 
 import java.io.IOException;
 import java.util.Set;
