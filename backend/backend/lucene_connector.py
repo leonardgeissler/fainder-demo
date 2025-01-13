@@ -9,34 +9,45 @@ from backend.proto.keyword_query_pb2_grpc import KeywordQueryStub
 
 
 class LuceneConnector:
+    channel: grpc.Channel | None
+
     def __init__(self, host: str, port: str) -> None:
         self.host = host
         self.port = port
-        self.channel = grpc.insecure_channel(f"{host}:{port}")
-        self.stub = KeywordQueryStub(self.channel)
-
-        logger.debug(f"Lucene connector initialized with host: {host} and port: {port}")
+        self.channel = None
 
     def __del__(self) -> None:
-        self.channel.close()
-        logger.debug("gRPC channel closed")
+        self.close()
+
+    def connect(self) -> None:
+        self.channel = grpc.insecure_channel(f"{self.host}:{self.port}")
+        self.stub = KeywordQueryStub(self.channel)
+        logger.debug(f"Connected to Lucene server with host: {self.host} and port: {self.port}")
+
+    def close(self) -> None:
+        if self.channel:
+            self.channel.close()
+            self.channel = None
+            logger.debug("gRPC channel closed")
 
     def evaluate_query(
-        self, query: str, doc_ids: list[int] | None = None
+        self, query: str, doc_ids: set[int] | None = None
     ) -> tuple[Sequence[int], Sequence[float]]:
         """
         Evaluates a keyword query using the Lucene server.
 
         Args:
             query: The query string to be evaluated by Lucene.
-            doc_ids: A list of document IDs to consider as a filter (none by default).
+            doc_ids: A set of document IDs to consider as a filter (none by default).
 
         Returns:
             list[int]: A list of document IDs that match the query.
             list[float]: A list of scores for each document ID.
         """
-        # TODO: Use the ranking returned by Lucene to sort the results
         start = time.perf_counter()
+        if not self.channel:
+            self.connect()
+
         try:
             logger.debug(f"Executing query: '{query}' with filter: {doc_ids}")
             response = self.stub.Evaluate(QueryRequest(query=query, doc_ids=doc_ids or []))
