@@ -51,7 +51,6 @@ page
           <!-- Results list -->
           <v-infinite-scroll
             v-if="!isLoading && !error && results && results.length > 0"
-            :height="300"
             mode="manual"
           >
             <template v-for="result in results" :key="result.id">
@@ -278,8 +277,8 @@ const chartColors = [
 const getChartData = (field, index) => {
   if (!field.histogram) return null;
 
-  const binEdges = field.histogram.bin_edges;
-  const counts = field.histogram.histogram;
+  const binEdges = field.histogram.bins;
+  const counts = field.histogram.densities;
 
   // Create array of bar objects with correct positioning and width
   const bars = counts.map((count, i) => ({
