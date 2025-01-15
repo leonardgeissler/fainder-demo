@@ -111,7 +111,7 @@ def generate_fainder_indices(
     n_clusters: int = 27,
     bin_budget: int = 270,
     alpha: float = 1,
-    transform: Literal["standard", "robust", "quantile", "power"] = "quantile",
+    transform: Literal["standard", "robust", "quantile", "power"] | None = None,
     algorithm: Literal["agglomerative", "hdbscan", "kmeans"] = "kmeans",
     seed: int = 42,
     workers: int | None = os.cpu_count(),

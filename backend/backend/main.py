@@ -8,7 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from lark import UnexpectedInput
 from loguru import logger
 
-from backend.config import PredicateError, QueryRequest, QueryResponse, Settings
+from backend.column_index import ColumnIndex
+from backend.config import (
+    ColumnSearchError,
+    PercentileError,
+    QueryRequest,
+    QueryResponse,
+    Settings,
+)
 from backend.croissant_store import CroissantStore
 from backend.fainder_index import FainderIndex
 from backend.lucene_connector import LuceneConnector
@@ -30,8 +37,9 @@ croissant_store = CroissantStore(settings.croissant_path)
 lucene_connector = LuceneConnector(settings.lucene_host, settings.lucene_port)
 rebinning_index = FainderIndex(settings.rebinning_index_path, metadata)
 conversion_index = FainderIndex(settings.conversion_index_path, metadata)
+column_search = ColumnIndex(settings.hnsw_index_path, metadata)
 query_evaluator = QueryEvaluator(
-    set(metadata.doc_to_cols.keys()), lucene_connector, rebinning_index, conversion_index
+    lucene_connector, rebinning_index, conversion_index, column_search, metadata
 )
 
 cors_origins = [
@@ -81,9 +89,12 @@ async def query(request: QueryRequest) -> QueryResponse:
         raise HTTPException(
             status_code=400, detail=f"Invalid query: {e.get_context(request.query)}"
         ) from e
-    except PredicateError as e:
+    except PercentileError as e:
         logger.info(f"Invalid percentile predicate: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid percentile predicate: {e}") from e
+    except ColumnSearchError as e:
+        logger.info(f"Column search error: {e}")
+        raise HTTPException(status_code=400, detail=f"Column search error: {e}") from e
     # TODO: Add other known errors for specific error handling
     except Exception as e:
         logger.error(f"Unknown query execution error: {e}")
