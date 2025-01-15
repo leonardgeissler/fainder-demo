@@ -18,6 +18,11 @@ page
       <!-- Main Content -->
       <div class="results-wrapper">
         <div class="list-container">
+          <!-- Add search stats -->
+          <div v-if="!isLoading && !error && results && results.length > 0" class="search-stats mb-4">
+            Found {{ resultCount }} results in {{ (searchTime).toFixed(4) }}s
+          </div>
+
           <!-- Remove the Modify Search button since we have inline search now -->
 
           <!-- Loading state -->
@@ -49,17 +54,29 @@ page
           </v-alert>
 
           <!-- Results list -->
-          <v-infinite-scroll
+          <v-virtual-scroll
             v-if="!isLoading && !error && results && results.length > 0"
             mode="manual"
+            :items="results"
           >
-            <template v-for="result in results" :key="result.id">
-              <v-card @click="selectResult(result)" :height="100">
-                <v-card-title>{{ result.name }}</v-card-title>
-                <v-card-subtitle>{{ result.alternateName }}</v-card-subtitle>
+            <template v-slot:default="{ item }">
+              <v-card @click="selectResult(item)" :height="100">
+                <v-card-title>{{ item.name }}</v-card-title>
+                <v-card-subtitle>{{ item.alternateName }}</v-card-subtitle>
               </v-card>
             </template>
-          </v-infinite-scroll>
+          </v-virtual-scroll>
+
+          <!-- Pagination controls -->
+          <div v-if="!isLoading && !error && results && results.length > 0" class="pagination-controls mt-4">
+            <v-pagination
+              v-model="currentPage"
+              :length="totalPages"
+              :total-visible="totalVisible"
+              rounded="circle"
+              width="100%"
+            ></v-pagination>
+          </div>
         </div>
 
         <div class="details-container">
@@ -132,10 +149,10 @@ const theme = useTheme();
 const route = useRoute();
 const q = ref(route.query);
 
-// read query and theme from query params
+// read query, page and theme from query params
 const query = ref(q.value.query);
 const selectedIndex = ref(parseInt(q.value.index) || 0);
-
+const currentPage = ref(parseInt(q.value.page) || 1);
 
 const descriptionPanel = ref([0]); // Array with 0 means first panel is open
 const recordSetPanels = ref([]); // Array of arrays for each file panel
@@ -143,6 +160,68 @@ const recordSetPanels = ref([]); // Array of arrays for each file panel
 // reset recordSetPanels and descriptionPanel when selectedResult changes
 
 console.log(query.value);
+
+// Add new refs for search stats
+const searchTime = ref(0);
+const resultCount = ref(0);
+
+const totalPages = ref(1);
+// Remove static perPage constant
+const totalVisible = ref(7);
+
+// Add ref for window height
+const windowHeight = ref(window.innerHeight);
+const itemHeight = 100; // Height of each result card in pixels
+const headerHeight = 200; // Approximate height of header elements (search + stats)
+const paginationHeight = 56; // Height of pagination controls
+
+// Update perPage to be calculated based on available height
+const perPage = computed(() => {
+  const availableHeight = windowHeight.value - headerHeight - paginationHeight;
+  const itemsPerPage = Math.floor(availableHeight / itemHeight);
+  // Ensure we show at least 3 items and at most 15 items
+  return Math.max(3, Math.min(15, itemsPerPage));
+});
+
+const handleResize = () => {
+  updateTotalVisible();
+  windowHeight.value = window.innerHeight;
+};
+// Add window resize handler
+onMounted(() => {
+  updateTotalVisible();
+  window.addEventListener('resize', handleResize);
+  windowHeight.value = window.innerHeight; // Initial value
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
+});
+
+function updateTotalVisible() {
+  const width = window.innerWidth;
+  if (width < 600) {
+    totalVisible.value = 2;
+  } else if (width < 960) {
+    totalVisible.value = 3;
+  } else {
+    totalVisible.value = 5;
+  }
+}
+
+watch(currentPage, async (newPage) => {
+  await loadResults(query.value, newPage);
+  // Update URL with new page
+  navigateTo({
+    path: '/results',
+    query: {
+      query: query.value,
+      page: newPage,
+      index: selectedIndex.value,
+      theme: theme.global.name.value
+    }
+  });
+});
 
 const selectResult = (result) => {
   const index = results.value.indexOf(result);
@@ -155,20 +234,21 @@ const selectResult = (result) => {
     console.log(recordSetPanels.value);
   }
 
-  // Update URL with new index
+  // Update URL keeping the page parameter
   navigateTo({
     path: '/results',
     query: {
       query: query.value,
+      page: currentPage.value,
       index: index,
-      theme: theme.global.name.value // Add theme to query
+      theme: theme.global.name.value
     }
   });
 };
 
-await loadResults(query.value);
+await loadResults(query.value, currentPage.value);
 
-async function loadResults(queryStr) {
+async function loadResults(queryStr, page = 1) {
   isLoading.value = true;
   error.value = null;
 
@@ -183,7 +263,9 @@ async function loadResults(queryStr) {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        query: queryStr
+        query: queryStr,
+        page: page,
+        per_page: perPage.value  // Access the computed value here
       })
     });
 
@@ -193,6 +275,10 @@ async function loadResults(queryStr) {
 
     const r = await response.json();
     results.value = r.results;
+    searchTime.value = r.search_time;
+    resultCount.value = r.result_count;
+    totalPages.value = r.total_pages;
+    currentPage.value = r.page;
 
     if (results.value && results.value.length > 0) {
       if (results.value[selectedIndex.value]){
@@ -315,13 +401,15 @@ const getChartData = (field, index) => {
 
 async function searchData({query: searchQuery}) {
   showSearchModal.value = false;
-  await loadResults(searchQuery);
+  currentPage.value = 1; // Reset to first page on new search
+  await loadResults(searchQuery, 1);
   query.value = searchQuery;
 
   return await navigateTo({
     path: '/results',
     query: {
       query: searchQuery,
+      page: 1,
       index: 0,
       theme: theme.global.name.value
     }
@@ -401,5 +489,22 @@ async function searchData({query: searchQuery}) {
 .panel-title {
   font-size: 1.25rem !important;
   font-weight: 500;
+}
+
+.search-stats {
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-size: 0.875rem;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+  width: 100%;
+}
+
+.pagination-controls :deep(.v-pagination) {
+  width: 100%;
+  justify-content: center;
 }
 </style>
