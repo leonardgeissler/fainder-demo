@@ -1,5 +1,4 @@
 import json
-import pickle
 from pathlib import Path
 from typing import Any
 
@@ -33,8 +32,8 @@ class Settings(BaseSettings):
     @classmethod
     @field_validator("metadata_file", mode="after")
     def metadata_file_type(cls, value: Path) -> Path:
-        if value.suffix not in {".json", ".pkl"}:
-            raise ValueError("metadata_file must point to a .json or .pkl file")
+        if value.suffix != ".json":
+            raise ValueError("metadata_file must point to a .json file")
         return value
 
     @computed_field  # type: ignore[misc]
@@ -70,14 +69,8 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[misc]
     @property
     def metadata(self) -> Metadata:
-        if self.metadata_file.suffix == ".json":
-            with open(self.data_dir / self.collection_name / self.metadata_file, "r") as f:
-                data = json.load(f)
-        elif self.metadata_file.suffix == ".pkl":
-            with open(self.data_dir / self.collection_name / self.metadata_file, "rb") as f:
-                data = pickle.load(f)
-        else:
-            raise ValueError("Unsupported file type for metadata_path")
+        with (self.data_dir / self.collection_name / self.metadata_file).open() as f:
+            data = json.load(f)
 
         return Metadata(**data)
 

@@ -23,7 +23,7 @@ class CroissantStore:
     def load_documents(self) -> None:
         self.documents.clear()
         for file in self.path.iterdir():
-            with open(file) as f:
+            with file.open() as f:
                 doc = json.load(f)
                 # TODO: choose a more specific name and replace "id" with the field name of our ID
                 self.documents[doc["id"]] = doc

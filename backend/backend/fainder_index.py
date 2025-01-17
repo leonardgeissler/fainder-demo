@@ -1,13 +1,16 @@
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 from fainder.execution.runner import run
-from fainder.typing import PercentileIndex, PercentileQuery
 from fainder.utils import load_input
 from loguru import logger
-from numpy.typing import NDArray
 
 from backend.config import Metadata, PercentileError
+
+if TYPE_CHECKING:
+    from fainder.typing import PercentileIndex, PercentileQuery
+    from numpy.typing import NDArray
 
 
 class FainderIndex:
