@@ -14,12 +14,8 @@ from fainder.utils import configure_run, save_output
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 
-from backend.croissant_store import Document
 
-
-def load_metadata(
-    base_path: Path,
-) -> tuple[list[tuple[np.uint32, Histogram]], dict[str, int], dict[int, Document]]:
+def load_metadata(base_path: Path) -> tuple[list[tuple[np.uint32, Histogram]], dict[str, int]]:
     """Load Croissant files and generate metadata.
 
     While loading the files, assign unique IDs to documents and columns. The function also creates
@@ -38,8 +34,6 @@ def load_metadata(
     name_to_vector: dict[str, int] = {}
     vector_to_cols: dict[int, set[int]] = defaultdict(set)
 
-    documents: dict[int, Document] = {}
-
     # Ingest Croissant files and assign unique ids to datasets and columns
     hists: list[tuple[np.uint32, Histogram]] = []
     col_id = 0
@@ -55,8 +49,6 @@ def load_metadata(
                 metadata = json.load(file)
 
             metadata["id"] = doc_id
-
-            documents[doc_id] = metadata
 
             # Ingest histograms and assign unique ids to columns
             try:
@@ -110,7 +102,7 @@ def load_metadata(
             file,
         )
 
-    return hists, name_to_vector, documents
+    return hists, name_to_vector
 
 
 def generate_fainder_indices(
@@ -179,7 +171,7 @@ def generate_embedding_index(
     ef_construction: int = 400,
     n_bidirectional_links: int = 64,
     seed: int = 42,
-) -> SentenceTransformer:
+) -> None:
     strings = list(name_to_vector.keys())
     ids = list(name_to_vector.values())
 
@@ -209,7 +201,6 @@ def generate_embedding_index(
 
     logger.info("Saving HNSW index")
     index.save_index((output_path / "index.bin").as_posix())
-    return embedder
 
 
 def parse_args():
@@ -246,7 +237,7 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     configure_run(args.log_level)
-    hists, name_to_vector, _ = load_metadata(args.path)
+    hists, name_to_vector = load_metadata(args.path)
 
     if not args.no_fainder:
         generate_fainder_indices(

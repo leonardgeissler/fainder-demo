@@ -83,10 +83,6 @@ class ColumnSearchError(Exception):
     pass
 
 
-class ReindexError(Exception):
-    pass
-
-
 class QueryRequest(BaseModel):
     query: str
     page: int = 1
