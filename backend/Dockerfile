@@ -1,18 +1,32 @@
-FROM python:3.11-slim-bookworm
+FROM python:3.12-slim
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+# Install project into /app
+WORKDIR /app
+
+# Install compiler toolchain
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential git python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
 
-COPY pyproject.toml .
-COPY backend ./backend
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev
 
-RUN pip install uv
-RUN uv sync
+# Copy the project into the image
+ADD . /app
 
-ENV FAINDER_DEMO_HOME=/app
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+ENV PATH="/app/.venv/bin:${PATH}"
 EXPOSE 8000
+ENTRYPOINT []
 
-CMD ["uv", "run", "fastapi", "dev", "backend/main.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["fastapi", "dev", "backend/main.py", "--host", "0.0.0.0", "--port", "8000"]

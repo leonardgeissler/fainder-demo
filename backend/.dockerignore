@@ -4,8 +4,9 @@ __pycache__
 *.pyo
 
 # Ignore virtual environments
-venv
 .env
+.venv
+venv
 
 # Ignore build output directories
 dist
@@ -27,8 +28,12 @@ build
 
 # Caches
 .ruff_cache
+.pytest_cache
 
 # Ignore Dockerfile and .dockerignore itself
 Dockerfile
 .dockerignore
 README.md
+
+scripts/
+tests/

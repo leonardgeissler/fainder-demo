@@ -18,6 +18,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: backend
+          target: /app
+        - action: rebuild
+          path: backend/pyproject.toml
     # user: ${UID:-1000}:${GID:-1000}
     environment:
       - DATA_DIR=/app/data
@@ -36,6 +43,13 @@ services:
     build:
       context: ./ui
       dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: ui
+          target: /app
+        - action: rebuild
+          path: ui/package.json
     # user: ${UID:-1000}:${GID:-1000}
     tmpfs: /tmp
     environment:
