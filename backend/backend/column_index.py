@@ -14,28 +14,46 @@ class ColumnIndex:
         path: Path,
         metadata: Metadata,
         model: str = "all-MiniLM-L6-v2",
+        use_embeddings: bool = True,
         ef: int = 50,
-        bypass_transformer: bool = False,
     ) -> None:
         self.name_to_vector = metadata.name_to_vector
         self.vector_to_name = {v: k for k, v in self.name_to_vector.items()}
         self.vector_to_cols = metadata.vector_to_cols
+        self.use_embeddings = use_embeddings
 
-        if bypass_transformer:
+        if not use_embeddings:
             return
+
         # Embedding model
-        # TODO: Expose model and ef parameters in the settings
+        logger.debug(f"Loading SentenceTransformer model '{model}'")
         self.embedder = SentenceTransformer(
             model, cache_folder=(path.parent / "model_cache").as_posix()
         )
-        dimension = self.embedder.get_sentence_embedding_dimension()
-        if dimension is None:
+        self.dimension = self.embedder.get_sentence_embedding_dimension()
+        logger.debug("Model loaded")
+        if self.dimension is None:
             raise ValueError("Dimension of the model is not known, cannot initialize HNSW index")
 
         # HNSW index
-        self.index = hnswlib.Index(space="cosine", dim=dimension)
+        logger.debug("Loading HNSW index")
+        self.ef = ef
+        self.index = hnswlib.Index(space="cosine", dim=self.dimension)
         self.index.load_index(str(path))
-        self.index.set_ef(ef)
+        self.index.set_ef(self.ef)
+        logger.debug("HNSW index loaded")
+
+    def update(self, path: Path, metadata: Metadata) -> None:
+        self.name_to_vector = metadata.name_to_vector
+        self.vector_to_name = {v: k for k, v in self.name_to_vector.items()}
+        self.vector_to_cols = metadata.vector_to_cols
+
+        if not self.use_embeddings:
+            return
+
+        self.index = hnswlib.Index(space="cosine", dim=self.dimension)
+        self.index.load_index(str(path))
+        self.index.set_ef(self.ef)
 
     def search(self, column_name: str, k: int, column_filter: set[uint32] | None) -> set[uint32]:
         if k < 0:

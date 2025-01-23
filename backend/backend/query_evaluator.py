@@ -63,6 +63,21 @@ class QueryEvaluator:
         # See https://docs.astral.sh/ruff/rules/cached-instance-method/ for details
         self.execute = lru_cache(maxsize=cache_size)(self._execute)
 
+    def update_indices(
+        self,
+        rebinning_index: FainderIndex,
+        conversion_index: FainderIndex,
+        hnsw_index: ColumnIndex,
+        metadata: Metadata,
+    ) -> None:
+        self.executor_rebinning = QueryExecutor(
+            self.lucene_connector, rebinning_index, hnsw_index, metadata
+        )
+        self.executor_conversion = QueryExecutor(
+            self.lucene_connector, conversion_index, hnsw_index, metadata
+        )
+        self.clear_cache()
+
     def parse(self, query: str) -> Tree:
         return self.grammar.parse(query)
 
@@ -288,11 +303,9 @@ class QueryExecutor(Transformer):
     def term(self, items: tuple[Token, set[uint32]] | tuple[Token, set[int]]) -> set[int]:
         logger.trace(f"Evaluating term with items: {items}")
         if items[0].value.strip().lower() == "column" or items[0].value.strip().lower() == "col":
-            item: set[uint32] = items[1]  # type: ignore
-            return col_to_doc_ids(item, self.metadata.col_to_doc)
+            return col_to_doc_ids(items[1], self.metadata.col_to_doc)  # type: ignore
 
-        item: set[int] = items[1]  # type: ignore
-        return item  # type: ignore
+        return items[1]  # type: ignore
 
     def not_expr(self, items: list[set[int]]) -> set[int]:
         logger.trace(f"Evaluating NOT expression with {len(items)} items")

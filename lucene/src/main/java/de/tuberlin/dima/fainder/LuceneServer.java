@@ -75,7 +75,7 @@ public class LuceneServer {
     private void start(int port) throws IOException {
         logger.info("Starting Lucene Server");
 
-        grpcServer = ServerBuilder.forPort(port).addService(new KeywordQueryImpl()).build().start();
+        grpcServer = ServerBuilder.forPort(port).addService(new LuceneConnectorImpl()).build().start();
         logger.info("Server started, listening on {}", grpcServer.getPort());
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -97,7 +97,7 @@ public class LuceneServer {
         }
     }
 
-    static class KeywordQueryImpl extends KeywordQueryGrpc.KeywordQueryImplBase {
+    static class LuceneConnectorImpl extends LuceneConnectorGrpc.LuceneConnectorImplBase {
         @Override
         public void evaluate(QueryRequest queryRequest, StreamObserver<QueryResponse> responseObserver) {
             String query = queryRequest.getQuery();
@@ -110,6 +110,43 @@ public class LuceneServer {
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+        }
+
+        @Override
+        public void recreateIndex(RecreateIndexRequest request, StreamObserver<RecreateIndexResponse> responseObserver) {
+            try {
+                // Close existing searcher to release file handles
+                if (luceneSearch != null) {
+                    luceneSearch.close();
+                }
+
+                // Delete existing index directory
+                Files.walk(indexPath)
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .forEach(java.io.File::delete);
+
+                // Create new index
+                LuceneIndexer.createIndex(indexPath, dataPath);
+                luceneSearch = new LuceneSearch(indexPath);
+
+                RecreateIndexResponse response = RecreateIndexResponse.newBuilder()
+                    .setSuccess(true)
+                    .setMessage("Index successfully recreated")
+                    .build();
+
+                responseObserver.onNext(response);
+                responseObserver.onCompleted();
+            } catch (Exception e) {
+                logger.error("Failed to recreate index: {}", e.getMessage());
+                RecreateIndexResponse response = RecreateIndexResponse.newBuilder()
+                    .setSuccess(false)
+                    .setMessage("Failed to recreate index: " + e.getMessage())
+                    .build();
+
+                responseObserver.onNext(response);
+                responseObserver.onCompleted();
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Literal
@@ -14,17 +15,19 @@ from fainder.utils import configure_run, save_output
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 
+from backend.config import Settings
+from backend.croissant_store import Document
 
-def load_metadata(base_path: Path) -> tuple[list[tuple[np.uint32, Histogram]], dict[str, int]]:
+
+def generate_metadata(
+    croissant_path: Path, metadata_path: Path
+) -> tuple[list[tuple[np.uint32, Histogram]], dict[str, int], dict[int, Document]]:
     """Load Croissant files and generate metadata.
 
     While loading the files, assign unique IDs to documents and columns. The function also creates
     and stores mappings between document IDs, columns IDs, and column names that are needed for
     downstream processing.
     """
-    croissant_dir = base_path / "croissant"
-    metadata_file = base_path / "metadata.json"
-
     # Initialize mappings
     # NOTE: We need the vector_id intermediate step because annoy and faiss require integer IDs
     doc_to_cols: dict[int, set[int]] = defaultdict(set)
@@ -34,6 +37,8 @@ def load_metadata(base_path: Path) -> tuple[list[tuple[np.uint32, Histogram]], d
     name_to_vector: dict[str, int] = {}
     vector_to_cols: dict[int, set[int]] = defaultdict(set)
 
+    documents: dict[int, Document] = {}
+
     # Ingest Croissant files and assign unique ids to datasets and columns
     hists: list[tuple[np.uint32, Histogram]] = []
     col_id = 0
@@ -42,13 +47,14 @@ def load_metadata(base_path: Path) -> tuple[list[tuple[np.uint32, Histogram]], d
 
     logger.info("Reading croissant files")
     # NOTE: Remove the sorting if it becomes a bottleneck
-    for doc_id, path in enumerate(sorted(croissant_dir.iterdir())):
+    for doc_id, path in enumerate(sorted(croissant_path.iterdir())):
         if path.is_file():
             # Read the file and add a document ID to it
             with path.open("r") as file:
                 metadata = json.load(file)
 
             metadata["id"] = doc_id
+            documents[doc_id] = metadata
 
             # Ingest histograms and assign unique ids to columns
             try:
@@ -89,7 +95,7 @@ def load_metadata(base_path: Path) -> tuple[list[tuple[np.uint32, Histogram]], d
 
     # Save the mappings and indices
     logger.info("Saving metadata")
-    with metadata_file.open("w") as file:
+    with metadata_path.open("w") as file:
         json.dump(
             {
                 "doc_to_cols": {k: list(v) for k, v in doc_to_cols.items()},
@@ -102,7 +108,7 @@ def load_metadata(base_path: Path) -> tuple[list[tuple[np.uint32, Histogram]], d
             file,
         )
 
-    return hists, name_to_vector
+    return hists, name_to_vector, documents
 
 
 def generate_fainder_indices(
@@ -208,9 +214,6 @@ def parse_args():
         description="Generate metadata and indices for a collection of dataset profiles"
     )
     parser.add_argument(
-        "-p", "--path", type=Path, help="Path to the root directory of a dataset collection"
-    )
-    parser.add_argument(
         "--no-fainder",
         action="store_true",
         help="Skip generating Fainder indices",
@@ -228,22 +231,38 @@ def parse_args():
         help="Set the logging level",
     )
 
-    # TODO: add more params: bin budget, n_clusters, alpha, seed, workers, etc
-    # TODO: add all the params from HNSW creation
-
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
     configure_run(args.log_level)
-    hists, name_to_vector = load_metadata(args.path)
+
+    try:
+        settings = Settings()  # type: ignore
+    except Exception as e:
+        logger.error(f"Error loading settings: {e}")
+        sys.exit(1)
+
+    hists, name_to_vector, _ = generate_metadata(settings.croissant_path, settings.metadata_path)
 
     if not args.no_fainder:
         generate_fainder_indices(
             hists=hists,
-            output_path=args.path / "fainder",
+            output_path=settings.fainder_path,
+            n_clusters=settings.fainder_n_clusters,
+            bin_budget=settings.fainder_bin_budget,
+            alpha=settings.fainder_alpha,
+            transform=settings.fainder_transform,
+            algorithm=settings.fainder_cluster_algorithm,
         )
 
     if not args.no_embeddigs:
-        generate_embedding_index(name_to_vector, output_path=args.path / "embeddings")
+        generate_embedding_index(
+            name_to_vector=name_to_vector,
+            output_path=settings.embedding_path,
+            model_name=settings.embedding_model,
+            batch_size=settings.embedding_batch_size,
+            ef_construction=settings.hnsw_ef_construction,
+            n_bidirectional_links=settings.hnsw_n_bidirectional_links,
+        )
