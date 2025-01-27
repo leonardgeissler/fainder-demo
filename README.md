@@ -125,10 +125,13 @@ TODO
 
 #### Developer Setup
 
+We recommend using [`uv`](https://docs.astral.sh/uv/) to manage the development environment of the
+backend component. You just have to run:
+
 ```bash
-# Follow the steps above until you have activated your virtual environment
-pip install -e ".[dev]"
-pre-commit install
+cd backend/
+uv sync --extra dev
+uv run pre-commit install
 ```
 
 ## Generating gRPC Code
