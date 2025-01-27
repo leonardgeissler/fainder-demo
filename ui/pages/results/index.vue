@@ -159,7 +159,7 @@ page
                 <v-expansion-panel>
                   <v-expansion-panel-title class="panel-title">Details</v-expansion-panel-title>
                   <v-expansion-panel-text>
-                    <div class="content-wrapper">
+                    <div class="content-wrapper highlight-text">
                       <div class="description-section">
                         <MDC :value="displayedContent" />
                         <v-btn
