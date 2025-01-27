@@ -66,8 +66,8 @@ page
           >
             <template v-slot:default="{ item }">
               <v-card @click="selectResult(item)" :height="100">
-                <v-card-title>{{ item.name }}</v-card-title>
-                <v-card-subtitle>{{ item.alternateName }}</v-card-subtitle>
+                <v-card-title class="highlight-text" v-html="item.name"></v-card-title>
+                <v-card-subtitle class="highlight-text" v-html="item.alternateName"></v-card-subtitle>
               </v-card>
             </template>
           </v-virtual-scroll>
@@ -90,10 +90,9 @@ page
         <div class="details-container">
           <div class="pa-20">
             <v-card v-if="selectedResult">
-              <v-card-title>{{ selectedResult.name }}</v-card-title>
-              <v-card-subtitle>{{
-                selectedResult.alternateName
-              }}</v-card-subtitle>
+              <v-card-title class="highlight-text" v-html="selectedResult.name">
+                </v-card-title>
+              <v-card-subtitle class="highlight-text" v-html="selectedResult.alternateName"></v-card-subtitle>
 
               <v-expansion-panels v-model="descriptionPanel">
                 <v-expansion-panel>
@@ -101,7 +100,7 @@ page
                     >Description</v-expansion-panel-title
                   >
                   <v-expansion-panel-text>
-                    <div class="markdown-wrapper">
+                    <div class="markdown-wrapper highlight-text">
                       <MDC :value="selectedResult.description"></MDC>
                     </div>
                   </v-expansion-panel-text>
@@ -132,7 +131,8 @@ page
                           v-for="(field, fieldIndex) in file.field"
                           :key="field.id"
                         >
-                          <td>{{ field.name }}</td>
+                          <td v-if="field.marked_name" v-html="field.marked_name"></td>
+                          <td v-else>{{ field.name }}</td>
                           <td>{{ field.dataType[0] }}</td>
                           <td v-if="field.histogram">
                             <Bar
@@ -174,7 +174,8 @@ const {
   totalPages,
   query,
   fainder_mode,
-  perPage
+  perPage,
+  enable_highlighting
 } = useSearchState();
 
 console.log(selectedResultIndex.value);
@@ -234,11 +235,7 @@ function updateTotalVisible() {
 }
 
 watch(currentPage, async (newPage) => {
-  await searchOperations.loadResults(
-    query.value,
-    newPage,
-    fainder_mode.value
-  );
+  await searchOperations.loadResults(query.value, newPage, fainder_mode.value, enable_highlighting.value);
 
   // Update URL with new page
   navigateTo({
@@ -248,6 +245,7 @@ watch(currentPage, async (newPage) => {
       page: newPage,
       index: selectedResultIndex.value,
       fainder_mode: fainder_mode.value,
+      enable_highlighting: enable_highlighting.value,
       theme: theme.global.name.value,
     },
   });
@@ -256,7 +254,7 @@ watch(currentPage, async (newPage) => {
 watch(updatePerPage, (newPerPage) => {
   if (currentPage.value > 0) {
     perPage.value = newPerPage;
-    searchOperations.loadResults(query.value, currentPage.value);
+    searchOperations.loadResults(query.value, currentPage.value, fainder_mode.value, enable_highlighting.value);
   }
 });
 
@@ -294,15 +292,17 @@ const retrySearch = async () => {
   await searchOperations.loadResults(
     query.value,
     currentPage.value,
-    route.query.fainder_mode
+    fainder_mode.value,
+    enable_highlighting.value,
   );
 };
 
-// Initial load
+// Initial load 
 await searchOperations.loadResults(
   query.value,
   currentPage.value,
-  fainder_mode.value
+  fainder_mode.value,
+  enable_highlighting.value
 );
 
 const chartOptions = ref({
@@ -507,5 +507,48 @@ const getChartData = (field, index) => {
   font-family: monospace;
   font-size: 0.9em;
   color: rgba(var(--v-theme-on-error), 0.7);
+}
+
+/* Update highlight styles for details container */
+.highlight-text :deep(mark) {
+  background-color: rgba(var(--v-theme-warning), 0.2);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.highlight-text {
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+.description-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Update highlight text styles to handle all text variants */
+.highlight-text,
+:deep(.v-card-title),
+:deep(.v-card-subtitle),
+:deep(.v-card-text) {
+  line-height: 1.6;
+}
+
+:deep(.v-card-title mark),
+:deep(.v-card-subtitle mark),
+:deep(.v-card-text mark),
+.highlight-text :deep(mark) {
+  background-color: rgba(var(--v-theme-warning), 0.2);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 500;
 }
 </style>
