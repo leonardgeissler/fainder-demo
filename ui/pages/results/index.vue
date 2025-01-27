@@ -65,9 +65,28 @@ page
             :items="results"
           >
             <template v-slot:default="{ item }">
-              <v-card @click="selectResult(item)" :height="100">
-                <v-card-title class="highlight-text" v-html="item.name"></v-card-title>
-                <v-card-subtitle class="highlight-text" v-html="item.alternateName"></v-card-subtitle>
+              <v-card @click="selectResult(item)" :height="80">
+                <div class="d-flex align-center">
+                  <v-img
+                    :src="item.thumbnailUrl"
+                    :alt="item.name"
+                    height="70"
+                    width="70"
+                    max-height="70"
+                    max-width="70"
+                    cover
+                    class="flex-shrink-0 rounded-image"
+                  >
+                    <!-- Fallback for failed image load -->
+                    <template v-slot:placeholder>
+                      <v-icon size="48" color="grey-lighten-2">mdi-image</v-icon>
+                    </template>
+                  </v-img>
+                  <div class="flex-grow-1 min-w-0">
+                    <v-card-title class="text-truncate highlight-text" v-html="'<strong>' + item.name + '</strong>'"></v-card-title>
+                    <v-card-subtitle class="text-truncate highlight-text" v-html="item.alternateName"></v-card-subtitle>
+                  </div>
+                </div>
               </v-card>
             </template>
           </v-virtual-scroll>
@@ -89,57 +108,227 @@ page
 
         <div class="details-container">
           <div class="pa-20">
-            <v-card v-if="selectedResult">
-              <v-card-title class="highlight-text" v-html="selectedResult.name">
-                </v-card-title>
-              <v-card-subtitle class="highlight-text" v-html="selectedResult.alternateName"></v-card-subtitle>
+          <v-card v-if="selectedResult">
+            <div class="d-flex align-center pa-4">
+              <div class="flex-grow-1">
+                <!-- Wrap title and subtitle in a container -->
+                <div class="content-container">
+                  <v-card-title class="highlight-text" v-html="'<strong>' + selectedResult.name + '</strong>'"></v-card-title>
+                  <v-card-subtitle class="highlight-text" v-html="selectedResult.alternateName"></v-card-subtitle>
+                </div>
+              </div>
+
+              <div v-if="selectedResult.distribution?.length" class="flex-shrink-0">
+                <v-menu
+                  location="bottom"
+                >
+                  <template v-slot:activator="{ props }">
+                    <v-btn
+                      color="primary"
+                      v-bind="props"
+                      prepend-icon="mdi-download"
+                      variant="tonal"
+                      class="download-btn"
+                    >
+                      Download
+                    </v-btn>
+                  </template>
+
+                  <v-list>
+                    <v-list-item
+                      v-for="file in selectedResult.distribution.filter(file => file.contentSize)"
+                      :key="file['@id']"
+                      :href="file.contentUrl"
+                      target="_blank"
+                      :title="file.description"
+                    >
+                      <v-list-item-title>
+                        {{ file.name }}
+                      </v-list-item-title>
+                      <v-list-item-subtitle>
+                        {{ file.encodingFormat }}
+                        {{ file.contentSize }}
+                      </v-list-item-subtitle>
+                    </v-list-item>
+                  </v-list>
+                </v-menu>
+              </div>
+            </div>
 
               <v-expansion-panels v-model="descriptionPanel">
                 <v-expansion-panel>
-                  <v-expansion-panel-title class="panel-title"
-                    >Description</v-expansion-panel-title
-                  >
+                  <v-expansion-panel-title class="panel-title">Details</v-expansion-panel-title>
                   <v-expansion-panel-text>
-                    <div class="markdown-wrapper highlight-text">
-                      <MDC :value="selectedResult.description"></MDC>
+                    <div class="content-wrapper">
+                      <div class="description-section">
+                        <MDC :value="displayedContent" />
+                        <v-btn
+                          v-if="isLongDescription"
+                          variant="text"
+                          density="comfortable"
+                          class="mt-2 text-medium-emphasis"
+                          @click="toggleDescription"
+                        >
+                          {{ showFullDescription ? 'Show less' : 'Show more' }}
+                          <v-icon :icon="showFullDescription ? 'mdi-chevron-up' : 'mdi-chevron-down'" class="ml-1" />
+                        </v-btn>
+                      </div>
+
+                      <div class="metadata-section">
+                        <div class="metadata-item">
+                          <span class="metadata-label">Creator</span>
+                          <span class="metadata-value highlight-text" v-html="selectedResult?.creator?.name || '-'"></span>
+                        </div>
+                        <div class="metadata-item">
+                          <span class="metadata-label">License</span>
+                          <span class="metadata-value">{{ selectedResult?.license?.name || '-' }}</span>
+                        </div>
+                        <div class="metadata-item">
+                          <span class="metadata-label">Keywords</span>
+                          <span class="metadata-value keywords-value " v-html="selectedResult?.creator?.name || '-'"></span>
+                        </div>
+                      </div>
                     </div>
                   </v-expansion-panel-text>
                 </v-expansion-panel>
               </v-expansion-panels>
 
-              <v-expansion-panels
-                v-if="selectedResult.recordSet"
-                v-for="(file, index) in selectedResult.recordSet"
-                :key="file.id"
-                v-model="recordSetPanels[index]"
-              >
+              <v-expansion-panels v-if="selectedResult?.recordSet?.length > 0" v-model="recordSetPanel">
                 <v-expansion-panel>
-                  <v-expansion-panel-title class="panel-title">{{
-                    "file: " + file.name
-                  }}</v-expansion-panel-title>
+                  <v-expansion-panel-title class="panel-title">
+                    Data Explorer
+                  </v-expansion-panel-title>
                   <v-expansion-panel-text>
-                    <v-table>
-                      <thead>
-                        <tr>
-                          <th>Field</th>
-                          <th>Type</th>
-                          <th>Histogram</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          v-for="(field, fieldIndex) in file.field"
-                          :key="field.id"
-                        >
-                          <td v-if="field.marked_name" v-html="field.marked_name"></td>
-                          <td v-else>{{ field.name }}</td>
-                          <td>{{ field.dataType[0] }}</td>
-                          <td v-if="field.histogram">
+                  <div v-if="selectedFile">
+                    <div class="d-flex align-center mb-4">
+                      <v-select
+                        v-model="selectedFileIndex"
+                        :items="recordSetItems"
+                        label="Select File"
+                        density="comfortable"
+                        hide-details
+                        class="max-w-xs"
+                      />
+                    </div>
+                    <div class="field-list">
+                    <div v-for="(field, fieldIndex) in selectedFile.field" :key="field.id" class="field-item mb-6">
+                        <div class="field-header mb-2">
+                          <span class="text-h6 highlight-text" v-html="field.name + ': '"></span>
+                          <v-chip class="ml-2" density="compact">{{ field.dataType[0] }}</v-chip>
+                        </div>
+                        <!-- Numerical Data with Histogram -->
+                        <div v-if="field.histogram" class="field-content">
+                          <div class="histogram-container">
                             <Bar
                               :chart-data="getChartData(field, fieldIndex)"
                               :chart-options="chartOptions"
                             />
-                          </td>
+                          </div>
+                          <div class="statistics-container" v-if="field.statistics">
+                            <table class="statistics-table">
+                              <tbody>
+                                <tr>
+                                  <td class="stat-label">Count:</td>
+                                  <td class="stat-value">{{ formatNumber(field.statistics.count) }}</td>
+                                </tr>
+                                <tr>
+                                  <td class="stat-label">Mean:</td>
+                                  <td class="stat-value">{{ formatNumber(field.statistics.mean) }}</td>
+                                </tr>
+                                <tr>
+                                  <td class="stat-label">Std Dev:</td>
+                                  <td class="stat-value">{{ formatNumber(field.statistics.std) }}</td>
+                                </tr>
+                                <tr>
+                                  <td class="stat-label">Min:</td>
+                                  <td class="stat-value">{{ formatNumber(field.statistics.min) }}</td>
+                                </tr>
+                                <tr>
+                                  <td class="stat-label">25%:</td>
+                                  <td class="stat-value">{{ formatNumber(field.statistics['25%']) }}</td>
+                                </tr>
+                                <tr>
+                                  <td class="stat-label">Median:</td>
+                                  <td class="stat-value">{{ formatNumber(field.statistics['50%']) }}</td>
+                                </tr>
+                                <tr>
+                                  <td class="stat-label">75%:</td>
+                                  <td class="stat-value">{{ formatNumber(field.statistics['75%']) }}</td>
+                                </tr>
+                                <tr>
+                                  <td class="stat-label">Max:</td>
+                                  <td class="stat-value">{{ formatNumber(field.statistics.max) }}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        <!-- Categorical Data -->
+                        <div v-else class="field-content categorical">
+                          <div class="categorical-summary">
+                            <div class="categorical-layout">
+                              <div class="unique-values-section">
+                                <div class="large-stat" v-if="field.n_unique">
+                                  <div class="stat-title">Unique Values</div>
+                                  <div class="stat-number">{{ formatNumber(field.n_unique) }}</div>
+                                </div>
+                              </div>
+                              <div class="value-distribution">
+                                <table class="statistics-table" v-if="field.most_common">
+                                  <thead>
+                                    <tr>
+                                      <th class="text-left">Value</th>
+                                      <th class="text-right">Count</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <template v-for="([value, count], index) in Object.entries(field.most_common).slice(0, 3)" :key="value">
+                                      <tr>
+                                        <td class="value-label">{{ value }}</td>
+                                        <td class="stat-value">{{ formatNumber(count) }}</td>
+                                      </tr>
+                                    </template>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </v-expansion-panels>
+              <v-expansion-panels v-model="metadataPanel">
+                <v-expansion-panel>
+                  <v-expansion-panel-title class="panel-title">Metadata</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-table>
+                      <tbody>
+                        <tr>
+                          <td><strong>Creator</strong></td>
+                          <td class="highlight-text"v-html="selectedResult?.creator?.name || '-'"></td>
+                        </tr>
+                        <tr>
+                          <td><strong>Publisher</strong></td>
+                          <td class="highlight-text" v-html="selectedResult?.publisher?.name || '-'"></td>
+                        </tr>
+                        <tr>
+                          <td><strong>License</strong></td>
+                          <td class="highlight-text" v-html="selectedResult?.license?.name || '-'"></td>
+                        </tr>
+                        <tr>
+                          <td><strong>Date Published</strong></td>
+                          <td class="highlight-text" v-html="selectedResult?.datePublished.substring(0, 10) || '-'"></td>
+                        </tr>
+                        <tr>
+                          <td><strong>Date Modified</strong></td>
+                          <td class="highlight-text" v-html="selectedResult?.dateModified.substring(0, 10) || '-'"></td>
+                        </tr>
+                        <tr>
+                          <td><strong>Keywords</strong></td>
+                          <td style="white-space: pre-line" class="highlight-text" v-html="selectedResult?.keywords || '-'"></td>
                         </tr>
                       </tbody>
                     </v-table>
@@ -189,9 +378,46 @@ const selectedResult = computed(() =>
 query.value = route.query.query;
 fainder_mode.value = route.query.fainder_mode || 'low_memory';
 
-const descriptionPanel = ref([0]);
-const recordSetPanels = ref([]);
+const descriptionPanel = ref([0]); // Array with 0 means first panel is open
+const recordSetPanel = ref([0]);  // Single panel
+const metadataPanel = ref([0]); // Initialize metadata panel
 const totalVisible = ref(7);
+const selectedFileIndex = ref(0);
+
+
+const showFullDescription = ref(false);
+const maxLength = 750;
+
+const isLongDescription = computed(() => {
+  return selectedResult.value?.description?.length > maxLength;
+});
+
+const displayedContent = computed(() => {
+  if (!selectedResult.value?.description) return 'Description missing';
+  if (!isLongDescription.value || showFullDescription.value) {
+    return selectedResult.value.description;
+  }
+  return selectedResult.value.description.slice(0, maxLength) + '...';
+});
+
+const toggleDescription = () => {
+  showFullDescription.value = !showFullDescription.value;
+};
+
+// Computed property for dropdown items
+const recordSetItems = computed(() => {
+  if (!selectedResult.value?.recordSet) return [];
+  return selectedResult.value.recordSet.map((file, index) => ({
+    title: file.name,
+    value: index,
+  }));
+});
+
+// Computed property for the currently selected file
+const selectedFile = computed(() => {
+  if (!selectedResult.value?.recordSet) return null;
+  return selectedResult.value.recordSet[selectedFileIndex.value];
+});
 
 // Add ref for window height
 const windowHeight = ref(window.innerHeight);
@@ -264,7 +490,9 @@ const selectResult = (result) => {
 
   if (result.recordSet) {
     descriptionPanel.value = [0];
-    recordSetPanels.value = result.recordSet.map(() => [0]);
+    recordSetPanel.value = result.recordSet.map(() => [0]);
+    showFullDescription.value = false;
+    selectedFileIndex.value = 0; // Reset to first file when selecting new result
   }
 
   // Update URL with all necessary parameters
@@ -297,7 +525,7 @@ const retrySearch = async () => {
   );
 };
 
-// Initial load 
+// Initial load
 await searchOperations.loadResults(
   query.value,
   currentPage.value,
@@ -313,24 +541,10 @@ const chartOptions = ref({
       grid: {
         offset: false,
       },
-      title: {
-        display: true,
-        text: "Value",
-        font: {
-          size: 14,
-        },
-      },
     },
     y: {
       beginAtZero: true,
-      title: {
-        display: true,
-        text: "Density",
-        font: {
-          size: 14,
-        },
-      },
-    },
+    }
   },
   plugins: {
     tooltip: {
@@ -346,13 +560,24 @@ const chartOptions = ref({
           ].toFixed(2)}`;
         },
         label: (item) => {
-          return `Count: ${item.parsed.y.toFixed(4)}`;
-        },
-      },
+          return `Density: ${item.parsed.y.toFixed(4)}`;
+        }
+      }
     },
+    legend: {
+      display: false
+    }
   },
   responsive: true,
   maintainAspectRatio: false,
+  layout: {
+    padding: {
+      left: 10,
+      right: 30,
+      top: 10,
+      bottom: 80
+    }
+  }
 });
 
 const chartColors = [
@@ -372,15 +597,15 @@ const getChartData = (field, index) => {
   if (!field.histogram) return null;
 
   const binEdges = field.histogram.bins;
-  const counts = field.histogram.densities;
+  const densities = field.histogram.densities;
 
-  if (counts == null || binEdges == null) return null;
+  if (densities == null || binEdges == null) return null;
 
   // Create array of bar objects with correct positioning and width
-  const bars = counts.map((count, i) => ({
-    x0: binEdges[i], // Start of bin
+  const bars = densities.map((density, i) => ({
+    x0: binEdges[i],     // Start of bin
     x1: binEdges[i + 1], // End of bin
-    y: count / (binEdges[i + 1] - binEdges[i]), // Density
+    y: density           // Density
   }));
 
   return {
@@ -407,12 +632,45 @@ const getChartData = (field, index) => {
   };
 };
 
+async function searchData({query: searchQuery}) {
+  showSearchModal.value = false;
+  await loadResults(searchQuery);
+  query.value = searchQuery;
 
+  return await navigateTo({
+    path: '/results',
+    query: {
+      query: searchQuery,
+      index: 0,
+      theme: theme.global.name.value
+    }
+  });
+
+}
+
+const processedKeywords = computed(() => {
+  if (!selectedResult.value?.keywords) return [];
+  return selectedResult.value.keywords.map(keyword => {
+    const parts = keyword.split(' > ');
+    return parts[parts.length - 1];
+  });
+});
+
+const formatNumber = (value) => {
+  if (value === undefined || value === null) return '-';
+  // Check if the value is an integer
+  if (Number.isInteger(value)) return value.toLocaleString();
+  // For floating point numbers, limit to 4 decimal places
+  return Number(value).toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4
+  });
+};
 
 </script>
 
 <style scoped>
-.app-container {
+.app-container { /*unused?*/
   display: flex;
   flex-direction: column;
   max-width: 100%;
@@ -442,6 +700,8 @@ const getChartData = (field, index) => {
 .details-container {
   flex: 1;
   min-width: 0; /* Prevents flex child from overflowing */
+  max-width: 1200px; /* Add maximum width */
+  margin: 0 auto; /* Center the container */
 }
 
 .mb-6 {
@@ -452,7 +712,7 @@ const getChartData = (field, index) => {
   background-color: #f5f5f5;
 }
 
-.markdown-wrapper {
+.markdown-wrapper { /*unused?*/
   padding: 24px;
 }
 
@@ -478,7 +738,7 @@ const getChartData = (field, index) => {
 
 .panel-title {
   font-size: 1.25rem !important;
-  font-weight: 500;
+  font-weight: bold;
 }
 
 .search-stats {
@@ -550,5 +810,311 @@ const getChartData = (field, index) => {
   padding: 0 2px;
   border-radius: 2px;
   font-weight: 500;
+}
+
+.description-truncated {
+  position: relative;
+  max-height: 200px;
+  overflow: hidden;
+}
+
+.description-truncated::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  background: linear-gradient(transparent, rgb(var(--v-theme-surface)));
+}
+
+.field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.field-item {
+  background-color: rgb(var(--v-theme-surface));
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.field-header {
+  display: flex;
+  align-items: baseline;
+}
+
+.field-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.histogram-container {
+  height: 300px;
+}
+
+.statistics-container {
+  background-color: rgba(var(--v-theme-surface), 0.8);
+  border-radius: 8px;
+  padding: 0px;
+  height: fit-content;
+}
+
+.statistics-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.statistics-table tr {
+  border-bottom: 1px solid rgba(var(--v-border-opacity), 0.12);
+}
+
+.statistics-table tr:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  padding: 8px 0;
+  font-weight: 500;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+}
+
+.stat-value {
+  padding: 8px 0;
+  text-align: right;
+  font-family: monospace;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.content-wrapper {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 32px;
+  padding: 0px 0;
+}
+
+.description-section {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.metadata-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-left: 32px;
+  border-left: 1px solid rgba(var(--v-border-opacity), 0.12);
+}
+
+.metadata-item {
+  display: grid;
+  gap: 4px;
+}
+
+.metadata-label {
+  font-weight: 700;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 1.125rem;
+  margin-bottom: 4px;
+}
+
+.metadata-value {
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 0.875rem;
+}
+
+.keywords-value {
+  word-break: break-word;
+}
+
+.field-content.categorical {
+  grid-template-columns: 1fr 1fr;
+}
+
+.categorical-summary {
+  background-color: rgba(var(--v-theme-surface), 0.8);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.mt-6 {
+  margin-top: 24px;
+}
+
+.value-label {
+  padding: 8px 0;
+  color: rgb(var(--v-theme-on-surface));
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.categorical-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.unique-values-section {
+  flex: 0 0 auto;
+  padding-right: 32px;
+  border-right: 1px solid rgba(var(--v-border-opacity), 0.12);
+}
+
+.large-stat {
+  text-align: center;
+}
+
+.stat-title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: rgba(var(--v-theme-on-surface));
+  margin-bottom: 8px;
+}
+
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.value-distribution {
+  flex: 1;
+  min-width: 0;
+}
+
+.statistics-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.statistics-table th {
+  font-weight: 600;
+  color: rgba(var(--v-theme-on-surface), 0.87);
+  padding: 8px 16px;
+  border-bottom: 2px solid rgba(var(--v-border-opacity), 0.12);
+}
+
+.statistics-table td {
+  padding: 0px 16px;
+  border-bottom: 1px solid rgba(var(--v-border-opacity), 0.12);
+}
+
+.stat-value {
+  text-align: right;
+  font-family: monospace;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+/* Make the layout responsive */
+@media (max-width: 768px) {
+  .content-wrapper {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .metadata-section {
+    padding-left: 0;
+    border-left: none;
+    border-top: 1px solid rgba(var(--v-border-opacity), 0.12);
+    padding-top: 24px;
+  }
+
+  .categorical-layout {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .unique-values-section {
+    padding-right: 0;
+    padding-bottom: 24px;
+    border-right: none;
+    border-bottom: 1px solid rgba(var(--v-border-opacity), 0.12);
+    width: 100%;
+  }
+
+  .value-distribution {
+    width: 100%;
+  }
+}
+
+@media (max-width: 1024px) {
+  .field-content {
+    grid-template-columns: 1fr;
+  }
+
+  .histogram-container {
+    height: 250px;
+  }
+
+  .statistics-container {
+    max-width: 100%;
+  }
+
+  .field-content.categorical {
+    grid-template-columns: 1fr;
+  }
+
+  .categorical-summary {
+    max-width: 100%;
+  }
+
+  .value-label {
+    max-width: none;
+  }
+}
+
+.description-truncated {
+  position: relative;
+  max-height: 200px;
+  overflow: hidden;
+}
+
+.description-truncated::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  background: linear-gradient(transparent, rgb(var(--v-theme-surface)));
+}
+
+.content-container {
+  padding: 0 16px;
+}
+
+.content-container .v-card-title {
+  padding-left: 0;
+  font-size: 1.75rem !important;
+  line-height: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.content-container .v-card-subtitle {
+  padding-left: 0;
+  font-size: 1.1rem;
+}
+
+.flex-grow-1.min-w-0 {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: block;
+}
+
+.rounded-image {
+  border-radius: 5px;
+  overflow: hidden;
 }
 </style>
