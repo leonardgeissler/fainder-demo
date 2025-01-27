@@ -88,7 +88,7 @@ class FainderIndex:
                 raise FainderError(f"Invalid Fainder Mode: {fainder_mode}")
 
         result = results[0]
-        logger.debug(f"Results: {result}")
+        logger.trace(f"Results: {result}")
         logger.info(f"Query '{query}' returned {len(result)} histograms in {runtime:.2f} seconds.")
 
         return result
