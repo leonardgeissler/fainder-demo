@@ -8,7 +8,7 @@ from loguru import logger
 from numpy import uint32
 
 from backend.column_index import ColumnIndex
-from backend.config import CacheInfo, Metadata
+from backend.config import CacheInfo, FainderMode, Metadata
 from backend.fainder_index import FainderIndex
 from backend.lucene_connector import LuceneConnector
 
@@ -49,42 +49,27 @@ class QueryEvaluator:
     def __init__(
         self,
         lucene_connector: LuceneConnector,
-        rebinning_index: FainderIndex,
-        conversion_index: FainderIndex,  # currently not used
+        fainder_index: FainderIndex,
         hnsw_index: ColumnIndex,
         metadata: Metadata,
-        cache_size: int = 128,  # if negative, caching is disabled
+        cache_size: int = 128,
     ):
         self.lucene_connector = lucene_connector
         self.grammar = Lark(GRAMMAR, start="start")
         self.annotator = QueryAnnotator()
-        self.executor_rebinning = QueryExecutor(
-            self.lucene_connector, rebinning_index, hnsw_index, metadata
-        )
-        self.executor_conversion = QueryExecutor(
-            self.lucene_connector, conversion_index, hnsw_index, metadata
-        )
+        self.executor = QueryExecutor(self.lucene_connector, fainder_index, hnsw_index, metadata)
 
         # NOTE: Don't use lru_cache on methods
-        # Use lru_cache only if caching is enabled
-        disable_cache = cache_size < 0  # if negative, caching is disabled
-        self.execute = (
-            self._execute if disable_cache else lru_cache(maxsize=cache_size)(self._execute)
-        )
+        # See https://docs.astral.sh/ruff/rules/cached-instance-method/ for details
+        self.execute = lru_cache(maxsize=cache_size)(self._execute)
 
     def update_indices(
         self,
-        rebinning_index: FainderIndex,
-        conversion_index: FainderIndex,
+        fainder_index: FainderIndex,
         hnsw_index: ColumnIndex,
         metadata: Metadata,
     ) -> None:
-        self.executor_rebinning = QueryExecutor(
-            self.lucene_connector, rebinning_index, hnsw_index, metadata
-        )
-        self.executor_conversion = QueryExecutor(
-            self.lucene_connector, conversion_index, hnsw_index, metadata
-        )
+        self.executor = QueryExecutor(self.lucene_connector, fainder_index, hnsw_index, metadata)
         self.clear_cache()
 
     def parse(self, query: str) -> Tree:
@@ -93,38 +78,33 @@ class QueryEvaluator:
     def _execute(
         self,
         query: str,
-        enable_filtering: bool = True,
-        fainder_mode: str = "low_memory",
+        fainder_mode: FainderMode = "low_memory",
         enable_highlighting: bool = True,
+        enable_filtering: bool = False,
     ) -> tuple[list[int], Highlights]:
         # Reset state for new query
         self.annotator.reset()
-        executor = self.executor_rebinning
-        executor.reset(enable_highlighting)
-        executor.enable_filtering = enable_filtering
+        self.executor.reset(fainder_mode, enable_highlighting, enable_filtering)
 
+        # Parse query
         parse_tree = self.parse(query)
         self.annotator.visit(parse_tree)
         logger.trace(f"Parse tree: {parse_tree.pretty()}")
 
-        # Execute query and cache highlights
+        # Execute query
         result: set[int]
         highlights: Highlights
-        result, highlights = executor.transform(parse_tree)
+        result, highlights = self.executor.transform(parse_tree)
 
         # Sort by score
         list_result = list(result)
-        list_result.sort(key=lambda x: executor.scores.get(x, -1), reverse=True)
+        list_result.sort(key=lambda x: self.executor.scores.get(x, -1), reverse=True)
         return list_result, highlights
 
     def clear_cache(self) -> None:
-        if not hasattr(self.execute, "cache_clear"):
-            return
         self.execute.cache_clear()
 
     def cache_info(self) -> CacheInfo:
-        if not hasattr(self.execute, "cache_info"):
-            return CacheInfo(hits=0, misses=0, max_size=0, curr_size=0)
         hits, misses, max_size, curr_size = self.execute.cache_info()
         return CacheInfo(hits=hits, misses=misses, max_size=max_size, curr_size=curr_size)
 
@@ -185,8 +165,9 @@ class QueryAnnotator(Visitor):
 class QueryExecutor(Transformer):
     """This transformer evaluates the parse tree bottom-up and compute the query result."""
 
+    fainder_mode: FainderMode
     scores: dict[int, float]
-    last_result: set[uint32] | None  # ids of the columns
+    last_result: set[int] | set[uint32] | None
     current_side: str | None
 
     def __init__(
@@ -195,18 +176,20 @@ class QueryExecutor(Transformer):
         fainder_index: FainderIndex,
         hnsw_index: ColumnIndex,
         metadata: Metadata,
-        enable_filtering: bool = False,
+        fainder_mode: FainderMode = "low_memory",
         enable_highlighting: bool = True,
+        enable_filtering: bool = False,
     ):
-        self.fainder_index = fainder_index
         self.lucene_connector = lucene_connector
-        self.enable_filtering = enable_filtering
+        self.fainder_index = fainder_index
         self.hnsw_index = hnsw_index
         self.metadata = metadata
-        self.enable_highlighting = enable_highlighting
-        self.reset()
 
-    def _get_column_filter(self, operator: str | None, side: str | None) -> set[uint32] | None:
+        self.reset(fainder_mode, enable_highlighting, enable_filtering)
+
+    def _get_column_filter(
+        self, operator: str | None, side: str | None
+    ) -> set[int] | set[uint32] | None:
         """Create a document filter for AND operators based on previous results."""
         if (
             not self.enable_filtering
@@ -220,11 +203,19 @@ class QueryExecutor(Transformer):
         logger.trace(f"Applying filter from previous result: {self.last_result}")
         return self.last_result
 
-    def reset(self, enable_highlighting: bool = True) -> None:
+    def reset(
+        self,
+        fainder_mode: FainderMode,
+        enable_highlighting: bool = True,
+        enable_filtering: bool = False,
+    ) -> None:
         self.scores = defaultdict(float)
         self.last_result = None
         self.current_side = None
+
+        self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
+        self.enable_filtering = enable_filtering
 
     def updates_scores(self, doc_ids: Sequence[int], scores: Sequence[float]) -> None:
         logger.trace(f"Updating scores for {len(doc_ids)} documents")
@@ -249,8 +240,10 @@ class QueryExecutor(Transformer):
         # TODO: add filter
         hist_filter = None
 
-        result_hists = self.fainder_index.search(percentile, comparison, reference, hist_filter)
-        # TODO: update results
+        result_hists = self.fainder_index.search(
+            percentile, comparison, reference, self.fainder_mode, hist_filter
+        )
+        # TODO: update last_result
         return hist_to_col_ids(result_hists, self.metadata.hist_to_col)
 
     def keywordterm(self, items: list[Token]) -> tuple[set[int], Highlights]:
@@ -375,7 +368,7 @@ class QueryExecutor(Transformer):
         doc_set, (doc_highlights, col_highlights) = items[0]
 
         if self.enable_highlighting:
-            # only return the column highlights that are in the document set
+            # Only return the column highlights that are in the document set
             filtered_col_highlights = col_ids_in_docs(
                 col_highlights, doc_set, self.metadata.doc_to_cols
             )
@@ -443,38 +436,28 @@ class QueryExecutor(Transformer):
 
 
 def col_ids_in_docs(
-    col_ids: set[uint32], doc_ids: set[int], doc_to_columns: dict[int, set[int]]
+    col_ids: set[uint32], doc_ids: set[int], doc_to_cols: dict[int, set[int]]
 ) -> set[uint32]:
-    col_ids_in_doc = doc_to_col_ids(doc_ids, doc_to_columns)
+    col_ids_in_doc = doc_to_col_ids(doc_ids, doc_to_cols)
     return col_ids_in_doc & col_ids
 
 
-def doc_to_col_ids(doc_ids: set[int], doc_to_columns: dict[int, set[int]]) -> set[uint32]:
+def doc_to_col_ids(doc_ids: set[int], doc_to_cols: dict[int, set[int]]) -> set[uint32]:
     return {
-        uint32(column_id)
+        uint32(col_id)
         for doc_id in doc_ids
-        if doc_id in doc_to_columns
-        for column_id in doc_to_columns[doc_id]
+        if doc_id in doc_to_cols
+        for col_id in doc_to_cols[doc_id]
     }
 
 
-def col_to_doc_ids(column_ids: set[uint32], column_to_doc: dict[int, int]) -> set[int]:
-    return {
-        column_to_doc[int(column_id)]
-        for column_id in column_ids
-        if int(column_id) in column_to_doc
-    }
+def col_to_doc_ids(col_ids: set[uint32], col_to_doc: dict[int, int]) -> set[int]:
+    return {col_to_doc[int(col_id)] for col_id in col_ids if int(col_id) in col_to_doc}
 
 
-def col_to_hist_ids(column_ids: set[uint32], column_to_hist: dict[int, int]) -> set[uint32]:
-    return {
-        uint32(column_to_hist[int(column_id)])
-        for column_id in column_ids
-        if int(column_id) in column_to_hist
-    }
+def col_to_hist_ids(col_ids: set[uint32], col_to_hist: dict[int, int]) -> set[uint32]:
+    return {uint32(col_to_hist[int(col_id)]) for col_id in col_ids if int(col_id) in col_to_hist}
 
 
-def hist_to_col_ids(hist_ids: set[uint32], hist_to_column: dict[int, int]) -> set[uint32]:
-    return {
-        uint32(hist_to_column[int(hist_id)]) for hist_id in hist_ids if hist_id in hist_to_column
-    }
+def hist_to_col_ids(hist_ids: set[uint32], hist_to_col: dict[int, int]) -> set[uint32]:
+    return {uint32(hist_to_col[int(hist_id)]) for hist_id in hist_ids if hist_id in hist_to_col}

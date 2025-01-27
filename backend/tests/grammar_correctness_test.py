@@ -143,11 +143,10 @@ def test_grammar_correctness(
 
     # Execute without caching
     no_cache_evaluator = QueryEvaluator(
-        evaluator.lucene_connector,
-        evaluator.executor_rebinning.fainder_index,
-        evaluator.executor_conversion.fainder_index,
-        evaluator.executor_rebinning.hnsw_index,
-        evaluator.executor_rebinning.metadata,
+        lucene_connector=evaluator.lucene_connector,
+        fainder_index=evaluator.executor.fainder_index,
+        hnsw_index=evaluator.executor.hnsw_index,
+        metadata=evaluator.executor.metadata,
         cache_size=-1,
     )
 

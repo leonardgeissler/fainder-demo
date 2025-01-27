@@ -1,6 +1,6 @@
 <template>
   <div class="logo" :class="size">
-    <img src="/FAINDER_LOGO_SVG_01.svg" :alt="alt" />
+    <img src="/logo.svg" :alt="alt" />
   </div>
 </template>
 

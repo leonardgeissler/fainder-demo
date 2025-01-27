@@ -16,10 +16,10 @@ from backend.column_index import ColumnIndex
 from backend.config import (
     CacheInfo,
     ColumnSearchError,
+    FainderError,
     IndexingError,
     MessageResponse,
     Metadata,
-    PercentileError,
     QueryRequest,
     QueryResponse,
     Settings,
@@ -49,8 +49,11 @@ logger.add(sys.stdout, level="DEBUG")
 # Global variables to store persistent objects
 croissant_store = CroissantStore(settings.croissant_path)
 lucene_connector = LuceneConnector(settings.lucene_host, settings.lucene_port)
-rebinning_index = FainderIndex(settings.rebinning_index_path, metadata)
-conversion_index = FainderIndex(settings.conversion_index_path, metadata)
+fainder_index = FainderIndex(
+    metadata=metadata,
+    rebinning_path=settings.rebinning_index_path,
+    conversion_path=settings.conversion_index_path,
+)
 column_index = ColumnIndex(
     settings.hnsw_index_path,
     metadata,
@@ -60,8 +63,7 @@ column_index = ColumnIndex(
 )
 query_evaluator = QueryEvaluator(
     lucene_connector=lucene_connector,
-    rebinning_index=rebinning_index,
-    conversion_index=conversion_index,
+    fainder_index=fainder_index,
     hnsw_index=column_index,
     metadata=metadata,
     cache_size=settings.query_cache_size,
@@ -148,7 +150,9 @@ async def query(request: QueryRequest) -> QueryResponse:
     try:
         start_time = time.perf_counter()
         doc_ids, (doc_highlights, col_highlights) = query_evaluator.execute(
-            request.query, fainder_mode=request.fainder_mode
+            request.query,
+            fainder_mode=request.fainder_mode,
+            enable_highlighting=request.enable_highlighting,
         )
 
         # Calculate pagination
@@ -183,9 +187,11 @@ async def query(request: QueryRequest) -> QueryResponse:
         raise HTTPException(
             status_code=400, detail=f"Invalid query: {e.get_context(request.query)}"
         ) from e
-    except PercentileError as e:
-        logger.info(f"Invalid percentile predicate: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid percentile predicate: {e}") from e
+    except FainderError as e:
+        logger.info(f"Error executing percentile predicate: {e}")
+        raise HTTPException(
+            status_code=400, detail=f"Error executing percentile predicate: {e}"
+        ) from e
     except ColumnSearchError as e:
         logger.info(f"Column search error: {e}")
         raise HTTPException(status_code=400, detail=f"Column search error: {e}") from e
@@ -249,10 +255,15 @@ async def update_indices() -> MessageResponse:
 
         # Update global variables
         croissant_store.replace_documents(documents)
-        rebinning_index.update(settings.rebinning_index_path, metadata)
-        conversion_index.update(settings.conversion_index_path, metadata)
-        column_index.update(settings.hnsw_index_path, metadata)
-        query_evaluator.update_indices(rebinning_index, conversion_index, column_index, metadata)
+        fainder_index.update(
+            metadata=metadata,
+            rebinning_path=settings.rebinning_index_path,
+            conversion_path=settings.conversion_index_path,
+        )
+        column_index.update(path=settings.hnsw_index_path, metadata=metadata)
+        query_evaluator.update_indices(
+            fainder_index=fainder_index, hnsw_index=column_index, metadata=metadata
+        )
 
         # Recreate Lucene index
         await lucene_connector.recreate_index()

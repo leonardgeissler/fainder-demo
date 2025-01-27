@@ -10,7 +10,7 @@
 (
     cd backend || exit
     virtualenv venv
-    # shellcheck source=backend/venv/bin/activate
+    # shellcheck source=backend/.venv/bin/activate
     source venv/bin/activate
     pip install -e ".[dev]"
 )

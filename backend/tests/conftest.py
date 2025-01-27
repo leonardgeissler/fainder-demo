@@ -60,9 +60,18 @@ def evaluator() -> QueryEvaluator:
     lucene_connector = LuceneConnector(settings.lucene_host, settings.lucene_port)
     # Fainder indices for testing are generated with the following parameters:
     # n_clusters = 27, bin_budget = 270, alpha = 1, transform = None,
-    rebinning_index = FainderIndex(settings.rebinning_index_path, metadata)
-    conversion_index = FainderIndex(settings.conversion_index_path, metadata)
-    column_index = ColumnIndex(settings.hnsw_index_path, metadata, use_embeddings=False)
+    fainder_index = FainderIndex(
+        metadata=metadata,
+        rebinning_path=settings.rebinning_index_path,
+        conversion_path=settings.conversion_index_path,
+    )
+    column_index = ColumnIndex(
+        path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False
+    )
     return QueryEvaluator(
-        lucene_connector, rebinning_index, conversion_index, column_index, metadata, cache_size=100
+        lucene_connector=lucene_connector,
+        fainder_index=fainder_index,
+        hnsw_index=column_index,
+        metadata=metadata,
+        cache_size=100,
     )
