@@ -171,7 +171,6 @@ async def query(request: QueryRequest) -> QueryResponse:
         logger.info(
             f"Query '{request.query}' returned {len(docs)} documents in {search_time:.4f} seconds."
         )
-
         return QueryResponse(
             query=request.query,
             results=docs,  # Documents now contain highlighted text
