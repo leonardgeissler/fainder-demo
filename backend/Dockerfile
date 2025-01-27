@@ -23,6 +23,7 @@ ADD . /app
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=README.md,target=README.md \
     uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:${PATH}"

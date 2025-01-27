@@ -6,9 +6,9 @@ build-backend = "hatchling.build"
 name = "backend"
 dynamic = ["version"]
 description = " A search engine for text and distribution-aware dataset search."
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "../LICENSE" }
+license = "Apache-2.0"
 authors = [
     { name = "Lennart Behme", email = "lennart.behme@tu-berlin.de" },
     { name = "Leonard Geißler", email = "l.geissler@tu-berlin.de" },

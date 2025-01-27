@@ -33,7 +33,6 @@ build
 # Ignore Dockerfile and .dockerignore itself
 Dockerfile
 .dockerignore
-README.md
 
 scripts/
 tests/
