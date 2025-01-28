@@ -101,12 +101,12 @@ def _apply_field_highlighting(doc: Document, field: str, highlighted: str) -> No
     """Apply highlighting to a specific field in the document."""
     field_split = field.split("_")
     helper = doc
+    logger.trace(f"Processing field: {field} and highlighting: {highlighted}")
     for i in range(len(field_split)):
         if i == len(field_split) - 1:
             helper[field_split[i]] = highlighted
         else:
             helper = helper[field_split[i]]
-            logger.debug(f"fields: {field_split}")
 
 
 def _apply_column_highlighting(
@@ -163,7 +163,7 @@ async def query(request: QueryRequest) -> QueryResponse:
 
         docs = croissant_store.get_documents(paginated_doc_ids)
         if request.enable_highlighting:
-            # make a deep copy of the documents to avoid modifying the original
+            # Make a deep copy of the documents to avoid modifying the original
             docs = copy.deepcopy(docs)
             # Only add highlights if enabled and they exist for the document
             docs = _apply_highlighting(docs, doc_highlights, col_highlights, paginated_doc_ids)
@@ -176,7 +176,7 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
         return QueryResponse(
             query=request.query,
-            results=docs,  # Documents now contain highlighted text
+            results=docs,
             search_time=search_time,
             result_count=len(doc_ids),
             page=request.page,

@@ -276,7 +276,7 @@ wheels = [
 [[package]]
 name = "fainder"
 version = "0.1.0"
-source = { git = "https://github.com/lbhm/fainder?rev=demo#e5d6be6878fcdb387419fc9b0a3c067a28e68dd8" }
+source = { git = "https://github.com/lbhm/fainder?rev=demo#8a7cf828536533a26b59756575a8575482144239" }
 dependencies = [
     { name = "loguru" },
     { name = "numpy" },

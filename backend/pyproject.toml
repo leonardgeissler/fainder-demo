@@ -58,7 +58,6 @@ path = "backend/__init__.py"
 [tool.hatch.metadata]
 allow-direct-references = true
 
-
 [tool.ruff]
 line-length = 99
 target-version = "py310"
