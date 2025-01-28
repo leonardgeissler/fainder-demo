@@ -4,6 +4,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, DirectoryPath, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+FainderMode = Literal["low_memory", "full_precision", "full_recall", "exact"]
+
 
 class Metadata(BaseModel):
     doc_to_cols: dict[int, set[int]]
@@ -25,7 +27,6 @@ class Settings(BaseSettings):
 
     # QueryEvaluator settings
     query_cache_size: int = 128
-    highlights_cache_size: int = 128  # Add highlight cache size setting
 
     # Lucene settings
     lucene_host: str = "127.0.0.1"
@@ -95,13 +96,11 @@ class QueryRequest(BaseModel):
     query: str
     page: int = 1
     per_page: int = 10
-    fainder_mode: Literal["low_memory", "full_precision", "full_recall", "exact"] = "low_memory"
+    fainder_mode: FainderMode = "low_memory"
     enable_highlighting: bool = True
 
 
 class QueryResponse(BaseModel):
-    """Response for a query request."""
-
     query: str
     results: list[dict[str, Any]]
     search_time: float
@@ -133,5 +132,5 @@ class IndexingError(Exception):
     pass
 
 
-class PercentileError(Exception):
+class FainderError(Exception):
     pass

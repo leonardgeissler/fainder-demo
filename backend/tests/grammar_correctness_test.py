@@ -134,25 +134,24 @@ def test_grammar_correctness(
 
     # Execute twice with caching to measure cache hit
     exec_start = time.perf_counter()
-    result1 = evaluator.execute(query)
+    result1, _ = evaluator.execute(query)
     first_exec_time = time.perf_counter() - exec_start
 
     exec_start = time.perf_counter()
-    result1_cached = evaluator.execute(query)
+    result1_cached, _ = evaluator.execute(query)
     cached_exec_time = time.perf_counter() - exec_start
 
     # Execute without caching
     no_cache_evaluator = QueryEvaluator(
-        evaluator.lucene_connector,
-        evaluator.executor_rebinning.fainder_index,
-        evaluator.executor_conversion.fainder_index,
-        evaluator.executor_rebinning.hnsw_index,
-        evaluator.executor_rebinning.metadata,
+        lucene_connector=evaluator.lucene_connector,
+        fainder_index=evaluator.executor.fainder_index,
+        hnsw_index=evaluator.executor.hnsw_index,
+        metadata=evaluator.executor.metadata,
         cache_size=-1,
     )
 
     exec_start = time.perf_counter()
-    result2 = no_cache_evaluator.execute(query)
+    result2, _ = no_cache_evaluator.execute(query)
     no_cache_exec_time = time.perf_counter() - exec_start
 
     # Log cache statistics

@@ -81,8 +81,8 @@ must place your Croissant files into a folder and set the `DATA_DIR` and `COLLEC
 accordingly (see above, we recommend `./data/<collection_name/croissant` if you want to use the
 Docker setup).
 
-**Note:** Currently, you have to manually have to trigger the intial index creation. To do so, you
-have to install the `backend` dependencies and run the following command:
+**Note:** Currently, you have to manually trigger the intial index creation. To do so, install the
+`backend` dependencies and run the following command:
 
 ```bash
 python -m backend.indexing
@@ -125,10 +125,13 @@ TODO
 
 #### Developer Setup
 
+We recommend using [`uv`](https://docs.astral.sh/uv/) to manage the development environment of the
+backend component. You just have to run:
+
 ```bash
-# Follow the steps above until you have activated your virtual environment
-pip install -e ".[dev]"
-pre-commit install
+cd backend/
+uv sync --extra dev
+uv run pre-commit install
 ```
 
 ## Generating gRPC Code

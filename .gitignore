@@ -45,8 +45,8 @@ model_cache/
 
 # Local project folders
 data/
+logs/
 
 # Lucene
 target/
 /lucene_index
-/logs

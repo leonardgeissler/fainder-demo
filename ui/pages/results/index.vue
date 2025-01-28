@@ -794,6 +794,7 @@ const formatNumber = (value) => {
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   font-size: 0.875rem;
   line-height: 1.4;

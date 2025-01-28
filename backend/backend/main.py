@@ -16,10 +16,10 @@ from backend.column_index import ColumnIndex
 from backend.config import (
     CacheInfo,
     ColumnSearchError,
+    FainderError,
     IndexingError,
     MessageResponse,
     Metadata,
-    PercentileError,
     QueryRequest,
     QueryResponse,
     Settings,
@@ -49,8 +49,11 @@ logger.add(sys.stdout, level="DEBUG")
 # Global variables to store persistent objects
 croissant_store = CroissantStore(settings.croissant_path)
 lucene_connector = LuceneConnector(settings.lucene_host, settings.lucene_port)
-rebinning_index = FainderIndex(settings.rebinning_index_path, metadata)
-conversion_index = FainderIndex(settings.conversion_index_path, metadata)
+fainder_index = FainderIndex(
+    metadata=metadata,
+    rebinning_path=settings.rebinning_index_path,
+    conversion_path=settings.conversion_index_path,
+)
 column_index = ColumnIndex(
     settings.hnsw_index_path,
     metadata,
@@ -60,8 +63,7 @@ column_index = ColumnIndex(
 )
 query_evaluator = QueryEvaluator(
     lucene_connector=lucene_connector,
-    rebinning_index=rebinning_index,
-    conversion_index=conversion_index,
+    fainder_index=fainder_index,
     hnsw_index=column_index,
     metadata=metadata,
     cache_size=settings.query_cache_size,
@@ -99,12 +101,12 @@ def _apply_field_highlighting(doc: Document, field: str, highlighted: str) -> No
     """Apply highlighting to a specific field in the document."""
     field_split = field.split("_")
     helper = doc
+    logger.trace(f"Processing field: {field} and highlighting: {highlighted}")
     for i in range(len(field_split)):
         if i == len(field_split) - 1:
             helper[field_split[i]] = highlighted
         else:
             helper = helper[field_split[i]]
-            logger.debug(f"fields: {field_split}")
 
 
 def _apply_column_highlighting(
@@ -148,7 +150,9 @@ async def query(request: QueryRequest) -> QueryResponse:
     try:
         start_time = time.perf_counter()
         doc_ids, (doc_highlights, col_highlights) = query_evaluator.execute(
-            request.query, fainder_mode=request.fainder_mode
+            query=request.query,
+            fainder_mode=request.fainder_mode,
+            enable_highlighting=request.enable_highlighting,
         )
 
         # Calculate pagination
@@ -159,7 +163,7 @@ async def query(request: QueryRequest) -> QueryResponse:
 
         docs = croissant_store.get_documents(paginated_doc_ids)
         if request.enable_highlighting:
-            # make a deep copy of the documents to avoid modifying the original
+            # Make a deep copy of the documents to avoid modifying the original
             docs = copy.deepcopy(docs)
             # Only add highlights if enabled and they exist for the document
             docs = _apply_highlighting(docs, doc_highlights, col_highlights, paginated_doc_ids)
@@ -172,7 +176,7 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
         return QueryResponse(
             query=request.query,
-            results=docs,  # Documents now contain highlighted text
+            results=docs,
             search_time=search_time,
             result_count=len(doc_ids),
             page=request.page,
@@ -183,9 +187,11 @@ async def query(request: QueryRequest) -> QueryResponse:
         raise HTTPException(
             status_code=400, detail=f"Invalid query: {e.get_context(request.query)}"
         ) from e
-    except PercentileError as e:
-        logger.info(f"Invalid percentile predicate: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid percentile predicate: {e}") from e
+    except FainderError as e:
+        logger.info(f"Error executing percentile predicate: {e}")
+        raise HTTPException(
+            status_code=400, detail=f"Error executing percentile predicate: {e}"
+        ) from e
     except ColumnSearchError as e:
         logger.info(f"Column search error: {e}")
         raise HTTPException(status_code=400, detail=f"Column search error: {e}") from e
@@ -249,10 +255,15 @@ async def update_indices() -> MessageResponse:
 
         # Update global variables
         croissant_store.replace_documents(documents)
-        rebinning_index.update(settings.rebinning_index_path, metadata)
-        conversion_index.update(settings.conversion_index_path, metadata)
-        column_index.update(settings.hnsw_index_path, metadata)
-        query_evaluator.update_indices(rebinning_index, conversion_index, column_index, metadata)
+        fainder_index.update(
+            metadata=metadata,
+            rebinning_path=settings.rebinning_index_path,
+            conversion_path=settings.conversion_index_path,
+        )
+        column_index.update(path=settings.hnsw_index_path, metadata=metadata)
+        query_evaluator.update_indices(
+            fainder_index=fainder_index, hnsw_index=column_index, metadata=metadata
+        )
 
         # Recreate Lucene index
         await lucene_connector.recreate_index()
