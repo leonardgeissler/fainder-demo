@@ -219,7 +219,7 @@ def parse_args():
         help="Skip generating Fainder indices",
     )
     parser.add_argument(
-        "--no-embeddigs",
+        "--no-embeddings",
         action="store_true",
         help="Skip generating embedding index",
     )
@@ -240,6 +240,7 @@ if __name__ == "__main__":
 
     try:
         settings = Settings()  # type: ignore
+        logger.debug(settings.model_dump())
     except Exception as e:
         logger.error(f"Error loading settings: {e}")
         sys.exit(1)
@@ -257,7 +258,7 @@ if __name__ == "__main__":
             algorithm=settings.fainder_cluster_algorithm,
         )
 
-    if not args.no_embeddigs:
+    if not args.no_embeddings:
         generate_embedding_index(
             name_to_vector=name_to_vector,
             output_path=settings.embedding_path,
