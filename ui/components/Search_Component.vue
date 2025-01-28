@@ -24,11 +24,19 @@ words # The search page will contain multiple search bars
               :auto-grow="true"
             />
             <div class="syntax-highlight" v-html="highlightedQuery"></div>
-            <div v-if="syntaxError" class="error-message">{{ syntaxError }}</div>
+            <div v-if="syntaxError" class="error-message">
+              {{ syntaxError }}
+            </div>
           </div>
         </v-col>
         <v-col cols="1">
-          <v-btn icon="mdi-cog" @click="showSettings = true" variant="text" elevation="0" density="compact">
+          <v-btn
+            icon="mdi-cog"
+            @click="showSettings = true"
+            variant="text"
+            elevation="0"
+            density="compact"
+          >
           </v-btn>
         </v-col>
       </v-row>
@@ -49,7 +57,10 @@ words # The search page will contain multiple search bars
 
       <!-- Simple Query Builder -->
       <v-expand-transition>
-        <v-row v-if="simpleBuilder && showSimpleBuilder" class="query-builder mt-4">
+        <v-row
+          v-if="simpleBuilder && showSimpleBuilder"
+          class="query-builder mt-4"
+        >
           <v-col cols="12">
             <div class="d-flex align-center justify-space-between mb-2">
               <div class="builder-header">
@@ -83,7 +94,9 @@ words # The search page will contain multiple search bars
                 @click="transferPercentileTerm(term, index)"
                 color="indigo"
               >
-                COLUMN(PERCENTILE({{ term.percentile }};{{ term.comparison }};{{ term.value }}))
+                COLUMN(PERCENTILE({{ term.percentile }};{{ term.comparison }};{{
+                  term.value
+                }}))
               </v-chip>
               <v-chip
                 v-for="(term, index) in combinedTerms"
@@ -93,7 +106,10 @@ words # The search page will contain multiple search bars
                 @click="transferCombinedTerm(term, index)"
                 color="success"
               >
-                COLUMN(NAME({{ term.column }};{{ term.threshold }}) AND PERCENTILE({{ term.percentile }};{{ term.comparison }};{{ term.value }}))
+                COLUMN(NAME({{ term.column }};{{ term.threshold }}) AND
+                PERCENTILE({{ term.percentile }};{{ term.comparison }};{{
+                  term.value
+                }}))
               </v-chip>
             </v-chip-group>
 
@@ -183,11 +199,9 @@ words # The search page will contain multiple search bars
                 </div>
               </v-col>
             </v-row>
-
           </v-col>
         </v-row>
       </v-expand-transition>
-
     </v-container>
 
     <!-- Settings Dialog -->
@@ -251,7 +265,9 @@ const props = defineProps({
 const emit = defineEmits(["searchData"]);
 const route = useRoute();
 const temp_fainder_mode = ref(route.query.fainder_mode || "low_memory");
-const temp_enable_highlighting = ref(route.query.enable_highlighting !== 'false');  // Default to true
+const temp_enable_highlighting = ref(
+  route.query.enable_highlighting !== "false"
+); // Default to true
 const current_rows = ref(1);
 
 const { fainder_mode, enable_highlighting } = useSearchState();
@@ -261,7 +277,7 @@ if (!fainder_mode.value) {
   fainder_mode.value = route.query.fainder_mode || "low_memory";
 }
 if (!enable_highlighting.value) {
-  enable_highlighting.value = route.query.enable_highlighting !== 'false';  // Default to true
+  enable_highlighting.value = route.query.enable_highlighting !== "false"; // Default to true
 }
 
 const searchQuery = ref(props.searchQuery);
@@ -280,22 +296,19 @@ const fainder_modes = [
   { title: "Exact Results", value: "exact" },
 ];
 
-
 // Simple query builder state
 const showSimpleBuilder = ref(false);
 
 const columnFilter = ref({
-  column: '',
-  threshold: ''
+  column: "",
+  threshold: "",
 });
 
 const percentileFilter = ref({
-  percentile: '',
-  comparison: '',
-  value: ''
+  percentile: "",
+  comparison: "",
+  value: "",
 });
-
-
 
 // on change of highlightEnabled value, update syntax highlighting
 watch(highlightEnabled, (value) => {
@@ -316,10 +329,10 @@ const handleKeyDown = (event) => {
     if (!event.shiftKey) {
       event.preventDefault();
       searchData();
-    }
-  } else if (event.key === "Shift") {
-    if (current_rows.value < props.lines) {
-      current_rows.value += 1; // on shift+enter, increase the number of rows
+    } else if (event.shiftKey) {
+      if (current_rows.value < props.lines) {
+        current_rows.value += 1; // on shift+enter, increase the number of rows
+      }
     }
   }
 };
@@ -339,8 +352,11 @@ onUnmounted(() => {
 const textareaMaxHeight = computed(() => `${props.lines * 24 + 26}px`);
 
 async function searchData() {
-  if ((!searchQuery.value || searchQuery.value.trim() === "" )
-  && columnTerms.value.length === 0 && percentileTerms.value.length === 0) {
+  if (
+    (!searchQuery.value || searchQuery.value.trim() === "") &&
+    columnTerms.value.length === 0 &&
+    percentileTerms.value.length === 0
+  ) {
     return;
   }
 
@@ -349,40 +365,44 @@ async function searchData() {
   const terms = [];
 
   // Add column terms
-  const columnQueryTerms = columnTerms.value.map(term =>
-    `COLUMN(NAME(${term.column};${term.threshold}))`
+  const columnQueryTerms = columnTerms.value.map(
+    (term) => `COLUMN(NAME(${term.column};${term.threshold}))`
   );
 
   // Add percentile terms
-  const percentileQueryTerms = percentileTerms.value.map(term =>
-    `COLUMN(PERCENTILE(${term.percentile};${term.comparison};${term.value}))`
+  const percentileQueryTerms = percentileTerms.value.map(
+    (term) =>
+      `COLUMN(PERCENTILE(${term.percentile};${term.comparison};${term.value}))`
   );
 
   // Add combined terms
-  const combinedQueryTerms = combinedTerms.value.map(term =>
-    `COLUMN(NAME(${term.column};${term.threshold}) AND PERCENTILE(${term.percentile};${term.comparison};${term.value}))`
+  const combinedQueryTerms = combinedTerms.value.map(
+    (term) =>
+      `COLUMN(NAME(${term.column};${term.threshold}) AND PERCENTILE(${term.percentile};${term.comparison};${term.value}))`
   );
   if (columnQueryTerms.length) {
-    terms.push(columnQueryTerms.join(' AND '));
+    terms.push(columnQueryTerms.join(" AND "));
   }
 
   if (percentileQueryTerms.length) {
-    terms.push(percentileQueryTerms.join(' AND '));
+    terms.push(percentileQueryTerms.join(" AND "));
   }
 
   if (combinedQueryTerms.length) {
-    terms.push(combinedQueryTerms.join(' AND '));
+    terms.push(combinedQueryTerms.join(" AND "));
   }
   // Combine filter terms
-  const filterTerms = terms.join(' AND ');
+  const filterTerms = terms.join(" AND ");
 
-  const filterQuery = filterTerms ? `${filterTerms}` : '';
+  const filterQuery = filterTerms ? `${filterTerms}` : "";
 
-
-  let query = searchQuery.value?.trim() || '';
+  let query = searchQuery.value?.trim() || "";
 
   // Check if query is just plain text (no operators or functions)
-  const isPlainText = !/(?:pp|percentile|kw|keyword|col|column)\s*\(|AND|OR|XOR|NOT|\(|\)/.test(query);
+  const isPlainText =
+    !/(?:pp|percentile|kw|keyword|col|column)\s*\(|AND|OR|XOR|NOT|\(|\)/.test(
+      query
+    );
 
   // Process plain text as keyword search
   if (isPlainText && query) {
@@ -401,7 +421,7 @@ async function searchData() {
   emit("searchData", {
     query: s_query,
     fainder_mode: fainder_mode.value,
-    enable_highlighting: enable_highlighting.value,  // Add this line
+    enable_highlighting: enable_highlighting.value, // Add this line
   });
 }
 
@@ -420,7 +440,11 @@ const validateSyntax = (value) => {
     const query = value.trim();
 
     // If it's a simple keyword query (no special syntax), treat it as valid
-    if (!query.includes("(") && !query.includes(")") && !/\b(AND|OR|XOR|NOT)\b/i.test(query)) {
+    if (
+      !query.includes("(") &&
+      !query.includes(")") &&
+      !/\b(AND|OR|XOR|NOT)\b/i.test(query)
+    ) {
       return true;
     }
 
@@ -434,34 +458,44 @@ const validateSyntax = (value) => {
     }
 
     // Extract and validate individual function calls
-    const functionPattern = /(?:pp|percentile|kw|keyword|col|column|name)\s*\([^)]+\)/gi;
+    const functionPattern =
+      /(?:pp|percentile|kw|keyword|col|column|name)\s*\([^)]+\)/gi;
     const functions = value.match(functionPattern) || [];
 
     for (const func of functions) {
       const lowFunc = func.toLowerCase();
-      if (lowFunc.startsWith('col') || lowFunc.startsWith('column')) {
+      if (lowFunc.startsWith("col") || lowFunc.startsWith("column")) {
         // Check if it contains name or percentile terms
-        if (!/^(?:col|column)\s*\(\s*(?:name\s*\([^;]+;\s*\d+\)|pp\s*\([^)]+\))\s*\)$/i.test(func)) {
+        if (
+          !/^(?:col|column)\s*\(\s*(?:name\s*\([^;]+;\s*\d+\)|pp\s*\([^)]+\))\s*\)$/i.test(
+            func
+          )
+        ) {
           // Check if it has invalid keyword inside
           if (/(?:kw|keyword)\s*\([^)]+\)/i.test(func)) {
             isValid.value = false;
-            syntaxError.value = "Keywords not allowed inside column expressions";
+            syntaxError.value =
+              "Keywords not allowed inside column expressions";
             return false;
           }
         }
-      } else if (lowFunc.startsWith('kw') || lowFunc.startsWith('keyword')) {
+      } else if (lowFunc.startsWith("kw") || lowFunc.startsWith("keyword")) {
         if (!/^(?:kw|keyword)\s*\([^)]+\)$/i.test(func)) {
           isValid.value = false;
           syntaxError.value = "Invalid keyword syntax";
           return false;
         }
-      } else if (lowFunc.startsWith('pp') || lowFunc.startsWith('percentile')) {
-        if (!/^(?:pp|percentile)\s*\(\s*\d+(?:\.\d+)?\s*;\s*(?:ge|gt|le|lt)\s*;\s*\d+(?:\.\d+)?\s*\)$/i.test(func)) {
+      } else if (lowFunc.startsWith("pp") || lowFunc.startsWith("percentile")) {
+        if (
+          !/^(?:pp|percentile)\s*\(\s*\d+(?:\.\d+)?\s*;\s*(?:ge|gt|le|lt)\s*;\s*\d+(?:\.\d+)?\s*\)$/i.test(
+            func
+          )
+        ) {
           isValid.value = false;
           syntaxError.value = "Invalid percentile syntax";
           return false;
         }
-      } else if (lowFunc.startsWith('name')) {
+      } else if (lowFunc.startsWith("name")) {
         if (!/^name\s*\([^;]+;\s*\d+\)$/i.test(func)) {
           isValid.value = false;
           syntaxError.value = "Invalid name syntax";
@@ -511,7 +545,7 @@ const highlightSyntax = (value) => {
   const maxBracketLevels = 4;
 
   highlighted = highlighted.replace(/[\(\)]/g, (match) => {
-    if (match === '(') {
+    if (match === "(") {
       bracketLevel = Math.min(bracketLevel + 1, maxBracketLevels);
       return `<span class="bracket-${bracketLevel - 1}">(</span>`;
     } else {
@@ -541,17 +575,19 @@ const removePercentileTerm = (index) => {
 // Separate validation for each filter type
 const isColumnFilterValid = computed(() => {
   const f = columnFilter.value;
-  return f.column?.trim() && f.threshold !== '' && !isNaN(f.threshold);
+  return f.column?.trim() && f.threshold !== "" && !isNaN(f.threshold);
 });
 
 const isPercentileFilterValid = computed(() => {
   const f = percentileFilter.value;
-  return f.percentile !== '' &&
-         parseFloat(f.percentile) >= 0 &&
-         parseFloat(f.percentile) <= 1 &&
-         f.comparison &&
-         f.value !== '' &&
-         !isNaN(f.value);
+  return (
+    f.percentile !== "" &&
+    parseFloat(f.percentile) >= 0 &&
+    parseFloat(f.percentile) <= 1 &&
+    f.comparison &&
+    f.value !== "" &&
+    !isNaN(f.value)
+  );
 });
 
 // Separate add functions for each filter type
@@ -560,13 +596,13 @@ const addColumnFilter = () => {
 
   columnTerms.value.push({
     column: columnFilter.value.column,
-    threshold: parseFloat(columnFilter.value.threshold)
+    threshold: parseFloat(columnFilter.value.threshold),
   });
 
   // Reset form
   columnFilter.value = {
-    column: '',
-    threshold: ''
+    column: "",
+    threshold: "",
   };
 };
 
@@ -576,14 +612,14 @@ const addPercentileFilter = () => {
   percentileTerms.value.push({
     percentile: parseFloat(percentileFilter.value.percentile),
     comparison: percentileFilter.value.comparison,
-    value: parseFloat(percentileFilter.value.value)
+    value: parseFloat(percentileFilter.value.value),
   });
 
   // Reset form
   percentileFilter.value = {
-    percentile: '',
-    comparison: '',
-    value: ''
+    percentile: "",
+    comparison: "",
+    value: "",
   };
 };
 
@@ -596,19 +632,19 @@ const addBothFilters = () => {
     threshold: parseFloat(columnFilter.value.threshold),
     percentile: parseFloat(percentileFilter.value.percentile),
     comparison: percentileFilter.value.comparison,
-    value: parseFloat(percentileFilter.value.value)
+    value: parseFloat(percentileFilter.value.value),
   });
 
   // Reset both forms
   columnFilter.value = {
-    column: '',
-    threshold: ''
+    column: "",
+    threshold: "",
   };
 
   percentileFilter.value = {
-    percentile: '',
-    comparison: '',
-    value: ''
+    percentile: "",
+    comparison: "",
+    value: "",
   };
 };
 
@@ -618,19 +654,17 @@ const addFilters = () => {
     addColumnFilter();
   } else if (isPercentileFilterValid.value && !isColumnFilterValid.value) {
     addPercentileFilter();
-  }
-  else if (isColumnFilterValid.value && isPercentileFilterValid.value) {
+  } else if (isColumnFilterValid.value && isPercentileFilterValid.value) {
     addBothFilters();
-  }
-  else {
+  } else {
     console.error("Invalid filter values");
   }
-}
+};
 
 const transferColumnTerm = (term, index) => {
   columnFilter.value = {
     column: term.column,
-    threshold: term.threshold.toString()
+    threshold: term.threshold.toString(),
   };
   removeColumnTerm(index);
 };
@@ -639,7 +673,7 @@ const transferPercentileTerm = (term, index) => {
   percentileFilter.value = {
     percentile: term.percentile.toString(),
     comparison: term.comparison,
-    value: term.value.toString()
+    value: term.value.toString(),
   };
   removePercentileTerm(index);
 };
@@ -647,12 +681,12 @@ const transferPercentileTerm = (term, index) => {
 const transferCombinedTerm = (term, index) => {
   columnFilter.value = {
     column: term.column,
-    threshold: term.threshold.toString()
+    threshold: term.threshold.toString(),
   };
   percentileFilter.value = {
     percentile: term.percentile.toString(),
     comparison: term.comparison,
-    value: term.value.toString()
+    value: term.value.toString(),
   };
   combinedTerms.value.splice(index, 1);
 };
@@ -712,10 +746,12 @@ function saveSettings() {
   position: relative;
   color: transparent !important;
   background: transparent !important;
-  caret-color: rgb(var(--v-theme-on-surface)); /* Updated: theme-aware caret color */
+  caret-color: rgb(
+    var(--v-theme-on-surface)
+  ); /* Updated: theme-aware caret color */
   z-index: 2;
   white-space: pre;
-  font-family: 'Roboto Mono', monospace;
+  font-family: "Roboto Mono", monospace;
   font-size: 16px;
   letter-spacing: normal;
   line-height: normal;
@@ -739,7 +775,7 @@ function saveSettings() {
   left: 16px;
   right: 48px;
   pointer-events: none;
-  font-family: 'Roboto Mono', monospace;
+  font-family: "Roboto Mono", monospace;
   font-size: 16px;
   z-index: 1;
   color: rgba(var(--v-theme-on-surface), 0.87);
