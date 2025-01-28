@@ -150,7 +150,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     try:
         start_time = time.perf_counter()
         doc_ids, (doc_highlights, col_highlights) = query_evaluator.execute(
-            request.query,
+            query=request.query,
             fainder_mode=request.fainder_mode,
             enable_highlighting=request.enable_highlighting,
         )

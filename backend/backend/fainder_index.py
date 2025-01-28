@@ -24,10 +24,10 @@ class FainderIndex:
         self.hist_to_col = metadata.hist_to_col
 
         self.rebinning_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = (
-            (load_input(rebinning_path, "index")) if rebinning_path else None
+            load_input(rebinning_path, "rebinning index") if rebinning_path else None
         )
         self.conversion_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = (
-            load_input(conversion_path, "index") if conversion_path else None
+            load_input(conversion_path, "conversion index") if conversion_path else None
         )
 
     def update(
@@ -38,8 +38,12 @@ class FainderIndex:
         self.col_to_hist = metadata.col_to_hist
         self.hist_to_col = metadata.hist_to_col
 
-        self.rebinning_index = load_input(rebinning_path, "index") if rebinning_path else None
-        self.conversion_index = load_input(conversion_path, "index") if conversion_path else None
+        self.rebinning_index = (
+            load_input(rebinning_path, "rebinning index") if rebinning_path else None
+        )
+        self.conversion_index = (
+            load_input(conversion_path, "conversion index") if conversion_path else None
+        )
 
     def search(
         self,
@@ -51,7 +55,9 @@ class FainderIndex:
     ) -> set[np.uint32]:
         # Data validation
         if not (0 < percentile <= 1) or comparison not in ["ge", "gt", "le", "lt"]:
-            raise FainderError(f"{percentile};{comparison};{reference}")
+            raise FainderError(
+                f"Invalid percentile predicate: {percentile};{comparison};{reference}"
+            )
 
         filter_array = np.array(list(hist_filter), dtype=np.uint32) if hist_filter else None
 
@@ -59,6 +65,8 @@ class FainderIndex:
         query: PctlQuery = (percentile, comparison, reference)  # type: ignore
         match fainder_mode:
             case "low_memory":
+                if self.rebinning_index is None:
+                    raise FainderError("Rebinning index must be loaded for low_memory mode.")
                 results, runtime = run(
                     self.rebinning_index,
                     queries=[query],
@@ -67,6 +75,8 @@ class FainderIndex:
                     hist_filter=filter_array,
                 )
             case "full_precision":
+                if self.conversion_index is None:
+                    raise FainderError("Conversion index must be loaded for full_precision mode.")
                 results, runtime = run(
                     self.conversion_index,
                     queries=[query],
@@ -75,6 +85,8 @@ class FainderIndex:
                     hist_filter=filter_array,
                 )
             case "full_recall":
+                if self.conversion_index is None:
+                    raise FainderError("Conversion index must be loaded for full_recall mode.")
                 results, runtime = run(
                     self.conversion_index,
                     queries=[query],
@@ -83,6 +95,8 @@ class FainderIndex:
                     hist_filter=filter_array,
                 )
             case "exact":
+                if self.conversion_index is None:
+                    raise FainderError("Conversion index must be loaded for exact mode.")
                 raise NotImplementedError("Exact mode not implemented yet.")
             case _:
                 raise FainderError(f"Invalid Fainder Mode: {fainder_mode}")
