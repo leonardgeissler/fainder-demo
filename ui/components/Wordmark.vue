@@ -36,6 +36,6 @@
   }
 
   .large img {
-    height: 120px;
+    height: 200px;
   }
   </style>

@@ -53,7 +53,7 @@ public class LuceneServer {
             indexPath = Paths.get(dataDir, collectionName, luceneDir);
             dataPath = Paths.get(dataDir, collectionName, croissantDir);
             port = Integer.parseInt(config.get("LUCENE_PORT", "8001"));
-            maxResults = Integer.parseInt(config.get("LUCENE_MAX_RESULTS", "100"));
+            maxResults = Integer.parseInt(config.get("LUCENE_MAX_RESULTS", "100000"));
             minScore = Float.parseFloat(config.get("LUCENE_MIN_SCORE", "1.0"));
         } catch (DotenvException e) {
             logger.error("Failed to load config: {}", e.getMessage());

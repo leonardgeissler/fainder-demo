@@ -54,7 +54,7 @@ QUERY_CACHE_SIZE=128         # Maximum number of query resuls to cache
 # Lucene
 LUCENE_HOST=127.0.0.1        # Hostname of the Lucene service
 LUCENE_PORT=8001             # Port of the Lucene service
-LUCENE_MAX_RESULTS=100       # Maximum number of results returned by Lucene for a keyword predicate
+LUCENE_MAX_RESULTS=100000    # Maximum number of results returned by Lucene for a keyword predicate
 LUCENE_MIN_SCORE=1.0         # Minimum score for a keyword predicate to be considered
 
 # Fainder
