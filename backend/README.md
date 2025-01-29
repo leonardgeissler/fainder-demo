@@ -22,3 +22,9 @@ Start fastapi production server:
 cd ..
 fastapi run backend/main.py
 ```
+
+Upgrade dependencies:
+
+```bash
+uv lock -U
+```

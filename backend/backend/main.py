@@ -1,6 +1,5 @@
 import copy
 import json
-import sys
 import time
 import traceback
 from collections.abc import AsyncGenerator
@@ -23,6 +22,7 @@ from backend.config import (
     QueryRequest,
     QueryResponse,
     Settings,
+    configure_logging,
 )
 from backend.croissant_store import CroissantStore, Document
 from backend.fainder_index import FainderIndex
@@ -34,19 +34,24 @@ from backend.indexing import (
 from backend.lucene_connector import LuceneConnector
 from backend.query_evaluator import ColumnHighlights, DocumentHighlights, QueryEvaluator
 
-try:
-    settings = Settings()  # type: ignore
-    with settings.metadata_path.open() as file:
-        metadata = Metadata(**json.load(file))
-except Exception as e:
-    logger.error(f"Error loading settings: {e}")
-    sys.exit(1)
-
-# TODO: Maybe move from loguru to standard logging to be compatible with FastAPI
-logger.remove()
-logger.add(sys.stdout, level="DEBUG")
-
 # Global variables to store persistent objects
+settings = Settings()  # type: ignore
+# NOTE: Potentially add more modules here if they are not intercepted by loguru
+configure_logging(
+    settings.log_level,
+    modules=[
+        "fastapi",
+        "fastapi_cli",
+        "fastapi_cli.cli",
+        "fastapi_cli.discover",
+        "uvicorn",
+        "uvicorn.access",
+        "uvicorn.error",
+    ],
+)
+with settings.metadata_path.open() as file:
+    metadata = Metadata(**json.load(file))
+
 croissant_store = CroissantStore(settings.croissant_path)
 lucene_connector = LuceneConnector(settings.lucene_host, settings.lucene_port)
 fainder_index = FainderIndex(
@@ -168,11 +173,10 @@ async def query(request: QueryRequest) -> QueryResponse:
             # Only add highlights if enabled and they exist for the document
             docs = _apply_highlighting(docs, doc_highlights, col_highlights, paginated_doc_ids)
 
-        end_time = time.perf_counter()
-        search_time = end_time - start_time
-
+        search_time = time.perf_counter() - start_time
         logger.info(
-            f"Query '{request.query}' returned {len(docs)} documents in {search_time:.4f} seconds."
+            f"Query '{request.query}' returned {len(doc_ids)} results and {len(docs)} paginated "
+            f"documents in {search_time:.4f} seconds."
         )
         return QueryResponse(
             query=request.query,
