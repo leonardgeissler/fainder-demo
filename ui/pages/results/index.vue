@@ -210,7 +210,8 @@ page
                     <div class="field-list">
                     <div v-for="(field, fieldIndex) in selectedFile.field" :key="field.id" class="field-item mb-6">
                         <div class="field-header mb-2">
-                          <span class="text-h6 highlight-text" v-html="field.name"></span>
+                          <span class="text-h6 highlight-text" v-html="field.marked_name" v-if="field.marked_name"></span>
+                          <span class="text-h6" v-else> {{ field.name }}</span>
                           <v-chip class="ml-2" density="compact">{{ field.dataType[0] }}</v-chip>
                         </div>
                         <!-- Numerical Data with Histogram -->
@@ -798,16 +799,8 @@ const formatNumber = (value) => {
 /* Update highlight styles for details container */
 .highlight-text :deep(mark) {
   background-color: rgba(var(--v-theme-warning), 0.2);
-  color: inherit;
-  padding: 0 2px;
-  border-radius: 2px;
-  font-weight: 500;
 }
 
-.highlight-text {
-  line-height: 1.6;
-  font-size: 1rem;
-}
 
 .description-preview {
   overflow: hidden;
