@@ -16,6 +16,8 @@ words # The search page will contain multiple search bars
               :rules="[validateSyntax]"
               @update:model-value="highlightSyntax"
               @keydown="handleKeyDown"
+              @focus="isSearchFocused = true"
+              @blur="isSearchFocused = false"
               hide-details="true"
               :rows="current_rows"
               class="search-input"
@@ -36,6 +38,7 @@ words # The search page will contain multiple search bars
             variant="text"
             elevation="0"
             density="compact"
+            class="ml-2"
           >
           </v-btn>
         </v-col>
@@ -186,7 +189,7 @@ words # The search page will contain multiple search bars
 
             <v-row>
               <v-col cols="12">
-                <div class="d-flex justify-end">
+                <div class="d-flex justify-end gap-2">
                   <v-btn
                     color="success"
                     @click="addFilters"
@@ -195,6 +198,14 @@ words # The search page will contain multiple search bars
                     class="mr-2"
                   >
                     Add
+                  </v-btn>
+                  <v-btn
+                    color="primary"
+                    @click="searchData"
+                    prepend-icon="mdi-magnify"
+                    :disabled="!hasActiveFilters"
+                  >
+                    Run Query
                   </v-btn>
                 </div>
               </v-col>
@@ -206,7 +217,7 @@ words # The search page will contain multiple search bars
 
     <!-- Settings Dialog -->
     <v-dialog v-model="showSettings" width="500">
-      <v-card>
+      <v-card elevation="0">
         <v-card-title class="text-h5 mt-2"> Search Settings </v-card-title>
 
         <v-card-text>
@@ -283,8 +294,9 @@ if (!enable_highlighting.value) {
 const searchQuery = ref(props.searchQuery);
 const syntaxError = ref("");
 const highlightedQuery = ref("");
-const highlightEnabled = useCookie("highlight-enabled");
+const highlightEnabled = useCookie("fainder_highlight_enabled", { default: () => true });
 const isValid = ref(true);
+const isSearchFocused = ref(false);
 
 console.log("Initial fainder_mode:", fainder_mode?.value);
 
@@ -325,6 +337,8 @@ watch(highlightEnabled, (value) => {
 });
 
 const handleKeyDown = (event) => {
+  if (!isSearchFocused.value) return;
+
   if (event.key === "Enter") {
     if (!event.shiftKey) {
       event.preventDefault();
@@ -338,15 +352,14 @@ const handleKeyDown = (event) => {
 };
 
 onMounted(() => {
-  window.addEventListener("keydown", handleKeyDown);
-  // Initialize syntax highlighting if there's an initial search query
+  // Remove window event listener
   if (props.searchQuery) {
     highlightSyntax(props.searchQuery);
   }
 });
 
 onUnmounted(() => {
-  window.removeEventListener("keydown", handleKeyDown);
+  // Remove window event listener cleanup
 });
 
 const textareaMaxHeight = computed(() => `${props.lines * 24 + 26}px`);
@@ -690,6 +703,13 @@ const transferCombinedTerm = (term, index) => {
   };
   combinedTerms.value.splice(index, 1);
 };
+
+const hasActiveFilters = computed(() => {
+  return columnTerms.value.length > 0 ||
+         percentileTerms.value.length > 0 ||
+         combinedTerms.value.length > 0 ||
+         (searchQuery.value && searchQuery.value.trim() !== '');
+});
 
 function cancelSettings() {
   showSettings.value = false;

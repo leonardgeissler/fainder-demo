@@ -1,7 +1,7 @@
 <template>
   <v-app>
     <v-app-bar :elevation="0" height="85">
-      <Logo size="medium" class="mr-4 ml-4" @click="gotoHome"/>
+      <Logo size="medium" class="mr-4 ml-4 clickable" @click="gotoHome"/>
       <v-spacer></v-spacer>
 
       <!-- Add search component in app bar only on results page -->
@@ -13,12 +13,13 @@
           :lines="1"
           :queryBuilder="false"
           @searchData="searchData"
-          class="app-bar-search mx-2"
+          class="app-bar-search"
         />
         <v-btn
           icon
           @click="showSearchDialog = true"
           density="compact"
+          class="ml-2"
         >
           <v-icon>mdi-arrow-expand</v-icon>
         </v-btn>
@@ -79,7 +80,7 @@
       transition="dialog-top-transition"
       maxWidth="56rem"
     >
-      <v-card>
+      <v-card elevation="0">
         <v-toolbar dark color="primary">
           <v-btn icon dark @click="showSearchDialog = false">
             <v-icon>mdi-close</v-icon>
@@ -123,7 +124,7 @@
   const theme = useTheme();
   const { query, fainder_mode, currentPage, selectedResultIndex } = useSearchState();
   const colorMode = useColorMode();
-  const highlightEnabled = useCookie('highlight-enabled', { default: () => true })
+  const highlightEnabled = useCookie('fainder_highlight_enabled', { default: () => true })
 
   const internalSearchQuery = computed(() => route.query.query);
   const searchComponentKey = ref(0);
@@ -178,11 +179,15 @@
 
 <style scoped>
 .app-bar-search {
-  max-width: 800px;  /* Increased from 600px */
+  max-width: 1200px;  /* Increased from 800px */
   flex-grow: 1;
 }
 
 .app-bar-search :deep(.v-field) {
   border-radius: 20px;
+}
+
+.clickable {
+  cursor: pointer;
 }
 </style>
