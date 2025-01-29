@@ -24,6 +24,7 @@ words # The search page will contain multiple search bars
               append-inner-icon="mdi-magnify"
               @click:append-inner="searchData"
               :auto-grow="true"
+              autofocus
             />
             <div class="syntax-highlight" v-html="highlightedQuery"></div>
             <div v-if="syntaxError" class="error-message">
@@ -352,9 +353,14 @@ const handleKeyDown = (event) => {
 };
 
 onMounted(() => {
-  // Remove window event listener
   if (props.searchQuery) {
     highlightSyntax(props.searchQuery);
+  }
+
+  // Focus the textarea
+  const textarea = document.querySelector('.search-input textarea');
+  if (textarea) {
+    textarea.focus();
   }
 });
 
