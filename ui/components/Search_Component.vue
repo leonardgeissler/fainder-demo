@@ -721,6 +721,17 @@ function saveSettings() {
   enable_highlighting.value = temp_enable_highlighting.value;
   console.log("New fainder_mode:", fainder_mode.value);
   console.log("New highlighting enabled:", enable_highlighting.value);
+  // update route
+  const route = useRoute();
+  navigateTo(
+    {path: route.path,
+      query: {
+        ...route.query,
+        fainder_mode: temp_fainder_mode.value,
+        enable_highlighting: temp_enable_highlighting.value,
+      }}
+  );
+
 }
 </script>
 
