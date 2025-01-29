@@ -1,8 +1,16 @@
+import logging
+import sys
+from collections.abc import Sequence
+from itertools import chain
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
+from loguru import logger
 from pydantic import BaseModel, DirectoryPath, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+if TYPE_CHECKING:
+    from types import FrameType
 
 FainderMode = Literal["low_memory", "full_precision", "full_recall", "exact"]
 
@@ -47,6 +55,8 @@ class Settings(BaseSettings):
     hnsw_n_bidirectional_links: int = 64
     hnsw_ef: int = 50
 
+    # Misc
+    log_level: Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @classmethod
@@ -134,3 +144,62 @@ class IndexingError(Exception):
 
 class FainderError(Exception):
     pass
+
+
+class InterceptHandler(logging.Handler):
+    """Logs to loguru from Python logging module.
+
+    See https://github.com/MatthewScholefield/loguru-logging-intercept"""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Route a record to loguru."""
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = str(record.levelno)
+
+        # Find caller from where the logged message originated
+        frame: FrameType | None = logging.currentframe()
+        depth = 2
+        while frame and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+        logger_with_opts = logger.opt(depth=depth, exception=record.exc_info)
+        try:
+            logger_with_opts.log(level, record.getMessage())
+        except Exception as e:
+            safe_msg = getattr(record, "msg", None) or str(record)
+            logger_with_opts.warning(
+                f"Exception logging the following native logger message: {safe_msg}, {e}"
+            )
+
+
+def configure_logging(level: str, modules: Sequence[str] = ()) -> None:
+    # TODO: Maybe move from loguru to standard logging (in case of performance problems)
+    logger.remove()
+    logger.add(
+        sys.stdout,
+        format="{time:HH:mm:ss} | {level: >5} | {file}:{line} | <level>{message}</level>",
+        level=level,
+    )
+
+    logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+    for logger_name in chain(("",), modules):
+        if logger_name:
+            # Undocumented way of getting a logger without creating it:
+            mod_logger = logging.Logger.manager.loggerDict.get(logger_name)
+        else:
+            # Root logger is not contained in loggerDict
+            mod_logger = logging.getLogger()
+        if (mod_logger) and (isinstance(mod_logger, logging.Logger)):
+            mod_logger.handlers = [InterceptHandler(level=0)]
+            mod_logger.propagate = False
+            logger.trace(f"InterceptHandler in place for logger {logger_name}")
+        else:
+            logger.debug(f"No logger found named {logger_name}")
+
+    # NOTE: This is a helper to list all loggers in the system
+    # for k, _ in logging.Logger.manager.loggerDict.items():
+    #     if "transformer" in k or "torch" in k:
+    #         continue
+    #     print(k)

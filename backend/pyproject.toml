@@ -38,6 +38,7 @@ dependencies = [
     "pydantic~=2.10",
     "pydantic-settings~=2.7",
     "sentence-transformers~=3.3",
+    "torch~=2.0",
 ]
 
 [project.optional-dependencies]
@@ -93,6 +94,14 @@ ignore = [
     "PLR",  # pylint refactoring
     "S101", # assert (needed for pytest)
 ]
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
 
 [tool.mypy]
 ignore_missing_imports = true
