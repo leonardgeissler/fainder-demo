@@ -13,30 +13,42 @@ from backend.fainder_index import FainderIndex
 from backend.lucene_connector import LuceneConnector
 
 GRAMMAR = """
-    start: query
-    query: expression (OPERATOR query)?
-    expression: not_expr | term | "(" query ")"
-    not_expr: "NOT" term | "NOT" "(" query ")"
-    term: KEYWORD_OPERATOR "(" keywordterm ")"
-        | COLUMN_OPERATOR "(" column_query ")"
-    column_query: col_expr (OPERATOR column_query)?
-    col_expr: not_col_expr | columnterm | "(" column_query ")"
-    not_col_expr: "NOT" columnterm | "NOT" "(" column_query ")"
-    columnterm: NAME_OPERATOR "(" nameterm ")" | PERCENTILE_OPERATOR "(" percentileterm ")"
-    percentileterm: FLOAT ";" COMPARISON ";" FLOAT
-    keywordterm: KEYWORD
-    nameterm: IDENTIFIER ";" NUMBER
-    OPERATOR: "AND" | "OR" | "XOR"
-    COMPARISON: "ge" | "gt" | "le" | "lt"
-    PERCENTILE_OPERATOR: ("pp"i | "percentile"i) " "*
-    KEYWORD_OPERATOR: ("kw"i | "keyword"i) " "*
-    COLUMN_OPERATOR: ("col"i | "column"i) " "*
-    NAME_OPERATOR: ("name"i) " "*
-    NUMBER: /[0-9]+/
-    FLOAT: /[0-9]+(\\.[0-9]+)?/
-    IDENTIFIER: /[a-zA-Z0-9_]+/
-    KEYWORD: /[^;)]+/
-    %ignore /\\s+/
+    query:          expr (BOOLEAN_OP query)?
+    expr:           not_expr | term | "(" query ")"
+    not_expr:       "NOT" term | "NOT" "(" query ")"
+    term:           KEYWORD_OP "(" keywordterm ")" | COLUMN_OP "(" column_query ")"
+
+    keywordterm:    lucene_query
+    lucene_query:   lucene_clause+
+    lucene_clause:  [LUCENE_OP] [field_prefix] (LUCENE_TERM | "(" lucene_query ")")
+    field_prefix:   IDENTIFIER ":"
+
+    column_query:   col_expr (BOOLEAN_OP column_query)?
+    col_expr:       not_col_expr | columnterm | "(" column_query ")"
+    not_col_expr:   "NOT" columnterm | "NOT" "(" column_query ")"
+
+    columnterm:     NAME_OP "(" nameterm ")" | PERCENTILE_OP "(" percentileterm ")"
+    percentileterm: FLOAT ";" COMPARISON_OP ";" SIGNED_NUMBER
+    nameterm:       IDENTIFIER ";" INT
+
+    KEYWORD_OP:     ("kw"i | "keyword"i)
+    COLUMN_OP:      ("col"i | "column"i)
+    NAME_OP:        ("name"i)
+    PERCENTILE_OP:  ("pp"i | "percentile"i)
+    BOOLEAN_OP:     "AND" | "OR" | "XOR"
+    COMPARISON_OP:  "ge" | "gt" | "le" | "lt"
+    LUCENE_OP:      "+" | "-"
+
+    IDENTIFIER:     /[a-zA-Z0-9_ ]+/
+    LUCENE_TERM:    /[^():+-;]+/
+
+    %ignore _WS
+    %ignore COMMENT
+    %import common.INT
+    %import common.FLOAT
+    %import common.SIGNED_NUMBER
+    %import common.WS -> _WS
+    %import common.SH_COMMENT -> COMMENT
 """
 
 # Type alias for highlights
@@ -55,7 +67,7 @@ class QueryEvaluator:
         cache_size: int = 128,
     ):
         self.lucene_connector = lucene_connector
-        self.grammar = Lark(GRAMMAR, start="start")
+        self.grammar = Lark(GRAMMAR, start="query")
         self.annotator = QueryAnnotator()
         self.executor = QueryExecutor(self.lucene_connector, fainder_index, hnsw_index, metadata)
 
@@ -79,7 +91,7 @@ class QueryEvaluator:
         self,
         query: str,
         fainder_mode: FainderMode = "low_memory",
-        enable_highlighting: bool = True,
+        enable_highlighting: bool = False,
         enable_filtering: bool = False,
     ) -> tuple[list[int], Highlights]:
         # Reset state for new query
@@ -177,7 +189,7 @@ class QueryExecutor(Transformer):
         hnsw_index: ColumnIndex,
         metadata: Metadata,
         fainder_mode: FainderMode = "low_memory",
-        enable_highlighting: bool = True,
+        enable_highlighting: bool = False,
         enable_filtering: bool = False,
     ):
         self.lucene_connector = lucene_connector
@@ -206,7 +218,7 @@ class QueryExecutor(Transformer):
     def reset(
         self,
         fainder_mode: FainderMode,
-        enable_highlighting: bool = True,
+        enable_highlighting: bool = False,
         enable_filtering: bool = False,
     ) -> None:
         self.scores = defaultdict(float)
@@ -246,18 +258,46 @@ class QueryExecutor(Transformer):
         # TODO: update last_result
         return hist_to_col_ids(result_hists, self.metadata.hist_to_col)
 
-    def keywordterm(self, items: list[Token]) -> tuple[set[int], Highlights]:
-        logger.trace(f"Evaluating keyword term: {items}")
-        keyword = items[0].value.strip()
-        # operator = items[-2] if len(items) > 2 else None
-        # side = items[-1] if len(items) > 2 else None
+    def field_prefix(self, items: list[Token]) -> str:
+        """Process a field prefix into the format field:"""
+        logger.trace(f"Processing field prefix: {items}")
+        return f"{items[0].value}:"
 
-        # TODO: add filter
+    def lucene_clause(self, items: list[Token | str]) -> str:
+        """Process a single Lucene clause including optional required operator and field prefix."""
+        logger.trace(f"Processing Lucene clause: {items}")
+        result = ""
+
+        for item in items:
+            if item:
+                if isinstance(item, Token):
+                    result += item.value
+                else:
+                    result += str(item)
+
+        return result.strip()
+
+    def lucene_query(self, items: list[str]) -> str:
+        """Merge Lucene query clauses into a single query string."""
+        logger.trace(f"Merging Lucene query clauses: {items}")
+        query_parts = []
+
+        for item in items:
+            if item:
+                query_parts.append(str(item))
+
+        joined = " ".join(filter(None, query_parts)).strip()
+        return "(" + joined + ")"
+
+    def keywordterm(self, items: list[Token]) -> tuple[set[int], Highlights]:
+        """Evaluate keyword term using merged Lucene query."""
+        logger.trace(f"Evaluating keyword term: {items}")
+        # Extract the lucene query from items
+        query = str(items[0]).strip() if items else ""
         doc_filter = None
 
-        # Get results and highlights
         result_docs, scores, highlights = self.lucene_connector.evaluate_query(
-            keyword, doc_filter, self.enable_highlighting
+            query, doc_filter, self.enable_highlighting
         )
         self.updates_scores(result_docs, scores)
 
@@ -316,14 +356,18 @@ class QueryExecutor(Transformer):
     def term(
         self, items: tuple[Token, set[uint32] | tuple[set[int], Highlights]]
     ) -> tuple[set[int], Highlights]:
+        """Process a term, which can be either a keyword or column operation."""
         logger.trace(f"Evaluating term with items: {items}")
-        if items[0].value.strip().lower() in ["column", "col"]:
+        operator: str = items[0].value
+        if operator.strip().lower() in ["column", "col"]:
             col_ids: set[uint32] = items[1]  # type: ignore
             return col_to_doc_ids(col_ids, self.metadata.col_to_doc), ({}, col_ids)
-        doc_ids: set[int]
-        highlights: Highlights
-        doc_ids, highlights = items[1]  # type: ignore
-        return doc_ids, highlights
+        if operator.strip().lower() in ["keyword", "kw"]:
+            doc_ids: set[int]
+            highlights: Highlights
+            doc_ids, highlights = items[1]  # type: ignore
+            return doc_ids, highlights
+        raise ValueError(f"Unknown term: {items[0].value}")
 
     def not_expr(self, items: list[tuple[set[int], Highlights]]) -> tuple[set[int], Highlights]:
         logger.trace(f"Evaluating NOT expression with {len(items)} items")
@@ -331,7 +375,7 @@ class QueryExecutor(Transformer):
         all_docs = set(self.metadata.doc_to_cols.keys())
         return all_docs - to_negate, ({}, set())  # Negate all documents
 
-    def expression(self, items: list[tuple[set[int], Highlights]]) -> tuple[set[int], Highlights]:
+    def expr(self, items: list[tuple[set[int], Highlights]]) -> tuple[set[int], Highlights]:
         logger.trace(f"Evaluating expression with {len(items[0])} items")
         return items[0]
 
@@ -361,20 +405,12 @@ class QueryExecutor(Transformer):
             case _:
                 raise ValueError(f"Unknown operator: {operator}")
 
-        result_highlights = self._merge_highlights(left_highlights, right_highlights, result_set)
-        return result_set, result_highlights
-
-    def start(self, items: list[tuple[set[int], Highlights]]) -> tuple[set[int], Highlights]:
-        doc_set, (doc_highlights, col_highlights) = items[0]
-
         if self.enable_highlighting:
-            # Only return the column highlights that are in the document set
-            filtered_col_highlights = col_ids_in_docs(
-                col_highlights, doc_set, self.metadata.doc_to_cols
+            result_highlights = self._merge_highlights(
+                left_highlights, right_highlights, result_set
             )
-            return doc_set, (doc_highlights, filtered_col_highlights)
-
-        return items[0]
+            return result_set, result_highlights
+        return result_set, ({}, set())
 
     def _merge_highlights(
         self, left_highlights: Highlights, right_highlights: Highlights, doc_ids: set[int]
@@ -431,8 +467,11 @@ class QueryExecutor(Transformer):
 
         # Merge column highlights
         result_columns = left_highlights[1] | right_highlights[1]
+        filtered_col_highlights = col_ids_in_docs(
+            result_columns, doc_ids, self.metadata.doc_to_cols
+        )
 
-        return result_document_highlights, result_columns
+        return result_document_highlights, filtered_col_highlights
 
 
 def col_ids_in_docs(
