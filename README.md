@@ -48,6 +48,7 @@ FAINDER_DIR=fainder          # Subdirectory containing Fainder indices for a col
 LUCENE_DIR=lucene            # Subdirectory containing a Lucene index for keyword predicates
 METADATA_FILE=metadata.json  # JSON file with metadata about a collection
 QUERY_CACHE_SIZE=128         # Maximum number of query resuls to cache
+DATASET_SLUG=kaggleRef       # Slug specific to the dataset collection
 
 # Lucene
 LUCENE_HOST=127.0.0.1               # Hostname of the Lucene service
