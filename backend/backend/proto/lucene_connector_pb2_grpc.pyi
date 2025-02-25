@@ -24,6 +24,11 @@ class LuceneConnectorStub:
         backend.proto.lucene_connector_pb2.QueryResponse,
     ]
 
+    EvaluateStream: grpc.UnaryStreamMultiCallable[
+        backend.proto.lucene_connector_pb2.QueryRequest,
+        backend.proto.lucene_connector_pb2.QueryResponseChunk,
+    ]
+
     RecreateIndex: grpc.UnaryUnaryMultiCallable[
         backend.proto.lucene_connector_pb2.RecreateIndexRequest,
         backend.proto.lucene_connector_pb2.RecreateIndexResponse,
@@ -33,6 +38,11 @@ class LuceneConnectorAsyncStub:
     Evaluate: grpc.aio.UnaryUnaryMultiCallable[
         backend.proto.lucene_connector_pb2.QueryRequest,
         backend.proto.lucene_connector_pb2.QueryResponse,
+    ]
+
+    EvaluateStream: grpc.aio.UnaryStreamMultiCallable[
+        backend.proto.lucene_connector_pb2.QueryRequest,
+        backend.proto.lucene_connector_pb2.QueryResponseChunk,
     ]
 
     RecreateIndex: grpc.aio.UnaryUnaryMultiCallable[
@@ -47,6 +57,13 @@ class LuceneConnectorServicer(metaclass=abc.ABCMeta):
         request: backend.proto.lucene_connector_pb2.QueryRequest,
         context: _ServicerContext,
     ) -> typing.Union[backend.proto.lucene_connector_pb2.QueryResponse, collections.abc.Awaitable[backend.proto.lucene_connector_pb2.QueryResponse]]: ...
+
+    @abc.abstractmethod
+    def EvaluateStream(
+        self,
+        request: backend.proto.lucene_connector_pb2.QueryRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[backend.proto.lucene_connector_pb2.QueryResponseChunk], collections.abc.AsyncIterator[backend.proto.lucene_connector_pb2.QueryResponseChunk]]: ...
 
     @abc.abstractmethod
     def RecreateIndex(

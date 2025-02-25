@@ -130,6 +130,60 @@ public class LuceneServer {
         }
 
         @Override
+        public void evaluateStream(QueryRequest queryRequest, StreamObserver<QueryResponseChunk> responseObserver) {
+            String query = queryRequest.getQuery();
+            Set<Integer> docIds = new HashSet<>(queryRequest.getDocIdsList());
+
+            SearchResult searchResults = luceneSearch.search(query, docIds, minScore, maxResults, queryRequest.getEnableHighlighting());
+
+            // Calculate chunk size - this can be adjusted based on your requirements
+            final int CHUNK_SIZE = 1024; // Number of documents per chunk
+
+            // Split results into chunks
+            int totalDocs = searchResults.docIds.size();
+            int numChunks = (int) Math.ceil((double) totalDocs / CHUNK_SIZE);
+
+            for (int chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
+                // Calculate start and end indices for this chunk
+                int startIdx = chunkIndex * CHUNK_SIZE;
+                int endIdx = Math.min(startIdx + CHUNK_SIZE, totalDocs);
+
+                // Build response chunk
+                QueryResponseChunk.Builder chunkBuilder = QueryResponseChunk.newBuilder();
+
+                // Add doc IDs and scores for this chunk
+                for (int i = startIdx; i < endIdx; i++) {
+                    chunkBuilder.addDocIds(searchResults.docIds.get(i));
+                    chunkBuilder.addScores(searchResults.scores.get(i));
+                }
+
+                // Add highlights for documents in this chunk
+                for (int i = startIdx; i < endIdx; i++) {
+                    int docId = searchResults.docIds.get(i);
+                    if (searchResults.highlights.containsKey(docId)) {
+                        Map<String, String> fieldHighlights = searchResults.highlights.get(docId);
+
+                        // Create field highlights for this document
+                        FieldHighlights.Builder fieldsBuilder = FieldHighlights.newBuilder();
+                        fieldsBuilder.putAllFields(fieldHighlights);
+
+                        // Add the highlights for this document
+                        chunkBuilder.putHighlights(docId, fieldsBuilder.build());
+                    }
+                }
+
+                // Mark if this is the last chunk
+                chunkBuilder.setIsLastChunk(chunkIndex == numChunks - 1);
+
+                // Send the chunk
+                responseObserver.onNext(chunkBuilder.build());
+            }
+
+            // Complete the stream
+            responseObserver.onCompleted();
+        }
+
+        @Override
         public void recreateIndex(RecreateIndexRequest request, StreamObserver<RecreateIndexResponse> responseObserver) {
             try {
                 // Close existing searcher to release file handles

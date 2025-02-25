@@ -36,6 +36,52 @@ class QueryRequest(google.protobuf.message.Message):
 global___QueryRequest = QueryRequest
 
 @typing.final
+class QueryResponseChunk(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class HighlightsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.int
+        @property
+        def value(self) -> global___FieldHighlights: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.int = ...,
+            value: global___FieldHighlights | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    DOC_IDS_FIELD_NUMBER: builtins.int
+    SCORES_FIELD_NUMBER: builtins.int
+    HIGHLIGHTS_FIELD_NUMBER: builtins.int
+    IS_LAST_CHUNK_FIELD_NUMBER: builtins.int
+    is_last_chunk: builtins.bool
+    """Indicates if this is the final chunk"""
+    @property
+    def doc_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    @property
+    def scores(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]: ...
+    @property
+    def highlights(self) -> google.protobuf.internal.containers.MessageMap[builtins.int, global___FieldHighlights]: ...
+    def __init__(
+        self,
+        *,
+        doc_ids: collections.abc.Iterable[builtins.int] | None = ...,
+        scores: collections.abc.Iterable[builtins.float] | None = ...,
+        highlights: collections.abc.Mapping[builtins.int, global___FieldHighlights] | None = ...,
+        is_last_chunk: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["doc_ids", b"doc_ids", "highlights", b"highlights", "is_last_chunk", b"is_last_chunk", "scores", b"scores"]) -> None: ...
+
+global___QueryResponseChunk = QueryResponseChunk
+
+@typing.final
 class FieldHighlights(google.protobuf.message.Message):
     """Change HighlightEntry to FieldHighlights with a map of field highlights"""
 
