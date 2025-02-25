@@ -12,13 +12,11 @@ Document = dict[str, Any]
 class CroissantStore:
     """Store a collection of Croissant files in memory."""
 
-    def __init__(
-        self, path: Path, overwrite_docs: bool = False, dataset_slug: str = "kaggleRef"
-    ) -> None:
+    def __init__(self, path: Path, dataset_slug: str, overwrite_docs: bool = False) -> None:
         self.documents: dict[int, Document] = {}
         self.path = path
-        self.overwrite_docs = overwrite_docs
         self.dataset_slug = dataset_slug
+        self.overwrite_docs = overwrite_docs
 
     def __len__(self) -> int:
         return len(self.documents)
@@ -46,7 +44,9 @@ class CroissantStore:
 
     def add_document(self, doc: Document) -> None:
         if self.dataset_slug not in doc:
-            raise CroissantError("Document does not have the specified dataset slug")
+            raise CroissantError(
+                f"Document does not have the specified dataset slug {self.dataset_slug}"
+            )
 
         ref: str = doc[self.dataset_slug].replace("/", "_")
         file_path = self.path / f"{ref}.json"
