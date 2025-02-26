@@ -182,7 +182,7 @@ def generate_embedding_index(
     seed: int = 42,
 ) -> None:
     strings = list(name_to_vector.keys())
-    ids = np.array(name_to_vector.values(), dtype=np.uint64)
+    ids = np.array(list(name_to_vector.values()), dtype=np.uint64)
 
     logger.info("Generating embeddings")
     embedder = SentenceTransformer(
