@@ -25,6 +25,7 @@ public class LuceneServer {
     private static int port;
     private static int maxResults;
     private static float minScore;
+    private static int chunkSize;
     private static LuceneSearch luceneSearch;
     private Server grpcServer;
 
@@ -52,6 +53,7 @@ public class LuceneServer {
             port = Integer.parseInt(config.get("LUCENE_PORT", "8001"));
             maxResults = Integer.parseInt(config.get("LUCENE_MAX_RESULTS", "100000"));
             minScore = Float.parseFloat(config.get("LUCENE_MIN_SCORE", "1.0"));
+            chunkSize = Integer.parseInt(config.get("LUCENE_CHUNK_SIZE", "1024"));
         } catch (DotenvException e) {
             logger.error("Failed to load config: {}", e.getMessage());
             System.exit(1);
@@ -136,17 +138,14 @@ public class LuceneServer {
 
             SearchResult searchResults = luceneSearch.search(query, docIds, minScore, maxResults, queryRequest.getEnableHighlighting());
 
-            // Calculate chunk size - this can be adjusted based on your requirements
-            final int CHUNK_SIZE = 1024; // Number of documents per chunk
-
             // Split results into chunks
             int totalDocs = searchResults.docIds.size();
-            int numChunks = (int) Math.ceil((double) totalDocs / CHUNK_SIZE);
+            int numChunks = (int) Math.ceil((double) totalDocs / chunkSize);
 
             for (int chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
                 // Calculate start and end indices for this chunk
-                int startIdx = chunkIndex * CHUNK_SIZE;
-                int endIdx = Math.min(startIdx + CHUNK_SIZE, totalDocs);
+                int startIdx = chunkIndex * chunkSize;
+                int endIdx = Math.min(startIdx + chunkSize, totalDocs);
 
                 // Build response chunk
                 QueryResponseChunk.Builder chunkBuilder = QueryResponseChunk.newBuilder();

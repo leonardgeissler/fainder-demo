@@ -81,17 +81,17 @@ class LuceneConnector:
             except grpc.RpcError as e:
                 # Check if this is a message size error
                 if "Received message larger than max" in str(e):
-                    logger.info("Query result too large, falling back to streaming")
+                    logger.info("Keyword query result too large, falling back to streaming")
                     return self.evaluate_query_stream(query, doc_ids, enable_highlighting)
                 # Re-raise if it's not a message size error
-                raise
+                raise e
 
         except grpc.RpcError as e:
             logger.error(f"Calling Lucene raised an error: {e}")
             return [], [], {}
 
     def evaluate_query_stream(
-        self, query: str, doc_ids: set[int] | None = None, enable_highlighting: bool = True
+        self, query: str, doc_ids: set[int] | None = None, enable_highlighting: bool = False
     ) -> tuple[Sequence[int], Sequence[float], dict[int, dict[str, str]]]:
         """
         Evaluates a keyword query using the Lucene server with streaming for large result sets.
