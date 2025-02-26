@@ -55,6 +55,7 @@ LUCENE_HOST=127.0.0.1               # Hostname of the Lucene service
 LUCENE_PORT=8001                    # Port of the Lucene service
 LUCENE_MAX_RESULTS=100000           # Maximum number of search results returned by Lucene
 LUCENE_MIN_SCORE=1.0                # Minimum score for a document to be returned
+LUCENE_CHUNK_SIZE=1024              # Maximum number of documents per chunk for streaming
 
 # Fainder
 FAINDER_N_CLUSTERS=50               # Number of index clusters

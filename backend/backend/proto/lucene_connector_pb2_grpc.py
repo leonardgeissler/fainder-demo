@@ -5,7 +5,7 @@ import warnings
 
 from backend.proto import lucene_connector_pb2 as backend_dot_proto_dot_lucene__connector__pb2
 
-GRPC_GENERATED_VERSION = '1.69.0'
+GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -39,6 +39,11 @@ class LuceneConnectorStub(object):
                 request_serializer=backend_dot_proto_dot_lucene__connector__pb2.QueryRequest.SerializeToString,
                 response_deserializer=backend_dot_proto_dot_lucene__connector__pb2.QueryResponse.FromString,
                 _registered_method=True)
+        self.EvaluateStream = channel.unary_stream(
+                '/fainder.LuceneConnector/EvaluateStream',
+                request_serializer=backend_dot_proto_dot_lucene__connector__pb2.QueryRequest.SerializeToString,
+                response_deserializer=backend_dot_proto_dot_lucene__connector__pb2.QueryResponseChunk.FromString,
+                _registered_method=True)
         self.RecreateIndex = channel.unary_unary(
                 '/fainder.LuceneConnector/RecreateIndex',
                 request_serializer=backend_dot_proto_dot_lucene__connector__pb2.RecreateIndexRequest.SerializeToString,
@@ -50,6 +55,12 @@ class LuceneConnectorServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def Evaluate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def EvaluateStream(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -68,6 +79,11 @@ def add_LuceneConnectorServicer_to_server(servicer, server):
                     servicer.Evaluate,
                     request_deserializer=backend_dot_proto_dot_lucene__connector__pb2.QueryRequest.FromString,
                     response_serializer=backend_dot_proto_dot_lucene__connector__pb2.QueryResponse.SerializeToString,
+            ),
+            'EvaluateStream': grpc.unary_stream_rpc_method_handler(
+                    servicer.EvaluateStream,
+                    request_deserializer=backend_dot_proto_dot_lucene__connector__pb2.QueryRequest.FromString,
+                    response_serializer=backend_dot_proto_dot_lucene__connector__pb2.QueryResponseChunk.SerializeToString,
             ),
             'RecreateIndex': grpc.unary_unary_rpc_method_handler(
                     servicer.RecreateIndex,
@@ -102,6 +118,33 @@ class LuceneConnector(object):
             '/fainder.LuceneConnector/Evaluate',
             backend_dot_proto_dot_lucene__connector__pb2.QueryRequest.SerializeToString,
             backend_dot_proto_dot_lucene__connector__pb2.QueryResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def EvaluateStream(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/fainder.LuceneConnector/EvaluateStream',
+            backend_dot_proto_dot_lucene__connector__pb2.QueryRequest.SerializeToString,
+            backend_dot_proto_dot_lucene__connector__pb2.QueryResponseChunk.FromString,
             options,
             channel_credentials,
             insecure,

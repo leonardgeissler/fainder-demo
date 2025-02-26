@@ -25,6 +25,7 @@ public class LuceneServer {
     private static int port;
     private static int maxResults;
     private static float minScore;
+    private static int chunkSize;
     private static LuceneSearch luceneSearch;
     private Server grpcServer;
 
@@ -52,6 +53,7 @@ public class LuceneServer {
             port = Integer.parseInt(config.get("LUCENE_PORT", "8001"));
             maxResults = Integer.parseInt(config.get("LUCENE_MAX_RESULTS", "100000"));
             minScore = Float.parseFloat(config.get("LUCENE_MIN_SCORE", "1.0"));
+            chunkSize = Integer.parseInt(config.get("LUCENE_CHUNK_SIZE", "1024"));
         } catch (DotenvException e) {
             logger.error("Failed to load config: {}", e.getMessage());
             System.exit(1);
@@ -126,6 +128,57 @@ public class LuceneServer {
             }
 
             responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+        }
+
+        @Override
+        public void evaluateStream(QueryRequest queryRequest, StreamObserver<QueryResponseChunk> responseObserver) {
+            String query = queryRequest.getQuery();
+            Set<Integer> docIds = new HashSet<>(queryRequest.getDocIdsList());
+
+            SearchResult searchResults = luceneSearch.search(query, docIds, minScore, maxResults, queryRequest.getEnableHighlighting());
+
+            // Split results into chunks
+            int totalDocs = searchResults.docIds.size();
+            int numChunks = (int) Math.ceil((double) totalDocs / chunkSize);
+
+            for (int chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
+                // Calculate start and end indices for this chunk
+                int startIdx = chunkIndex * chunkSize;
+                int endIdx = Math.min(startIdx + chunkSize, totalDocs);
+
+                // Build response chunk
+                QueryResponseChunk.Builder chunkBuilder = QueryResponseChunk.newBuilder();
+
+                // Add doc IDs and scores for this chunk
+                for (int i = startIdx; i < endIdx; i++) {
+                    chunkBuilder.addDocIds(searchResults.docIds.get(i));
+                    chunkBuilder.addScores(searchResults.scores.get(i));
+                }
+
+                // Add highlights for documents in this chunk
+                for (int i = startIdx; i < endIdx; i++) {
+                    int docId = searchResults.docIds.get(i);
+                    if (searchResults.highlights.containsKey(docId)) {
+                        Map<String, String> fieldHighlights = searchResults.highlights.get(docId);
+
+                        // Create field highlights for this document
+                        FieldHighlights.Builder fieldsBuilder = FieldHighlights.newBuilder();
+                        fieldsBuilder.putAllFields(fieldHighlights);
+
+                        // Add the highlights for this document
+                        chunkBuilder.putHighlights(docId, fieldsBuilder.build());
+                    }
+                }
+
+                // Mark if this is the last chunk
+                chunkBuilder.setIsLastChunk(chunkIndex == numChunks - 1);
+
+                // Send the chunk
+                responseObserver.onNext(chunkBuilder.build());
+            }
+
+            // Complete the stream
             responseObserver.onCompleted();
         }
 
