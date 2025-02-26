@@ -12,9 +12,10 @@ Document = dict[str, Any]
 class CroissantStore:
     """Store a collection of Croissant files in memory."""
 
-    def __init__(self, path: Path, overwrite_docs: bool = False) -> None:
+    def __init__(self, path: Path, dataset_slug: str, overwrite_docs: bool = False) -> None:
         self.documents: dict[int, Document] = {}
         self.path = path
+        self.dataset_slug = dataset_slug
         self.overwrite_docs = overwrite_docs
 
     def __len__(self) -> int:
@@ -42,17 +43,19 @@ class CroissantStore:
         return [self.get_document(doc_id) for doc_id in doc_ids]
 
     def add_document(self, doc: Document) -> None:
-        if "kaggleRef" not in doc:
-            raise CroissantError("Document does not have a kaggleRef field")
+        if self.dataset_slug not in doc:
+            raise CroissantError(
+                f"Document does not have the specified dataset slug {self.dataset_slug}"
+            )
 
-        ref: str = doc["kaggleRef"].replace("/", "_")
+        ref: str = doc[self.dataset_slug].replace("/", "_")
         file_path = self.path / f"{ref}.json"
 
         if file_path.exists():
             if self.overwrite_docs:
-                logger.warning(f"Overwriting document with kaggleRef {ref}")
+                logger.warning(f"Overwriting document with dataset slug {ref}")
             else:
-                raise CroissantError(f"Document with kaggleRef {ref} already exists")
+                raise CroissantError(f"Document with dataset slug {ref} already exists")
 
         with file_path.open("w") as file:
             json.dump(doc, file)

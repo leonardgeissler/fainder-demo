@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     embedding_dir: Path = Path("embeddings")
     fainder_dir: Path = Path("fainder")
     metadata_file: Path = Path("metadata.json")
+    dataset_slug: str = "kaggleRef"
 
     # QueryEvaluator settings
     query_cache_size: int = 128
