@@ -52,7 +52,7 @@ configure_logging(
 with settings.metadata_path.open() as file:
     metadata = Metadata(**json.load(file))
 
-croissant_store = CroissantStore(settings.croissant_path)
+croissant_store = CroissantStore(settings.croissant_path, settings.dataset_slug)
 lucene_connector = LuceneConnector(settings.lucene_host, settings.lucene_port)
 fainder_index = FainderIndex(
     metadata=metadata,
