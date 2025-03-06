@@ -11,6 +11,7 @@ from numpy import uint32
 
 from backend.column_index import ColumnIndex
 from backend.config import CacheInfo, FainderMode, Metadata
+from backend.engine.optimizer import MergeKeywords
 from backend.engine.parser import DQLParser
 from backend.fainder_index import FainderIndex
 from backend.lucene_connector import LuceneConnector
@@ -35,6 +36,7 @@ class QueryEvaluator:
         self.parser = DQLParser()
         self.annotator = QueryAnnotator()
         self.executor = QueryExecutor(self.lucene_connector, fainder_index, hnsw_index, metadata)
+        self.merge_keywords = MergeKeywords()
 
         # NOTE: Don't use lru_cache on methods
         # See https://docs.astral.sh/ruff/rules/cached-instance-method/ for details
@@ -58,6 +60,7 @@ class QueryEvaluator:
         fainder_mode: FainderMode = FainderMode.low_memory,
         enable_highlighting: bool = False,
         enable_filtering: bool = False,
+        enable_kw_merge: bool = True,
     ) -> tuple[list[int], Highlights]:
         # Reset state for new query
         self.annotator.reset()
@@ -69,9 +72,16 @@ class QueryEvaluator:
 
         # Optimze query
         # TODO: Add optimizer class
+        if enable_kw_merge:
+            parse_tree = self.merge_keywords.transform(parse_tree)
+            logger.trace(f"Optimized tree: {parse_tree.pretty()}")
+            logger.trace(f"Optimized query: {parse_tree}")
+
         # TODO: Do we need visit_topdown here?
-        self.annotator.visit(parse_tree)
-        logger.trace(f"Optimized query: {parse_tree}")
+        if enable_filtering:
+            self.annotator.visit(parse_tree)
+            logger.trace(f"Annotated tree: {parse_tree.pretty()}")
+            logger.trace(f"Optimized query: {parse_tree}")
 
         # Execute query
         result, highlights = self.executor.transform(parse_tree)
