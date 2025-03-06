@@ -45,6 +45,7 @@ def log_performance_csv(
     fainder_mode: str,
     additional_filter_size: float,
     execution_time: float,
+    filter_size: int,
     results: set[uint32],
 ):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -59,6 +60,7 @@ def log_performance_csv(
                 fainder_mode,
                 execution_time,
                 additional_filter_size,
+                filter_size,
                 len(results),
             ]
         )
@@ -75,7 +77,7 @@ def test_fainder_filter_performance(evaluator: QueryEvaluator, query: dict[str, 
     time_without_filtering = time.perf_counter() - start_time
     num_of_hists = len(evaluator.executor.metadata.hist_to_col)
 
-    log_performance_csv(csv_path, query["percentile"], query["comparison"], query["reference"], query["fainder_mode"], 0, time_without_filtering, result_without_filtering)
+    log_performance_csv(csv_path, query["percentile"], query["comparison"], query["reference"], query["fainder_mode"], 0, time_without_filtering, 0, result_without_filtering)
 
     for additional_filter_size in ADDITIONAL_FILTER_SIZES:
 
@@ -88,7 +90,7 @@ def test_fainder_filter_performance(evaluator: QueryEvaluator, query: dict[str, 
         result_with_filtering = evaluator.executor.fainder_index.search(query["percentile"], query["comparison"], query["reference"], query["fainder_mode"], hist_filter)
         time_with_filtering = time.perf_counter() - start_time
 
-        log_performance_csv(csv_path, query["percentile"], query["comparison"], query["reference"], query["fainder_mode"], additional_filter_size, time_with_filtering, result_with_filtering)
+        log_performance_csv(csv_path, query["percentile"], query["comparison"], query["reference"], query["fainder_mode"], additional_filter_size, time_with_filtering, additional_filter_size, result_with_filtering)
 
         assert len(result_with_filtering) == len(result_without_filtering)
 
