@@ -106,9 +106,6 @@ class MergeKeywords(Transformer[Token, ParseTree]):
     When on the same level.
     """
 
-    # TODO: add support for merging terms when not all terms are keyword terms
-    # so merging: "kw(a) AND kw(b) AND col(..)" -> "kw(a AND b) AND col(..)"
-
     def _merge_terms(
         self, items: list[ParseTree | Token], operator: str, rule_name: str
     ) -> ParseTree:
