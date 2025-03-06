@@ -14,6 +14,56 @@ class ParentAnnotator(Visitor[Token]):
         return tree
 
 
+LEAF_COSTS = {
+    "keyword_op": 1,
+    "percentile_op": 2,
+    "name_op": 1,
+}
+
+EXTRA_COSTS = {
+    "col_op": 1,  # extra cost for column
+    "negation": 0,  # extra cost for negation
+}
+
+
+class CostSorter(Visitor[Token]):
+    """
+    This visitor annotates each node with a cost value as a tree attribute.
+    It should only be used bottom-up so using .visit().
+    It also sorts the children of each node by cost.
+    """
+
+    def __default__(self, tree: ParseTree | Token) -> ParseTree | Token:
+        if isinstance(tree, Token):
+            return tree
+
+        if tree.data in LEAF_COSTS:
+            # If the node is a leaf node, set its cost
+            tree.cost = LEAF_COSTS[tree.data]  # type: ignore
+            return tree
+
+        # Calculate costs from children
+        total_cost = 0
+        for child in tree.children:
+            if isinstance(child, Tree):
+                # Get cost from child if it exists
+                total_cost += getattr(child, "cost", 0)
+
+        # Sort children by cost
+        logger.trace(f"Before sorting: {tree.children}")
+        tree.children.sort(key=lambda x: getattr(x, "cost", 0))
+        logger.trace(f"After sorting: {tree.children}")
+
+        # Add any additional cost for the current node
+        if tree.data in EXTRA_COSTS:
+            total_cost += EXTRA_COSTS[tree.data]
+
+        # Store the cost on the tree node
+        tree.cost = total_cost  # type: ignore
+
+        return tree
+
+
 def check_all_keyword_terms(items: list[ParseTree | Token]) -> bool:
     if not _are_parse_trees(items):
         return False
