@@ -87,11 +87,35 @@ def get_keyword_string(tree: ParseTree) -> str:
     assert tree.data == "keyword_op"
     assert len(tree.children) == 1
     assert isinstance(tree.children[0], Token)
-    return tree.children[0].value
+    return str(tree.children[0].value)[1:-1]
 
 
 def _are_parse_trees(items: list[Any]) -> TypeGuard[list[ParseTree]]:
     return all(isinstance(item, Tree) for item in items)
+
+
+def _create_merged_keyword(keyword_strings: list[str], operator: str) -> ParseTree:
+    """Creates a merged keyword ParseTree from a list of keyword strings."""
+    if len(keyword_strings) == 1:
+        merged_query = f"'({keyword_strings[0]})'"
+    else:
+        first_keyword = keyword_strings[0]
+        rest_keywords = [f"{operator} {kw}" for kw in keyword_strings[1:]]
+        merged_parts = [first_keyword, *rest_keywords]
+        merged_query = f"'({' '.join(merged_parts)})'"
+
+    return Tree("keyword_op", [Token("STRING", merged_query)])
+
+
+def _is_keyword_or_negated_keyword(item: ParseTree) -> bool:
+    """Check if a ParseTree is a keyword or negated keyword."""
+    if item.data == "keyword_op":
+        return True
+    return (
+        item.data == "negation"
+        and isinstance(item.children[0], Tree)
+        and item.children[0].data == "keyword_op"
+    )
 
 
 def merge_consecutive_keywords(items: list[ParseTree], operator: str) -> list[ParseTree]:
@@ -106,39 +130,25 @@ def merge_consecutive_keywords(items: list[ParseTree], operator: str) -> list[Pa
     def flush_keywords() -> None:
         nonlocal pending_negation
         if current_keywords:
-            # Include pending negation only if there are other keywords to merge with
             if pending_negation:
                 current_keywords.insert(0, pending_negation)
                 pending_negation = None
-            merged = Tree(
-                "keyword_op",
-                [
-                    Token(
-                        "STRING",
-                        f" {operator} ".join(get_keyword_string(kw) for kw in current_keywords),
-                    )
-                ],
-            )
+
+            keyword_strings = [get_keyword_string(kw) for kw in current_keywords]
+            merged = _create_merged_keyword(keyword_strings, operator)
             result.append(merged)
             current_keywords.clear()
         elif pending_negation:
-            # If we have a pending negation but no keywords to merge with, add it as-is
             result.append(pending_negation)
             pending_negation = None
 
     for item in items:
         if item.data == "keyword_op":
             current_keywords.append(item)
-        elif (
-            item.data == "negation"
-            and isinstance(item.children[0], Tree)
-            and item.children[0].data == "keyword_op"
-        ):
+        elif _is_keyword_or_negated_keyword(item):
             if current_keywords:
-                # If we already have keywords, merge the negation with them
                 current_keywords.append(item)
             else:
-                # Otherwise, hold it pending to see if more keywords follow
                 flush_keywords()
                 pending_negation = item
         else:
@@ -164,6 +174,8 @@ class MergeKeywords(Transformer[Token, ParseTree]):
 
         # Merge consecutive keyword terms
         merged_items = merge_consecutive_keywords(items, operator)
+        if len(merged_items) == 1:
+            return merged_items[0]
         return Tree(Token("RULE", rule_name), merged_items)  # type: ignore
 
     def conjunction(self, items: list[ParseTree | Token]) -> ParseTree:
