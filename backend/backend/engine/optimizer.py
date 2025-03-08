@@ -161,7 +161,7 @@ def merge_consecutive_keywords(items: list[ParseTree], operator: str) -> list[Pa
 
 class MergeKeywords(Transformer[Token, ParseTree]):
     """
-    This transformer merges lucene queries into a single query string.
+    This transformer merges keyword queries into a single query string.
     And optionally merges keyword terms into a single keyword term.
     When on the same level.
     """

@@ -173,7 +173,7 @@ TEST_CASES: dict[str, dict[str, Case]] = {
             ),
         },
     },
-    "advanced_lucene_queries": {
+    "advanced_keyword_queries": {
         "field_specific_keyword": {
             "query": "kw('alternateName:(Weather)')",
             "expected": [0],
