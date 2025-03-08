@@ -31,8 +31,8 @@ from backend.indexing import (
     generate_fainder_indices,
     generate_metadata,
 )
-from backend.lucene_connector import LuceneConnector
 from backend.query_evaluator import ColumnHighlights, DocumentHighlights, QueryEvaluator
+from backend.tantivy_index import TantivyIndex
 
 # Global variables to store persistent objects
 settings = Settings()  # type: ignore
@@ -53,13 +53,14 @@ with settings.metadata_path.open() as file:
     metadata = Metadata(**json.load(file))
 
 croissant_store = CroissantStore(settings.croissant_path, settings.dataset_slug)
-lucene_connector = LuceneConnector(settings.lucene_host, settings.lucene_port)
 fainder_index = FainderIndex(
     metadata=metadata,
     rebinning_path=settings.rebinning_index_path,
     conversion_path=settings.conversion_index_path,
     histogram_path=settings.histogram_path,
 )
+tantivy_index = TantivyIndex(str(settings.tantivy_path))
+
 column_index = ColumnIndex(
     settings.hnsw_index_path,
     metadata,
@@ -68,8 +69,8 @@ column_index = ColumnIndex(
     ef=settings.hnsw_ef,
 )
 query_evaluator = QueryEvaluator(
-    lucene_connector=lucene_connector,
     fainder_index=fainder_index,
+    tantivy_index=tantivy_index,
     hnsw_index=column_index,
     metadata=metadata,
     cache_size=settings.query_cache_size,
@@ -85,12 +86,8 @@ cors_origins = [
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, Any]:
     # Startup
     croissant_store.load_documents()
-    query_evaluator.lucene_connector.connect()
 
     yield
-
-    # Shutdown
-    query_evaluator.lucene_connector.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -240,8 +237,10 @@ async def update_indices() -> MessageResponse:
         # the old ones, we should consider optimizing this in the future
 
         # Generate indices
-        hists, name_to_vector, documents = generate_metadata(
-            croissant_path=settings.croissant_path, metadata_path=settings.metadata_path
+        hists, name_to_vector, documents, tantivy_index = generate_metadata(
+            croissant_path=settings.croissant_path,
+            metadata_path=settings.metadata_path,
+            tantivy_path=settings.tantivy_path,
         )
         generate_embedding_index(
             name_to_vector=name_to_vector,
@@ -276,11 +275,11 @@ async def update_indices() -> MessageResponse:
         )
         column_index.update(path=settings.hnsw_index_path, metadata=metadata)
         query_evaluator.update_indices(
-            fainder_index=fainder_index, hnsw_index=column_index, metadata=metadata
+            fainder_index=fainder_index,
+            tantivy_index=tantivy_index,
+            hnsw_index=column_index,
+            metadata=metadata,
         )
-
-        # Recreate Lucene index
-        await lucene_connector.recreate_index()
 
         logger.info("Indices updated successfully")
         return MessageResponse(message="Indices updated successfully")
