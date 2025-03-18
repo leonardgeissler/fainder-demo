@@ -11,9 +11,7 @@ from .assets.test_cases_highlighting import HIGHLIGHTING_CASES, HighlightingCase
     [(name, case) for name, case in HIGHLIGHTING_CASES.items()],
 )
 def test_highlighter(test_name: str, test_case: HighlightingCase, engine: Engine) -> None:
-    engine.optimizer = Optimizer(
-        cost_sorting=False, keyword_merging=False, intermediate_filtering=False
-    )
+    engine.optimizer = Optimizer(cost_sorting=False, keyword_merging=False)
     _, highlights = engine.execute(
         test_case["query"],
         enable_highlighting=True,

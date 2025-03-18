@@ -20,13 +20,9 @@ class Engine:
     ) -> None:
         self.parser = Parser()
         if executor_type == ExecutorType.PREFILTERING:
-            self.optimizer = Optimizer(
-                cost_sorting=True, keyword_merging=True, intermediate_filtering=True
-            )
+            self.optimizer = Optimizer(cost_sorting=True, keyword_merging=True)
         else:
-            self.optimizer = Optimizer(
-                cost_sorting=True, keyword_merging=True, intermediate_filtering=False
-            )
+            self.optimizer = Optimizer(cost_sorting=True, keyword_merging=True)
         self.executor = create_executor(
             executor_type, tantivy_index, fainder_index, hnsw_index, metadata
         )
@@ -71,7 +67,7 @@ class Engine:
         parse_tree = self.optimizer.optimize(parse_tree)
 
         # Execute query
-        result, highlights = self.executor.transform(parse_tree)
+        result, highlights = self.executor.process(parse_tree)
 
         # Sort by score
         result_list = list(result)

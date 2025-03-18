@@ -2,9 +2,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from lark import ParseTree, Token, Tree, Visitor
-from lark.visitors import Visitor_Recursive
 from loguru import logger
-from regex import P
 
 if TYPE_CHECKING:
     from lark.tree import Branch
@@ -52,7 +50,6 @@ class Optimizer:
         self,
         cost_sorting: bool = True,
         keyword_merging: bool = True,
-        intermediate_filtering: bool = False,
     ) -> None:
         self.opt_rules: list[OptimizationRule] = [QuoteRemover()]
         if cost_sorting:
@@ -63,9 +60,6 @@ class Optimizer:
                     "Using keyword merging without cost sorting may lead to suboptimal results"
                 )
             self.opt_rules.append(MergeKeywords())
-        if intermediate_filtering:
-            logger.warning("Intermediate filtering not yet implemented")
-            self.opt_rules.append(IntermediaryResultGroups())
 
     def optimize(self, tree: ParseTree) -> ParseTree:
         """
@@ -228,84 +222,3 @@ class MergeKeywords(Visitor[Token], OptimizationRule):
                 else:
                     keyword_strings.append(f"({child})")
         return f" {operator} ".join(keyword_strings)
-    
-class IntermediaryResultGroups(Visitor_Recursive[Token], OptimizationRule):
-    """
-    This visitor adds numbers for intermediary result groups to each node.
-    A node can have groups it writes to and possibly multiple it reads from.
-    """
-    
-    def __init__(self) -> None:
-        super().__init__()
-        # Use dictionaries to store attributes for both Tree and Token objects
-        self.write_groups = {}
-        self.read_groups = {}
-        
-    def apply(self, tree: ParseTree) -> None:
-        # Initialize the root node with group 0
-        self.write_groups[id(tree)] = 0
-        self.read_groups[id(tree)] = [0]
-        self.visit_topdown(tree)
-
-    def __default__(self, tree: ParseTree) -> None:
-        # Set attributes for all children using the parent's values
-        if id(tree) in self.write_groups and id(tree) in self.read_groups:
-            write_group = self.write_groups[id(tree)]
-            read_group = self.read_groups[id(tree)]
-            
-            for child in tree.children:
-                # Store in our dictionaries rather than on the objects directly
-                self.write_groups[id(child)] = write_group
-                self.read_groups[id(child)] = read_group
-        
-    def query(self, tree: ParseTree) -> None:
-        # Set attributes for query node and children
-        self.write_groups[id(tree)] = 0
-        self.read_groups[id(tree)] = [0]
-        
-        # Set same attributes for all children
-        for child in tree.children:
-            self.write_groups[id(child)] = 0
-            self.read_groups[id(child)] = [0]
-
-    def conjunction(self, tree: ParseTree) -> None:
-        # For conjunction, all children read and write to the same groups
-        if id(tree) in self.write_groups and id(tree) in self.read_groups:
-            write_group = self.write_groups[id(tree)]
-            read_group = self.read_groups[id(tree)]
-            
-            for child in tree.children:
-                self.write_groups[id(child)] = write_group
-                self.read_groups[id(child)] = read_group
-
-    def disjunction(self, tree: ParseTree) -> None:
-        # For disjunction, increment the write group and add to read groups
-        if id(tree) in self.write_groups and id(tree) in self.read_groups:
-            write_group = self.write_groups[id(tree)] + 1
-            read_groups = [*self.read_groups[id(tree)], write_group]
-                
-            for child in tree.children:
-                self.write_groups[id(child)] = write_group
-                self.read_groups[id(child)] = read_groups
-
-    def negation(self, tree: ParseTree) -> None:
-        # For negation, increment the write group and add to read groups
-        if id(tree) in self.write_groups and id(tree) in self.read_groups:
-            write_group = self.write_groups[id(tree)] + 1
-            read_groups = [*self.read_groups[id(tree)], write_group]
-                
-            for child in tree.children:
-                self.write_groups[id(child)] = write_group
-                self.read_groups[id(child)] = read_groups
-                
-    def get_write_group(self, tree: ParseTree | Token) -> int:
-        """Get the write group for a tree or token."""
-        if id(tree) in self.write_groups:
-            return self.write_groups[id(tree)]
-        raise ValueError("Node does not have a write group")
-    
-    def get_read_groups(self, tree: ParseTree | Token) -> list[int]:
-        """Get the read groups for a tree or token."""
-        if id(tree) in self.read_groups:
-            return self.read_groups[id(tree)]
-        raise ValueError("Node does not have read groups")
