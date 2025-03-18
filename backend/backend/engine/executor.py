@@ -141,14 +141,14 @@ class SimpleExecutor(BaseExecutor):
     ) -> tuple[set[int], Highlights] | set[uint32]:
         logger.trace(f"Evaluating conjunction with items: {items}")
 
-        return self._junction(items, and_)
+        return junction(items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
 
     def disjunction(
         self, items: list[tuple[set[int], Highlights]] | list[set[uint32]]
     ) -> tuple[set[int], Highlights] | set[uint32]:
         logger.trace(f"Evaluating disjunction with items: {items}")
 
-        return self._junction(items, or_)
+        return junction(items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
 
     def negation(self, items: list[T]) -> T:
         logger.trace(f"Evaluating negation with {len(items)} items")
@@ -174,89 +174,6 @@ class SimpleExecutor(BaseExecutor):
         if len(items) != 1:
             raise ValueError("Query must have exactly one item")
         return items[0]
-
-    def _junction(
-        self,
-        items: list[tuple[set[int], Highlights]] | list[set[uint32]],
-        operator: Callable[[Any, Any], Any],
-    ) -> tuple[set[int], Highlights] | set[uint32]:
-        if len(items) < 2:
-            raise ValueError("Junction must have at least two items")
-
-        # Items contains table results (i.e., tuple[set[int], Highlights])
-        if self._is_table_result(items):
-            if self.enable_highlighting:
-                # Initialize result with first item
-                doc_ids: set[int] = items[0][0]
-                highlights: Highlights = items[0][1]
-
-                # Merge all other items
-                for item in items[1:]:
-                    doc_ids = operator(doc_ids, item[0])
-                    highlights = self._merge_highlights(highlights, item[1], doc_ids)
-
-                return doc_ids, highlights
-
-            return reduce(operator, [item[0] for item in items]), ({}, set())
-
-        # Items contains column results (i.e., set[uint32])
-        return reduce(operator, items)  #  type: ignore
-
-    def _is_table_result(self, val: list[Any]) -> TypeGuard[list[tuple[set[int], Highlights]]]:
-        return all(isinstance(item, tuple) for item in val)
-
-    def _merge_highlights(
-        self, left: Highlights, right: Highlights, doc_ids: set[int]
-    ) -> Highlights:
-        """Merge highlights for documents that are in the result set."""
-        pattern = r"<mark>(.*?)</mark>"
-        regex = re.compile(pattern, re.DOTALL)
-
-        # Merge document highlights
-        doc_highlights: DocumentHighlights = {}
-        left_doc_highlights = left[0]
-        right_doc_highlights = right[0]
-        for doc_id in doc_ids:
-            left_highlights = left_doc_highlights.get(doc_id, {})
-            right_highlights = right_doc_highlights.get(doc_id, {})
-
-            # Only process if either side has highlights
-            if left_highlights or right_highlights:
-                merged_highlights = {}
-
-                # Process each field that appears in either highlight set
-                all_keys = set(left_highlights.keys()) | set(right_highlights.keys())
-                for key in all_keys:
-                    left_text = left_highlights.get(key, "")
-                    right_text = right_highlights.get(key, "")
-
-                    # If either text is empty, use the non-empty one
-                    if not left_text:
-                        merged_highlights[key] = right_text
-                        continue
-                    if not right_text:
-                        merged_highlights[key] = left_text
-                        continue
-
-                    # Both texts have content, merge their marks
-                    # Extract all marked words from right text
-                    right_marks = set(regex.findall(right_text))
-
-                    # Add marks from right text to left text
-                    for word in right_marks:
-                        if f"<mark>{word}</mark>" not in left_text:
-                            # Word isn't marked yet
-                            left_text = left_text.replace(word, f"<mark>{word}</mark>")
-
-                    merged_highlights[key] = left_text
-
-                doc_highlights[doc_id] = merged_highlights
-
-        # Merge column highlights
-        col_highlights = left[1] | right[1]
-        col_highlights &= doc_to_col_ids(doc_ids, self.metadata.doc_to_cols)
-
-        return doc_highlights, col_highlights
 
 
 def create_executor(
@@ -285,6 +202,95 @@ def create_executor(
         # TODO: Implement ParallelExecutor
         raise NotImplementedError("ParallelExecutor not implemented yet")
     raise ValueError(f"Unknown executor type: {executor_type}")
+
+
+def is_table_result(val: list[Any]) -> TypeGuard[list[tuple[set[int], Highlights]]]:
+    """Check if a list contains table results (document IDs and highlights)."""
+    return all(isinstance(item, tuple) for item in val)
+
+
+def merge_highlights(
+    left: Highlights, right: Highlights, doc_ids: set[int], doc_to_cols: dict[int, set[int]]
+) -> Highlights:
+    """Merge highlights for documents that are in the result set."""
+    pattern = r"<mark>(.*?)</mark>"
+    regex = re.compile(pattern, re.DOTALL)
+
+    # Merge document highlights
+    doc_highlights: DocumentHighlights = {}
+    left_doc_highlights = left[0]
+    right_doc_highlights = right[0]
+    for doc_id in doc_ids:
+        left_highlights = left_doc_highlights.get(doc_id, {})
+        right_highlights = right_doc_highlights.get(doc_id, {})
+
+        # Only process if either side has highlights
+        if left_highlights or right_highlights:
+            merged_highlights = {}
+
+            # Process each field that appears in either highlight set
+            all_keys = set(left_highlights.keys()) | set(right_highlights.keys())
+            for key in all_keys:
+                left_text = left_highlights.get(key, "")
+                right_text = right_highlights.get(key, "")
+
+                # If either text is empty, use the non-empty one
+                if not left_text:
+                    merged_highlights[key] = right_text
+                    continue
+                if not right_text:
+                    merged_highlights[key] = left_text
+                    continue
+
+                # Both texts have content, merge their marks
+                # Extract all marked words from right text
+                right_marks = set(regex.findall(right_text))
+
+                # Add marks from right text to left text
+                for word in right_marks:
+                    if f"<mark>{word}</mark>" not in left_text:
+                        # Word isn't marked yet
+                        left_text = left_text.replace(word, f"<mark>{word}</mark>")
+
+                merged_highlights[key] = left_text
+
+            doc_highlights[doc_id] = merged_highlights
+
+    # Merge column highlights
+    col_highlights = left[1] | right[1]
+    col_highlights &= doc_to_col_ids(doc_ids, doc_to_cols)
+
+    return doc_highlights, col_highlights
+
+
+def junction(
+    items: list[tuple[set[int], Highlights]] | list[set[uint32]],
+    operator: Callable[[Any, Any], Any],
+    enable_highlighting: bool = False,
+    doc_to_cols: dict[int, set[int]] | None = None,
+) -> tuple[set[int], Highlights] | set[uint32]:
+    """Combine query results using a junction operator (AND/OR)."""
+    if len(items) < 2:
+        raise ValueError("Junction must have at least two items")
+
+    # Items contains table results (i.e., tuple[set[int], Highlights])
+    if is_table_result(items):
+        if enable_highlighting and doc_to_cols is not None:
+            # Initialize result with first item
+            doc_ids: set[int] = items[0][0]
+            highlights: Highlights = items[0][1]
+
+            # Merge all other items
+            for item in items[1:]:
+                doc_ids = operator(doc_ids, item[0])
+                highlights = merge_highlights(highlights, item[1], doc_ids, doc_to_cols)
+
+            return doc_ids, highlights
+
+        return reduce(operator, [item[0] for item in items]), ({}, set())
+
+    # Items contains column results (i.e., set[uint32])
+    return reduce(operator, items)  # type: ignore
 
 
 def doc_to_col_ids(doc_ids: set[int], doc_to_cols: dict[int, set[int]]) -> set[uint32]:

@@ -22,7 +22,6 @@ def test_execute(category: str, test_name: str, test_case: ExecutorCase, engine:
     default_result, _ = engine.execute(
         query,
         enable_highlighting=False,
-        enable_filtering=False,
     )
     default_time = time.perf_counter() - exec_start
 
@@ -31,7 +30,6 @@ def test_execute(category: str, test_name: str, test_case: ExecutorCase, engine:
     no_merging_result, _ = engine.execute(
         query,
         enable_highlighting=False,
-        enable_filtering=False,
     )
     no_merging_time = time.perf_counter() - exec_start
 
@@ -40,7 +38,6 @@ def test_execute(category: str, test_name: str, test_case: ExecutorCase, engine:
     no_opt_result, _ = engine.execute(
         query,
         enable_highlighting=False,
-        enable_filtering=False,
     )
     no_opt_time = time.perf_counter() - exec_start
 

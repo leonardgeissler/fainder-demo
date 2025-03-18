@@ -17,7 +17,6 @@ def test_highlighter(test_name: str, test_case: HighlightingCase, engine: Engine
     _, highlights = engine.execute(
         test_case["query"],
         enable_highlighting=True,
-        enable_filtering=False,
     )
 
     assert highlights == test_case["expected"]
