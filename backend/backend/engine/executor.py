@@ -48,7 +48,7 @@ class BaseExecutor(Transformer[Token, tuple[set[int], Highlights]], ABC):
         fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
         enable_highlighting: bool = False,
     ) -> None:
-        pass
+        """Initialize the executor with the necessary indices and metadata."""
 
     @abstractmethod
     def process(self, tree: ParseTree) -> tuple[set[int], Highlights]:
@@ -343,7 +343,6 @@ class PrefilteringExecutor(BaseExecutor):
         if len(read_groups) == 0:
             return hist_ids
         for read_group in read_groups:
-            logger.trace(f"Read group: {read_group}")
             if len(self.intermediate_results) <= read_group:
                 return None
             intermediate_hist_ids = self.intermediate_results[read_group].hist_ids
