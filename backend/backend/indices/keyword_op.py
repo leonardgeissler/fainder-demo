@@ -32,6 +32,7 @@ def get_tantivy_schema() -> tantivy.Schema:
     schema_builder.add_text_field("creator", stored=True, tokenizer_name="en_stem")
     schema_builder.add_text_field("publisher", stored=True, tokenizer_name="en_stem")
     schema_builder.add_text_field("alternateName", stored=True, tokenizer_name="en_stem")
+    schema_builder.add_float_field("usability", stored=True, fast=True)
     return schema_builder.build()
 
 
@@ -61,8 +62,13 @@ class TantivyIndex:
         writer.wait_merging_threads()
 
     def search(
-        self, query: str, enable_highlighting: bool = False
+        self,
+        query: str,
+        enable_highlighting: bool = False,
+        min_usability_score: float = 0.0,
+        rank_by_usability: bool = True,
     ) -> tuple[list[int], list[float], DocumentHighlights]:
+        logger.debug(f"Searching Tantivy index with query: {query}")
         parsed_query = self.index.parse_query(query, default_field_names=DOC_FIELDS)
         searcher = self.index.searcher()
 
@@ -81,8 +87,18 @@ class TantivyIndex:
             if doc_id is None:
                 logger.error(f"Tantivy document with address {doc_address} has no id field")
                 continue
+            usability_score: int | None = doc.get_first("usability")
+            if usability_score is None or usability_score < min_usability_score:
+                logger.debug(
+                    f"Tantivy document with id {doc_id} has no usability field or its score is "
+                    "below the threshold"
+                )
+                continue
+            if rank_by_usability:
+                scores.append(usability_score * score)
+            else:
+                scores.append(score)
             results.append(doc_id)
-            scores.append(score)
 
             if enable_highlighting:
                 for field in DOC_FIELDS:
@@ -94,7 +110,6 @@ class TantivyIndex:
                     highlighted = snippet.highlighted()
                     if len(highlighted) == 0:
                         continue
-
                     html_snippet: str = doc.get_first(field) or ""
                     offset = 0
                     for fragment in highlighted:
@@ -115,5 +130,4 @@ class TantivyIndex:
                     highlights[doc_id][field_name] = html_snippet
 
         logger.info(f"Processing results took {time.perf_counter() - process_start:.5f}s")
-
         return results, scores, highlights

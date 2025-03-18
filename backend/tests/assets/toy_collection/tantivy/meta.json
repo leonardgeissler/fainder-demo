@@ -5,17 +5,17 @@
   },
   "segments": [
     {
-      "segment_id": "3cf320c6-3265-443b-92dd-776f621a3dde",
+      "segment_id": "f974d5e8-b161-49d8-b37c-5fb5b794ddcd",
       "max_doc": 1,
       "deletes": null
     },
     {
-      "segment_id": "2f484b99-683d-48f4-94c7-1c197db5276d",
+      "segment_id": "31af1c77-10be-4fc2-9f5a-e4b2ae0fc5ad",
       "max_doc": 1,
       "deletes": null
     },
     {
-      "segment_id": "d19b841d-4f95-4a14-be7f-6f63f9ffa8a2",
+      "segment_id": "948f18d5-05d0-4ca2-8f85-d69839cb3726",
       "max_doc": 1,
       "deletes": null
     }
@@ -107,6 +107,16 @@
         },
         "stored": true,
         "fast": false
+      }
+    },
+    {
+      "name": "usability",
+      "type": "f64",
+      "options": {
+        "indexed": false,
+        "fieldnorms": false,
+        "fast": true,
+        "stored": true
       }
     }
   ],
