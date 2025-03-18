@@ -1,5 +1,3 @@
-from os import read, write
-from pydoc import doc
 import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -7,9 +5,9 @@ from collections.abc import Callable, Sequence
 from functools import reduce
 from operator import and_, or_
 from typing import Any, TypeGuard, TypeVar
-from unittest import result
 
 from lark import ParseTree, Token, Transformer
+from lark.visitors import Visitor_Recursive
 from loguru import logger
 from numpy import uint32
 from numpy.typing import NDArray
@@ -51,6 +49,10 @@ class BaseExecutor(Transformer[Token, tuple[set[int], Highlights]], ABC):
         enable_highlighting: bool = False,
     ) -> None:
         pass
+
+    @abstractmethod
+    def process(self, tree: ParseTree) -> tuple[set[int], Highlights]:
+        """Start processing the parse tree."""
 
 
 class SimpleExecutor(BaseExecutor):
@@ -182,33 +184,100 @@ class SimpleExecutor(BaseExecutor):
             raise ValueError("Query must have exactly one item")
         return items[0]
 
+    def process(self, tree: ParseTree) -> tuple[set[int], Highlights]:
+        """Start processing the parse tree."""
+        return self.transform(tree)
+
+
+class IntermediaryResultGroups(Visitor_Recursive[Token]):
+    """
+    This visitor adds numbers for intermediary result groups to each node.
+    A node can have groups it writes to and possibly multiple it reads from.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        # Use dictionaries to store attributes for both Tree and Token objects
+        self.write_groups: dict[int, int] = {}
+        self.read_groups: dict[int, list[int]] = {}
+
+    def apply(self, tree: ParseTree) -> None:
+        # Initialize the root node with group 0
+        self.write_groups[id(tree)] = 0
+        self.read_groups[id(tree)] = [0]
+        self.visit_topdown(tree)
+
+    def __default__(self, tree: ParseTree) -> None:
+        # Set attributes for all children using the parent's values
+        if id(tree) in self.write_groups and id(tree) in self.read_groups:
+            write_group = self.write_groups[id(tree)]
+            read_group = self.read_groups[id(tree)]
+
+            for child in tree.children:
+                # Store in our dictionaries rather than on the objects directly
+                self.write_groups[id(child)] = write_group
+                self.read_groups[id(child)] = read_group
+
+    def query(self, tree: ParseTree) -> None:
+        # Set attributes for query node and children
+        self.write_groups[id(tree)] = 0
+        self.read_groups[id(tree)] = [0]
+
+        # Set same attributes for all children
+        for child in tree.children:
+            self.write_groups[id(child)] = 0
+            self.read_groups[id(child)] = [0]
+
+    def conjunction(self, tree: ParseTree) -> None:
+        # For conjunction, all children read and write to the same groups
+        if id(tree) in self.write_groups and id(tree) in self.read_groups:
+            write_group = self.write_groups[id(tree)]
+            read_group = self.read_groups[id(tree)]
+
+            for child in tree.children:
+                self.write_groups[id(child)] = write_group
+                self.read_groups[id(child)] = read_group
+
+    def disjunction(self, tree: ParseTree) -> None:
+        # For disjunction, give each child a new write group and add to read groups
+        if id(tree) in self.write_groups and id(tree) in self.read_groups:
+            write_group = self.write_groups[id(tree)]
+
+            for child in tree.children:
+                write_group += 1
+                self.write_groups[id(child)] = write_group
+                self.read_groups[id(child)] = [write_group]
+
+    def negation(self, tree: ParseTree) -> None:
+        # For negation, increment the write group and add to read groups
+        if id(tree) in self.write_groups and id(tree) in self.read_groups:
+            write_group = self.write_groups[id(tree)] + 1
+            read_groups = [*self.read_groups[id(tree)], write_group]
+
+            for child in tree.children:
+                self.write_groups[id(child)] = write_group
+                self.read_groups[id(child)] = read_groups
+
+
 class IntermediateResults:
-    """Intermediate results for prefiltering. Only one of doc_ids, col_ids, or hist_ids should be set. 
+    """Intermediate results for prefiltering.
+    Only one of doc_ids, col_ids, or hist_ids should be set.
     If multiple are set, this should result in an error.
     """
+
     doc_ids: set[int] | None = None
     col_ids: set[uint32] | None = None
     hist_ids: set[uint32] | None = None
 
-def _get_write_group(tree: ParseTree | Token, optimizer_rules: list[IntermediaryResultGroups]) -> int:
-    """Get the write group for a tree or token using the IntermediaryResultGroups rule."""
-    for rule in optimizer_rules:
-        if isinstance(rule, IntermediaryResultGroups):
-            return rule.get_write_group(tree)
-    raise ValueError("No IntermediaryResultGroups rule found in optimizer_rules")
-
-def _get_read_groups(tree: ParseTree | Token, optimizer_rules: list[IntermediaryResultGroups]) -> list[int]:
-    """Get the read groups for a tree or token using the IntermediaryResultGroups rule."""
-    for rule in optimizer_rules:
-        if isinstance(rule, IntermediaryResultGroups):
-            return rule.get_read_groups(tree)
-    raise ValueError("No IntermediaryResultGroups rule found in optimizer_rules")
 
 class PrefilteringExecutor(BaseExecutor):
     """Uses prefiltering to reduce the number of documents before executing the query."""
+
     fainder_mode: FainderMode
     scores: dict[int, float]
     intermediate_results: list[IntermediateResults]
+    write_groups: dict[int, int]  # Maps node ID to write group
+    read_groups: dict[int, list[int]]  # Maps node ID to read groups
 
     def __init__(
         self,
@@ -218,13 +287,14 @@ class PrefilteringExecutor(BaseExecutor):
         metadata: Metadata,
         fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
         enable_highlighting: bool = False,
-        optimizer_rules: list[IntermediaryResultGroups] = None,
     ) -> None:
         self.tantivy_index = tantivy_index
         self.fainder_index = fainder_index
         self.hnsw_index = hnsw_index
         self.metadata = metadata
-        self.optimizer_rules = optimizer_rules or []
+        self.write_groups = {}
+        self.intermediate_results = []
+        self.read_groups = {}
 
         self.reset(fainder_mode, enable_highlighting)
 
@@ -236,6 +306,9 @@ class PrefilteringExecutor(BaseExecutor):
         self.scores = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
+        self.intermediate_results = []
+        self.write_groups = {}
+        self.read_groups = {}
 
     def updates_scores(self, doc_ids: Sequence[int], scores: Sequence[float]) -> None:
         logger.trace(f"Updating scores for {len(doc_ids)} documents")
@@ -248,7 +321,9 @@ class PrefilteringExecutor(BaseExecutor):
 
     def _update_intermediate_results(self, result: IntermediateResults, write_group: int) -> None:
         if write_group >= len(self.intermediate_results):
-            self.intermediate_results.extend([IntermediateResults() for _ in range(write_group + 1)])
+            self.intermediate_results.extend(
+                [IntermediateResults() for _ in range(write_group + 1)]
+            )
 
         if result.doc_ids is not None:
             self.intermediate_results[write_group].doc_ids = None
@@ -263,19 +338,49 @@ class PrefilteringExecutor(BaseExecutor):
             self.intermediate_results[write_group].col_ids = None
             self.intermediate_results[write_group].hist_ids = result.hist_ids
 
-    def _get_hist_ids_from_read_groups(self, read_groups: list[int]) -> set[uint32]:
+    def _get_hist_ids_from_read_groups(self, read_groups: list[int]) -> set[uint32] | None:
         hist_ids: set[uint32] = set()
         if len(read_groups) == 0:
             return hist_ids
         for read_group in read_groups:
-            if self.intermediate_results[read_group].hist_ids is not None:
-                hist_ids |= self.intermediate_results[read_group].hist_ids
-            if self.intermediate_results[read_group].col_ids is not None:
-                hist_ids |= col_to_hist_ids(self.intermediate_results[read_group].col_ids, self.metadata.col_to_hist)
-            if self.intermediate_results[read_group].doc_ids is not None:
-                hist_ids |= col_to_hist_ids(doc_to_col_ids(self.intermediate_results[read_group].doc_ids, self.metadata.doc_to_cols), self.metadata
-                .col_to_hist)
+            logger.trace(f"Read group: {read_group}")
+            if len(self.intermediate_results) <= read_group:
+                return None
+            intermediate_hist_ids = self.intermediate_results[read_group].hist_ids
+            if intermediate_hist_ids is not None:
+                hist_ids |= intermediate_hist_ids
+                continue
+            intermediate_col_ids = self.intermediate_results[read_group].col_ids
+            if intermediate_col_ids is not None:
+                hist_ids |= col_to_hist_ids(intermediate_col_ids, self.metadata.col_to_hist)
+                continue
+            intermediate_doc_ids = self.intermediate_results[read_group].doc_ids
+            if intermediate_doc_ids is not None:
+                hist_ids |= col_to_hist_ids(
+                    doc_to_col_ids(intermediate_doc_ids, self.metadata.doc_to_cols),
+                    self.metadata.col_to_hist,
+                )
+                continue
+        logger.trace(f"Hist IDs: {hist_ids}")
         return hist_ids
+
+    def _get_write_group(self, node: ParseTree | Token) -> int:
+        """Get the write group for a node."""
+        node_id = id(node)
+        if node_id in self.write_groups:
+            return self.write_groups[node_id]
+        logger.warning(f"Node {node} does not have a write group")
+        logger.warning(f"Write groups: {self.write_groups}")
+        raise ValueError("Node does not have a write group")
+
+    def _get_read_groups(self, node: ParseTree | Token) -> list[int]:
+        """Get the read groups for a node."""
+        node_id = id(node)
+        if node_id in self.read_groups:
+            return self.read_groups[node_id]
+        logger.warning(f"Node {node} does not have read groups")
+        logger.warning(f"Read groups: {self.read_groups}")
+        raise ValueError("Node does not have read groups")
 
     ### Operator implementations ###
 
@@ -289,12 +394,12 @@ class PrefilteringExecutor(BaseExecutor):
 
         result = IntermediateResults()
         result.doc_ids = set(result_docs)
-        write_group = _get_write_group(items[0], self.optimizer_rules)
+        write_group = self._get_write_group(items[0])
         self._update_intermediate_results(result, write_group)
 
-        return set(result_docs), (highlights, set()), write_group  # Return empty set for column highlights
+        return set(result_docs), (highlights, set()), write_group
 
-    def col_op(self, items: list[tuple[set[uint32] , int]]) -> tuple[set[int], Highlights, int]:
+    def col_op(self, items: list[tuple[set[uint32], int]]) -> tuple[set[int], Highlights, int]:
         logger.trace(f"Evaluating column term: {items}")
 
         if len(items) != 1:
@@ -316,9 +421,9 @@ class PrefilteringExecutor(BaseExecutor):
         result = self.hnsw_index.search(column, k, None)
         intermediate = IntermediateResults()
         intermediate.col_ids = result
-        write_group = _get_write_group(items[0], self.optimizer_rules)
+        write_group = self._get_write_group(items[0])
         self._update_intermediate_results(intermediate, write_group)
-        return result, write_group  # noqa: RET504
+        return result, write_group
 
     def percentile_op(self, items: list[Token]) -> tuple[set[uint32], int]:
         logger.trace(f"Evaluating percentile term: {items}")
@@ -326,14 +431,14 @@ class PrefilteringExecutor(BaseExecutor):
         percentile = float(items[0])
         comparison: str = items[1]
         reference = float(items[2])
-        hist_filter = self._get_hist_ids_from_read_groups(_get_read_groups(items[0], self.optimizer_rules))
-        write_group = _get_write_group(items[0], self.optimizer_rules)
-        if len(hist_filter) == 0:
+        hist_filter = self._get_hist_ids_from_read_groups(self._get_read_groups(items[0]))
+        write_group = self._get_write_group(items[0])
+        if hist_filter is not None and len(hist_filter) == 0:
             return set(), write_group
         result_hists = self.fainder_index.search(
             percentile, comparison, reference, self.fainder_mode, hist_filter
         )
-        result = hist_to_col_ids(result_hists, self.metadata.hist_to_col) 
+        result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
         intermediate = IntermediateResults()
         intermediate.hist_ids = result_hists
         self._update_intermediate_results(intermediate, write_group)
@@ -347,9 +452,9 @@ class PrefilteringExecutor(BaseExecutor):
         clean_items: list[tuple[set[int], Highlights]] | list[set[uint32]] = []
         for item in items:
             if len(item) == 3:
-                clean_items.append((item[0], item[1]))
+                clean_items.append((item[0], item[1]))  # type: ignore
             else:
-                clean_items.append((item[0]))
+                clean_items.append(item[0])  # type: ignore
 
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
         intermediate = IntermediateResults()
@@ -357,15 +462,11 @@ class PrefilteringExecutor(BaseExecutor):
             intermediate.doc_ids = result[0]
         else:
             intermediate.col_ids = result
-        if len(items[0]) == 3:
-            write_group = items[0][2]
-        else:
-            write_group = items[0][1]
+        write_group = items[0][2] if len(items[0]) == 3 else items[0][1]
         self._update_intermediate_results(intermediate, write_group)
         if isinstance(result, tuple):
             return result[0], result[1], write_group
         return result, write_group
-    
 
     def disjunction(
         self, items: list[tuple[set[int], Highlights, int]] | list[tuple[set[uint32], int]]
@@ -375,9 +476,9 @@ class PrefilteringExecutor(BaseExecutor):
         clean_items: list[tuple[set[int], Highlights]] | list[set[uint32]] = []
         for item in items:
             if len(item) == 3:
-                clean_items.append((item[0], item[1]))
+                clean_items.append((item[0], item[1]))  # type: ignore
             else:
-                clean_items.append((item[0]))
+                clean_items.append(item[0])  # type: ignore
 
         result = junction(clean_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
         intermediate = IntermediateResults()
@@ -385,45 +486,43 @@ class PrefilteringExecutor(BaseExecutor):
             intermediate.doc_ids = result[0]
         else:
             intermediate.col_ids = result
-        if len(items[0]) == 3:
-            write_group = items[0][2]
-        else:
-            write_group = items[0][1]
-        write_group = write_group - 1 # Very important!
+        write_group = items[0][2] if len(items[0]) == 3 else items[0][1]
+        write_group = write_group - 1  # Very important!
         self._update_intermediate_results(intermediate, write_group)
         if isinstance(result, tuple):
             return result[0], result[1], write_group
         return result, write_group
-    
-    def negation(self, items: list[tuple[set[int], Highlights, int]] | list[tuple[set[uint32], int]]) -> tuple[set[int], Highlights, int] | tuple[set[uint32], int]:
+
+    def negation(
+        self, items: list[tuple[set[int], Highlights, int]] | list[tuple[set[uint32], int]]
+    ) -> tuple[set[int], Highlights, int] | tuple[set[uint32], int]:
         logger.trace(f"Evaluating negation with {len(items)} items")
 
         if len(items) != 1:
             raise ValueError("Negation term must have exactly one item")
-        if isinstance(items[0], tuple):
-            if len(items[0]) == 3:
-                to_negate, _, write_group = items[0]
-                write_group = write_group - 1 # Very important!
-                all_docs = set(self.metadata.doc_to_cols.keys())
-                # Result highlights are reset for negated results
-                doc_highlights: DocumentHighlights = {}
-                col_highlights: ColumnHighlights = set()
-                result = (all_docs - to_negate, (doc_highlights, col_highlights), write_group)
-                intermediate = IntermediateResults()
-                intermediate.doc_ids = result[0]
-                self._update_intermediate_results(intermediate, write_group)
-                return result
-            elif len(items[0]) == 2:
-                to_negate_cols: set[uint32] = items[0][0]
-                write_group_cols: int = items[0][1]
-                # For column expressions, we negate using the set of all column IDs
-                all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
-                result = all_columns - to_negate_cols
-                intermediate = IntermediateResults()
-                intermediate.col_ids = result
-                self._update_intermediate_results(intermediate, write_group_cols)
-                return result, write_group_cols
-            
+        if len(items[0]) == 3:
+            to_negate, _, write_group = items[0]
+            write_group = write_group - 1  # Very important!
+            all_docs = set(self.metadata.doc_to_cols.keys())
+            # Result highlights are reset for negated results
+            doc_highlights: DocumentHighlights = {}
+            col_highlights: ColumnHighlights = set()
+            result = (all_docs - to_negate, (doc_highlights, col_highlights), write_group)
+            intermediate = IntermediateResults()
+            intermediate.doc_ids = result[0]
+            self._update_intermediate_results(intermediate, write_group)
+            return result
+        if len(items[0]) == 2:
+            to_negate_cols: set[uint32] = items[0][0]
+            write_group_cols: int = items[0][1]
+            # For column expressions, we negate using the set of all column IDs
+            all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
+            result_col = all_columns - to_negate_cols
+            intermediate = IntermediateResults()
+            intermediate.col_ids = result_col
+            self._update_intermediate_results(intermediate, write_group_cols)
+            return result_col, write_group_cols
+
         raise ValueError("Negation term must have exactly one item")
 
     def query(self, items: list[tuple[set[int], Highlights, int]]) -> tuple[set[int], Highlights]:
@@ -432,6 +531,19 @@ class PrefilteringExecutor(BaseExecutor):
         if len(items) != 1:
             raise ValueError("Query must have exactly one item")
         return items[0][0], items[0][1]
+
+    def process(self, tree: ParseTree) -> tuple[set[int], Highlights]:
+        """Start processing the parse tree."""
+        self.write_groups = {}
+        self.read_groups = {}
+        groups = IntermediaryResultGroups()
+        groups.apply(tree)
+        self.write_groups = groups.write_groups
+        self.read_groups = groups.read_groups
+        logger.warning(f"Write groups: {self.write_groups}")
+        logger.warning(f"Read groups: {self.read_groups}")
+        return self.transform(tree)
+
 
 def create_executor(
     executor_type: ExecutorType,
