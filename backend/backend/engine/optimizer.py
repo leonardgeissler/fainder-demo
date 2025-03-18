@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from lark import ParseTree, Token, Tree, Visitor
+from lark.visitors import Visitor_Recursive
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -63,7 +64,7 @@ class Optimizer:
             self.opt_rules.append(MergeKeywords())
         if intermediate_filtering:
             logger.warning("Intermediate filtering not yet implemented")
-            self.opt_rules.append(ParentAnnotator())
+            self.opt_rules.append(IntermediaryResultGroups())
 
     def optimize(self, tree: ParseTree) -> ParseTree:
         """
@@ -226,3 +227,43 @@ class MergeKeywords(Visitor[Token], OptimizationRule):
                 else:
                     keyword_strings.append(f"({child})")
         return f" {operator} ".join(keyword_strings)
+
+
+class IntermediaryResultGroups(Visitor_Recursive[Token], OptimizationRule):
+    """
+    This visitor adds numbers for intermediary result groups to each node.
+    A note can has groups it writes to and possibly multiple it reads from.
+    """
+
+    def apply(self, tree: ParseTree) -> None:
+        self.visit_topdown(tree)
+
+    def query(self, tree: ParseTree) -> None:
+        # set for children same as parent
+        for child in tree.children:
+            if isinstance(child, Tree):
+                child.write_group = 0  # type: ignore
+                child.read_groups = [0]  # type: ignore
+
+    def conjunction(self, tree: ParseTree) -> None:
+        # set for children same as parent
+        for child in tree.children:
+            if isinstance(child, Tree):
+                child.write_group = tree.write_group  # type: ignore
+                child.read_groups = tree.write_group  # type: ignore
+
+    def disjunction(self, tree: ParseTree) -> None:
+        write_group = tree.write_group + 1  # type: ignore
+        read_groups = [*tree.read_groups, write_group]  # type: ignore
+        for child in tree.children:
+            if isinstance(child, Tree):
+                child.write_group = write_group  # type: ignore
+                child.read_groups = read_groups  # type: ignore
+
+    def negation(self, tree: ParseTree) -> None:
+        write_group = tree.write_group + 1  # type: ignore
+        read_groups = [*tree.read_groups, write_group]  # type: ignore
+        for child in tree.children:
+            if isinstance(child, Tree):
+                child.write_group = write_group  # type: ignore
+                child.read_groups = read_groups  # type: ignore

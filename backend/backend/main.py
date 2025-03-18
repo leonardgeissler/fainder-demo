@@ -91,6 +91,7 @@ engine = Engine(
     hnsw_index=hnsw_index,
     metadata=metadata,
     cache_size=settings.query_cache_size,
+    executor_type=settings.executor_type,
 )
 
 logger.info("Initializing FastAPI app")

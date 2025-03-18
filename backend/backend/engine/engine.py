@@ -1,9 +1,9 @@
 from functools import lru_cache
 
-from backend.config import CacheInfo, FainderMode, Metadata
+from backend.config import CacheInfo, ExecutorType, FainderMode, Metadata
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .executor import Executor, Highlights
+from .executor import Highlights, create_executor
 from .optimizer import Optimizer
 from .parser import Parser
 
@@ -16,10 +16,21 @@ class Engine:
         hnsw_index: HnswIndex,
         metadata: Metadata,
         cache_size: int = 128,
+        executor_type: ExecutorType = ExecutorType.SIMPLE,
     ) -> None:
         self.parser = Parser()
-        self.optimizer = Optimizer()
-        self.executor = Executor(tantivy_index, fainder_index, hnsw_index, metadata)
+        if executor_type == ExecutorType.PREFILTERING:
+            self.optimizer = Optimizer(
+                cost_sorting=True, keyword_merging=True, intermediate_filtering=True
+            )
+        else:
+            self.optimizer = Optimizer(
+                cost_sorting=True, keyword_merging=True, intermediate_filtering=False
+            )
+        self.executor = create_executor(
+            executor_type, tantivy_index, fainder_index, hnsw_index, metadata
+        )
+        self.executor_type = executor_type
 
         # NOTE: Don't use lru_cache on methods
         # See https://docs.astral.sh/ruff/rules/cached-instance-method/ for details
@@ -32,7 +43,9 @@ class Engine:
         hnsw_index: HnswIndex,
         metadata: Metadata,
     ) -> None:
-        self.executor = Executor(tantivy_index, fainder_index, hnsw_index, metadata)
+        self.executor = create_executor(
+            self.executor_type, tantivy_index, fainder_index, hnsw_index, metadata
+        )
         self.clear_cache()
 
     def clear_cache(self) -> None:
@@ -47,10 +60,9 @@ class Engine:
         query: str,
         fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
         enable_highlighting: bool = False,
-        enable_filtering: bool = False,
     ) -> tuple[list[int], Highlights]:
         # Reset state for new query
-        self.executor.reset(fainder_mode, enable_highlighting, enable_filtering)
+        self.executor.reset(fainder_mode, enable_highlighting)
 
         # Parse query
         parse_tree = self.parser.parse(query)

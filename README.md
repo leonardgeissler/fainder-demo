@@ -49,6 +49,7 @@ QUERY_CACHE_SIZE=128         # Maximum number of query results to cache
 DATASET_SLUG=kaggleRef       # Document field with a unique dataset identifier
 CROISSANT_STORE_TYPE=dict    # Croissant store implementation (dict or file)
 CROISSANT_CACHE_SIZE=128     # Size of the Croissant store cache (only relevant for file store)
+EXECUTOR_TYPE=simple         # Query executor implementation (simple or prefiltering)
 
 # Fainder
 FAINDER_N_CLUSTERS=50               # Number of index clusters
