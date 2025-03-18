@@ -93,6 +93,7 @@ engine = Engine(
     cache_size=settings.query_cache_size,
     min_usability_score=settings.min_usability_score,
     rank_by_usability=settings.rank_by_usability,
+    executor_type=settings.executor_type,
 )
 
 logger.info("Initializing FastAPI app")

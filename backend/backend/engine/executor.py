@@ -1,4 +1,5 @@
 import re
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from functools import reduce
@@ -10,19 +11,50 @@ from loguru import logger
 from numpy import uint32
 from numpy.typing import NDArray
 
-from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Highlights, Metadata
+from backend.config import (
+    ColumnHighlights,
+    DocumentHighlights,
+    ExecutorType,
+    FainderMode,
+    Highlights,
+    Metadata,
+)
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 T = TypeVar("T", tuple[set[int], Highlights], set[uint32])
 
 
-class Executor(Transformer[Token, tuple[set[int], Highlights]]):
+class BaseExecutor(Transformer[Token, tuple[set[int], Highlights]], ABC):
+    """Base abstract class for query executors that defines the common interface."""
+
+    scores: dict[int, float]
+
+    @abstractmethod
+    def reset(
+        self,
+        fainder_mode: FainderMode,
+        enable_highlighting: bool = False,
+    ) -> None:
+        """Reset the executor's state."""
+
+    @abstractmethod
+    def __init__(
+        self,
+        tantivy_index: TantivyIndex,
+        fainder_index: FainderIndex,
+        hnsw_index: HnswIndex,
+        metadata: Metadata,
+        fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
+        enable_highlighting: bool = False,
+    ) -> None:
+        pass
+
+
+class SimpleExecutor(BaseExecutor):
     """This transformer evaluates a parse tree bottom-up and computes the query result."""
 
     fainder_mode: FainderMode
     scores: dict[int, float]
-    last_result: set[int] | set[uint32] | None  # Maybe rename this to intermediate_result
-    current_side: str | None
 
     def __init__(
         self,
@@ -32,12 +64,9 @@ class Executor(Transformer[Token, tuple[set[int], Highlights]]):
         metadata: Metadata,
         fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
         enable_highlighting: bool = False,
-        enable_filtering: bool = False,
         min_usability_score: float = 0.0,
         rank_by_usability: bool = True,
     ) -> None:
-        super().__init__(visit_tokens=False)
-
         self.tantivy_index = tantivy_index
         self.fainder_index = fainder_index
         self.hnsw_index = hnsw_index
@@ -45,21 +74,16 @@ class Executor(Transformer[Token, tuple[set[int], Highlights]]):
         self.min_usability_score = min_usability_score
         self.rank_by_usability = rank_by_usability
 
-        self.reset(fainder_mode, enable_highlighting, enable_filtering)
+        self.reset(fainder_mode, enable_highlighting)
 
     def reset(
         self,
         fainder_mode: FainderMode,
         enable_highlighting: bool = False,
-        enable_filtering: bool = False,
     ) -> None:
         self.scores = defaultdict(float)
-        self.last_result = None
-        self.current_side = None
-
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
-        self.enable_filtering = enable_filtering
 
     def updates_scores(self, doc_ids: Sequence[int], scores: Sequence[float]) -> None:
         logger.trace(f"Updating scores for {len(doc_ids)} documents")
@@ -75,15 +99,11 @@ class Executor(Transformer[Token, tuple[set[int], Highlights]]):
     def keyword_op(self, items: list[Token]) -> tuple[set[int], Highlights]:
         logger.trace(f"Evaluating keyword term: {items}")
 
-        # NOTE: Currently unused
-        # doc_filter = None
-
         result_docs, scores, highlights = self.tantivy_index.search(
             items[0], self.enable_highlighting, self.min_usability_score, self.rank_by_usability
         )
         self.updates_scores(result_docs, scores)
 
-        # TODO: update last_result
         return set(result_docs), (highlights, set())  # Return empty set for column highlights
 
     def col_op(self, items: list[set[uint32]]) -> tuple[set[int], Highlights]:
@@ -104,12 +124,8 @@ class Executor(Transformer[Token, tuple[set[int], Highlights]]):
         column = items[0]
         k = int(items[1])
 
-        # NOTE: Currently unused
-        column_filter = None
+        result = self.hnsw_index.search(column, k, None)
 
-        result = self.hnsw_index.search(column, k, column_filter)
-
-        # TODO: update last_result
         return result  # noqa: RET504
 
     def percentile_op(self, items: list[Token]) -> set[uint32]:
@@ -119,14 +135,9 @@ class Executor(Transformer[Token, tuple[set[int], Highlights]]):
         comparison: str = items[1]
         reference = float(items[2])
 
-        # NOTE: Currently unused
-        hist_filter = None
-
         result_hists = self.fainder_index.search(
-            percentile, comparison, reference, self.fainder_mode, hist_filter
+            percentile, comparison, reference, self.fainder_mode
         )
-
-        # TODO: update last_result
         return hist_to_col_ids(result_hists, self.metadata.hist_to_col)
 
     def conjunction(
@@ -251,23 +262,37 @@ class Executor(Transformer[Token, tuple[set[int], Highlights]]):
 
         return doc_highlights, col_highlights
 
-    def _get_column_filter(
-        self, operator: str | None, side: str | None
-    ) -> set[int] | set[uint32] | None:
-        """Create a document filter for AND operators based on previous results.
-        NOTE: Currently unused
-        """
-        if (
-            not self.enable_filtering
-            or not self.last_result
-            or operator != "AND"
-            or side != "right"
-        ):
-            return None
 
-        # Only apply filters to the right side of AND operations
-        logger.trace(f"Applying filter from previous result: {self.last_result}")
-        return self.last_result
+def create_executor(
+    executor_type: ExecutorType,
+    tantivy_index: TantivyIndex,
+    fainder_index: FainderIndex,
+    hnsw_index: HnswIndex,
+    metadata: Metadata,
+    fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
+    enable_highlighting: bool = False,
+    min_usability_score: float = 0.0,
+    rank_by_usability: bool= True,
+) -> BaseExecutor:
+    """Factory function to create the appropriate executor based on the executor type."""
+    if executor_type == ExecutorType.SIMPLE:
+        return SimpleExecutor(
+            tantivy_index=tantivy_index,
+            fainder_index=fainder_index,
+            hnsw_index=hnsw_index,
+            metadata=metadata,
+            fainder_mode=fainder_mode,
+            enable_highlighting=enable_highlighting,
+            min_usability_score=min_usability_score,
+            rank_by_usability=rank_by_usability,
+        )
+    if executor_type == ExecutorType.PREFILTERING:
+        # TODO: Implement PrefilteringExecutor
+        raise NotImplementedError("PrefilteringExecutor not implemented yet")
+    if executor_type == ExecutorType.PARALLEL:
+        # TODO: Implement ParallelExecutor
+        raise NotImplementedError("ParallelExecutor not implemented yet")
+    raise ValueError(f"Unknown executor type: {executor_type}")
 
 
 def doc_to_col_ids(doc_ids: set[int], doc_to_cols: dict[int, set[int]]) -> set[uint32]:
