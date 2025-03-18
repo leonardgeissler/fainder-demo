@@ -47,6 +47,8 @@ class BaseExecutor(Transformer[Token, tuple[set[int], Highlights]], ABC):
         metadata: Metadata,
         fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
         enable_highlighting: bool = False,
+        min_usability_score: float = 0.0,
+        rank_by_usability: bool = True,
     ) -> None:
         """Initialize the executor with the necessary indices and metadata."""
 
@@ -287,6 +289,8 @@ class PrefilteringExecutor(BaseExecutor):
         metadata: Metadata,
         fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
         enable_highlighting: bool = False,
+        min_usability_score: float = 0.0,
+        rank_by_usability: bool = True,
     ) -> None:
         self.tantivy_index = tantivy_index
         self.fainder_index = fainder_index
@@ -295,6 +299,8 @@ class PrefilteringExecutor(BaseExecutor):
         self.write_groups = {}
         self.intermediate_results = []
         self.read_groups = {}
+        self.min_usability_score = min_usability_score
+        self.rank_by_usability = rank_by_usability
 
         self.reset(fainder_mode, enable_highlighting)
 
@@ -387,7 +393,7 @@ class PrefilteringExecutor(BaseExecutor):
         logger.trace(f"Evaluating keyword term: {items}")
 
         result_docs, scores, highlights = self.tantivy_index.search(
-            items[0], self.enable_highlighting
+            items[0], self.enable_highlighting, self.min_usability_score, self.rank_by_usability
         )
         self.updates_scores(result_docs, scores)
 
@@ -553,7 +559,7 @@ def create_executor(
     fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
     enable_highlighting: bool = False,
     min_usability_score: float = 0.0,
-    rank_by_usability: bool= True,
+    rank_by_usability: bool = True,
 ) -> BaseExecutor:
     """Factory function to create the appropriate executor based on the executor type."""
     if executor_type == ExecutorType.SIMPLE:
@@ -575,6 +581,8 @@ def create_executor(
             metadata=metadata,
             fainder_mode=fainder_mode,
             enable_highlighting=enable_highlighting,
+            min_usability_score=min_usability_score,
+            rank_by_usability=rank_by_usability,
         )
     if executor_type == ExecutorType.PARALLEL:
         # TODO: Implement ParallelExecutor
