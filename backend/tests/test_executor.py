@@ -12,7 +12,7 @@ from .assets.test_cases_executor import EXECUTOR_CASES, ExecutorCase
     ("category", "test_name", "test_case"),
     [(cat, name, case) for cat, cases in EXECUTOR_CASES.items() for name, case in cases.items()],
 )
-def test_execute(category: str, test_name: str, test_case: ExecutorCase, engine: Engine) -> None:
+def test_execute(category: str, test_name: str, test_case: ExecutorCase, engine: Engine, prefiltering_engine: Engine) -> None:
     query = test_case["query"]
     expected_result = test_case["expected"]
 
@@ -41,6 +41,14 @@ def test_execute(category: str, test_name: str, test_case: ExecutorCase, engine:
     )
     no_opt_time = time.perf_counter() - exec_start
 
+    prefiltering_engine.optimizer = Optimizer(cost_sorting=True, keyword_merging=True, intermediate_filtering=True)
+    exec_start = time.perf_counter()
+    prefiltering_result, _ = prefiltering_engine.execute(
+        query,
+        enable_highlighting=False,
+    )
+    prefiltering_time = time.perf_counter() - exec_start
+
     # Log timing information in a structured format
     performance_log = {
         "test_type": "executor",
@@ -50,10 +58,11 @@ def test_execute(category: str, test_name: str, test_case: ExecutorCase, engine:
         "default_time": default_time,
         "no_merging_time": no_merging_time,
         "no_opt_time": no_opt_time,
+        "prefiltering_time": prefiltering_time
     }
     logger.info(performance_log)
 
     # Verify results are consistent
     assert (
-        set(default_result) == set(no_merging_result) == set(expected_result) == set(no_opt_result)
+        set(default_result) == set(no_merging_result) == set(expected_result) == set(no_opt_result) == set(prefiltering_result)
     )
