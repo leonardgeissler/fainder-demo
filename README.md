@@ -54,6 +54,7 @@ EXECUTOR_TYPE=simple         # Query executor implementation (simple or prefilte
 QUERY_CACHE_SIZE=128                # Maximum number of query results to cache
 MIN_USABILITY_SCORE=0.0             # Minimum usability threshold for query results
 RANK_BY_USABILITY=True              # Boolean to enable/disable usability
+EXECUTOR_TYPE=simple         # Query executor implementation (simple or prefiltering)
 
 # Fainder
 FAINDER_N_CLUSTERS=50               # Number of index clusters

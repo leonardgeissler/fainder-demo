@@ -47,8 +47,6 @@ class BaseExecutor(Transformer[Token, tuple[set[int], Highlights]], ABC):
         metadata: Metadata,
         fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
         enable_highlighting: bool = False,
-        min_usability_score: float = 0.0,
-        rank_by_usability: bool = True,
     ) -> None:
         """Initialize the executor with the necessary indices and metadata."""
 

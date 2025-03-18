@@ -16,9 +16,9 @@ class Engine:
         hnsw_index: HnswIndex,
         metadata: Metadata,
         cache_size: int = 128,
-        executor_type: ExecutorType = ExecutorType.PREFILTERING,
         min_usability_score: float = 0.0,
         rank_by_usability: bool = True,
+        executor_type: ExecutorType = ExecutorType.SIMPLE,
     ) -> None:
         self.parser = Parser()
         if executor_type == ExecutorType.PREFILTERING:
@@ -26,9 +26,16 @@ class Engine:
         else:
             self.optimizer = Optimizer(cost_sorting=True, keyword_merging=True)
         self.executor = create_executor(
-            executor_type, tantivy_index, fainder_index, hnsw_index, metadata, enable_highlighting = False,min_usability_score=min_usability_score,
+            executor_type,
+            tantivy_index,
+            fainder_index,
+            hnsw_index,
+            metadata,
+            min_usability_score=min_usability_score,
             rank_by_usability=rank_by_usability,
         )
+        self.min_usability_score = min_usability_score
+        self.rank_by_usability = rank_by_usability
         self.executor_type = executor_type
 
         # NOTE: Don't use lru_cache on methods
@@ -43,7 +50,13 @@ class Engine:
         metadata: Metadata,
     ) -> None:
         self.executor = create_executor(
-            self.executor_type, tantivy_index, fainder_index, hnsw_index, metadata
+            self.executor_type,
+            tantivy_index,
+            fainder_index,
+            hnsw_index,
+            metadata,
+            min_usability_score=self.min_usability_score,
+            rank_by_usability=self.rank_by_usability,
         )
         self.clear_cache()
 
