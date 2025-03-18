@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from loguru import logger
 
-from backend.config import Metadata, Settings
+from backend.config import Metadata, Settings, ExecutorType
 from backend.engine import Engine, Parser
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
@@ -72,6 +72,35 @@ def engine() -> Engine:
         cache_size=-1,
     )
 
+
+@pytest.fixture(scope="module")
+def prefiltering_engine() -> Engine:
+    settings = Settings(
+        data_dir=Path(__file__).parent / "assets",
+        collection_name="toy_collection",
+        _env_file=None,  # type: ignore
+    )
+
+    with settings.metadata_path.open() as file:
+        metadata = Metadata(**json.load(file))
+
+    tantivy_index = TantivyIndex(index_path=settings.tantivy_path, recreate=False)
+    # Fainder indices for testing are generated with the following parameters:
+    # n_clusters = 23, bin_budget = 230, alpha = 1, transform = None,
+    fainder_index = FainderIndex(
+        rebinning_path=settings.rebinning_index_path,
+        conversion_path=settings.conversion_index_path,
+        histogram_path=settings.histogram_path,
+    )
+    hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
+    return Engine(
+        tantivy_index=tantivy_index,
+        fainder_index=fainder_index,
+        hnsw_index=hnsw_index,
+        metadata=metadata,
+        cache_size=-1,
+        executor_type=ExecutorType.PREFILTERING,
+    )
 
 @pytest.fixture(scope="module")
 def parser() -> Parser:
