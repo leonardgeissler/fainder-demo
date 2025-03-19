@@ -410,6 +410,9 @@ class PrefilteringExecutor(BaseExecutor):
         col_ids = items[0][0]
         write_group = items[0][1]
         doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
+        intermediate = IntermediateResults()
+        intermediate.doc_ids = doc_ids
+        self._update_intermediate_results(intermediate, write_group)
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids), write_group
 
