@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Callable, Sequence
 from functools import reduce
 from operator import and_, or_
-from typing import Any, TypeGuard, TypeVar
+from typing import Any, Literal, TypedDict, TypeGuard, TypeVar
 
 from lark import ParseTree, Token, Transformer
 from lark.visitors import Visitor_Recursive
@@ -270,6 +270,39 @@ class IntermediateResults:
     hist_ids: set[uint32] | None = None
 
 
+# sizes at which point to stop prefiltering per Fainder mode
+class FilteringStopPointsConfig(TypedDict):
+    doc_ids: int
+    col_ids: int
+    hist_ids: int
+
+
+FilteringStopPointsMap = dict[FainderMode, FilteringStopPointsConfig]
+
+filtering_stop_points: dict[FainderMode, FilteringStopPointsConfig] = {
+    FainderMode.LOW_MEMORY: {
+        "doc_ids": 50000,
+        "col_ids": 500000,
+        "hist_ids": 500000,
+    },
+    FainderMode.FULL_PRECISION: {
+        "doc_ids": 50000,
+        "col_ids": 500000,
+        "hist_ids": 500000,
+    },
+    FainderMode.FULL_RECALL: {
+        "doc_ids": 50000,
+        "col_ids": 500000,
+        "hist_ids": 500000,
+    },
+    FainderMode.EXACT: {
+        "doc_ids": 100000,
+        "col_ids": 1000000,
+        "hist_ids": 1000000,
+    },
+}
+
+
 class PrefilteringExecutor(BaseExecutor):
     """Uses prefiltering to reduce the number of documents before executing the query."""
 
@@ -342,28 +375,86 @@ class PrefilteringExecutor(BaseExecutor):
             self.intermediate_results[write_group].col_ids = None
             self.intermediate_results[write_group].hist_ids = result.hist_ids
 
+    def _exceeds_filtering_limit(
+        self, ids: set[uint32] | set[int], id_type: Literal["hist_ids", "col_ids", "doc_ids"]
+    ) -> bool:
+        """Check if the number of IDs exceeds the filtering limit for the current mode."""
+        return len(ids) > filtering_stop_points[self.fainder_mode][id_type]
+
+    def _process_hist_ids(self, read_group: int, hist_ids: set[uint32]) -> set[uint32] | None:
+        """Process histogram IDs from read group and update the accumulated set."""
+        intermediate_hist_ids = self.intermediate_results[read_group].hist_ids
+        if intermediate_hist_ids is None:
+            return hist_ids
+
+        if self._exceeds_filtering_limit(intermediate_hist_ids, "hist_ids"):
+            return None
+
+        hist_ids |= intermediate_hist_ids
+        if self._exceeds_filtering_limit(hist_ids, "hist_ids"):
+            return None
+
+        return hist_ids
+
+    def _process_col_ids(self, read_group: int, hist_ids: set[uint32]) -> set[uint32] | None:
+        """Process column IDs from read group and update the histogram IDs."""
+        intermediate_col_ids = self.intermediate_results[read_group].col_ids
+        if intermediate_col_ids is None:
+            return hist_ids
+
+        if self._exceeds_filtering_limit(intermediate_col_ids, "col_ids"):
+            return None
+
+        new_hist_ids = hist_ids | col_to_hist_ids(intermediate_col_ids, self.metadata.col_to_hist)
+        if self._exceeds_filtering_limit(new_hist_ids, "hist_ids"):
+            return None
+
+        return new_hist_ids
+
+    def _process_doc_ids(self, read_group: int, hist_ids: set[uint32]) -> set[uint32] | None:
+        """Process document IDs from read group and update the histogram IDs."""
+        intermediate_doc_ids = self.intermediate_results[read_group].doc_ids
+        if intermediate_doc_ids is None:
+            return hist_ids
+
+        if self._exceeds_filtering_limit(intermediate_doc_ids, "doc_ids"):
+            return None
+
+        col_ids = doc_to_col_ids(intermediate_doc_ids, self.metadata.doc_to_cols)
+        new_hist_ids = hist_ids | col_to_hist_ids(col_ids, self.metadata.col_to_hist)
+        if self._exceeds_filtering_limit(new_hist_ids, "hist_ids"):
+            return None
+
+        return new_hist_ids
+
     def _get_hist_ids_from_read_groups(self, read_groups: list[int]) -> set[uint32] | None:
+        """Get the hist IDs from the read groups. Return None if the stop point is reached."""
         hist_ids: set[uint32] = set()
         if len(read_groups) == 0:
             return hist_ids
+
         for read_group in read_groups:
             if len(self.intermediate_results) <= read_group:
                 return None
-            intermediate_hist_ids = self.intermediate_results[read_group].hist_ids
-            if intermediate_hist_ids is not None:
-                hist_ids |= intermediate_hist_ids
-                continue
-            intermediate_col_ids = self.intermediate_results[read_group].col_ids
-            if intermediate_col_ids is not None:
-                hist_ids |= col_to_hist_ids(intermediate_col_ids, self.metadata.col_to_hist)
-                continue
-            intermediate_doc_ids = self.intermediate_results[read_group].doc_ids
-            if intermediate_doc_ids is not None:
-                hist_ids |= col_to_hist_ids(
-                    doc_to_col_ids(intermediate_doc_ids, self.metadata.doc_to_cols),
-                    self.metadata.col_to_hist,
-                )
-                continue
+
+            # Process histogram IDs
+            result = self._process_hist_ids(read_group, hist_ids)
+            if result is None:
+                return None
+            hist_ids = result
+
+            # Process column IDs
+            result = self._process_col_ids(read_group, hist_ids)
+            if result is None:
+                return None
+            hist_ids = result
+
+            # Process document IDs
+            result = self._process_doc_ids(read_group, hist_ids)
+            if result is None:
+                return None
+            hist_ids = result
+
         logger.trace(f"Hist IDs: {hist_ids}")
         return hist_ids
 
