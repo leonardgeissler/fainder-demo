@@ -47,7 +47,6 @@ def test_execute(
     )
     no_opt_time = time.perf_counter() - exec_start
 
-    prefiltering_engine.optimizer = Optimizer(cost_sorting=True, keyword_merging=True)
     exec_start = time.perf_counter()
     prefiltering_result, _ = prefiltering_engine.execute(
         query,

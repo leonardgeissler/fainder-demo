@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Callable, Sequence
 from functools import reduce
 from operator import and_, or_
-from typing import Any, Literal, TypedDict, TypeGuard, TypeVar
+from typing import Any, Literal, TypeGuard, TypeVar
 
 from lark import ParseTree, Token, Transformer
 from lark.visitors import Visitor_Recursive
@@ -20,23 +20,16 @@ from backend.config import (
     Highlights,
     Metadata,
 )
+from backend.engine.constants import filtering_stop_points
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 T = TypeVar("T", tuple[set[int], Highlights], set[uint32])
 
 
-class BaseExecutor(Transformer[Token, tuple[set[int], Highlights]], ABC):
+class Executor(ABC):
     """Base abstract class for query executors that defines the common interface."""
 
     scores: dict[int, float]
-
-    @abstractmethod
-    def reset(
-        self,
-        fainder_mode: FainderMode,
-        enable_highlighting: bool = False,
-    ) -> None:
-        """Reset the executor's state."""
 
     @abstractmethod
     def __init__(
@@ -51,11 +44,19 @@ class BaseExecutor(Transformer[Token, tuple[set[int], Highlights]], ABC):
         """Initialize the executor with the necessary indices and metadata."""
 
     @abstractmethod
-    def process(self, tree: ParseTree) -> tuple[set[int], Highlights]:
+    def reset(
+        self,
+        fainder_mode: FainderMode,
+        enable_highlighting: bool = False,
+    ) -> None:
+        """Reset the executor's state."""
+
+    @abstractmethod
+    def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
         """Start processing the parse tree."""
 
 
-class SimpleExecutor(BaseExecutor):
+class SimpleExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor):
     """This transformer evaluates a parse tree bottom-up and computes the query result."""
 
     fainder_mode: FainderMode
@@ -184,7 +185,7 @@ class SimpleExecutor(BaseExecutor):
             raise ValueError("Query must have exactly one item")
         return items[0]
 
-    def process(self, tree: ParseTree) -> tuple[set[int], Highlights]:
+    def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
         """Start processing the parse tree."""
         return self.transform(tree)
 
@@ -270,40 +271,7 @@ class IntermediateResults:
     hist_ids: set[uint32] | None = None
 
 
-# sizes at which point to stop prefiltering per Fainder mode
-class FilteringStopPointsConfig(TypedDict):
-    doc_ids: int
-    col_ids: int
-    hist_ids: int
-
-
-FilteringStopPointsMap = dict[FainderMode, FilteringStopPointsConfig]
-
-filtering_stop_points: dict[FainderMode, FilteringStopPointsConfig] = {
-    FainderMode.LOW_MEMORY: {
-        "doc_ids": 50000,
-        "col_ids": 500000,
-        "hist_ids": 500000,
-    },
-    FainderMode.FULL_PRECISION: {
-        "doc_ids": 50000,
-        "col_ids": 500000,
-        "hist_ids": 500000,
-    },
-    FainderMode.FULL_RECALL: {
-        "doc_ids": 50000,
-        "col_ids": 500000,
-        "hist_ids": 500000,
-    },
-    FainderMode.EXACT: {
-        "doc_ids": 100000,
-        "col_ids": 1000000,
-        "hist_ids": 1000000,
-    },
-}
-
-
-class PrefilteringExecutor(BaseExecutor):
+class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor):
     """Uses prefiltering to reduce the number of documents before executing the query."""
 
     fainder_mode: FainderMode
@@ -629,7 +597,7 @@ class PrefilteringExecutor(BaseExecutor):
             raise ValueError("Query must have exactly one item")
         return items[0][0], items[0][1]
 
-    def process(self, tree: ParseTree) -> tuple[set[int], Highlights]:
+    def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
         """Start processing the parse tree."""
         self.write_groups = {}
         self.read_groups = {}
@@ -652,7 +620,7 @@ def create_executor(
     enable_highlighting: bool = False,
     min_usability_score: float = 0.0,
     rank_by_usability: bool = True,
-) -> BaseExecutor:
+) -> Executor:
     """Factory function to create the appropriate executor based on the executor type."""
     if executor_type == ExecutorType.SIMPLE:
         return SimpleExecutor(

@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 from lark import ParseTree, Token, Tree, Visitor
 from loguru import logger
 
+from backend.config import ExecutorType
+
 if TYPE_CHECKING:
     from lark.tree import Branch
 
@@ -68,6 +70,16 @@ class Optimizer:
         for rule in self.opt_rules:
             rule.apply(tree)
         return tree
+
+
+def create_optimizer(
+    executor_type: ExecutorType,
+    cost_sorting: bool = True,
+    keyword_merging: bool = True,
+) -> Optimizer:
+    if executor_type == ExecutorType.PREFILTERING:
+        return Optimizer(cost_sorting=True, keyword_merging=True)
+    return Optimizer(cost_sorting=cost_sorting, keyword_merging=keyword_merging)
 
 
 class QuoteRemover(Visitor[Token], OptimizationRule):

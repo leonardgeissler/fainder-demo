@@ -4,7 +4,7 @@ from backend.config import CacheInfo, ExecutorType, FainderMode, Metadata
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 from .executor import Highlights, create_executor
-from .optimizer import Optimizer
+from .optimizer import create_optimizer
 from .parser import Parser
 
 
@@ -21,10 +21,7 @@ class Engine:
         executor_type: ExecutorType = ExecutorType.SIMPLE,
     ) -> None:
         self.parser = Parser()
-        if executor_type == ExecutorType.PREFILTERING:
-            self.optimizer = Optimizer(cost_sorting=True, keyword_merging=True)
-        else:
-            self.optimizer = Optimizer(cost_sorting=True, keyword_merging=True)
+        self.optimizer = create_optimizer(executor_type)
         self.executor = create_executor(
             executor_type,
             tantivy_index,
@@ -83,7 +80,7 @@ class Engine:
         parse_tree = self.optimizer.optimize(parse_tree)
 
         # Execute query
-        result, highlights = self.executor.process(parse_tree)
+        result, highlights = self.executor.execute(parse_tree)
 
         # Sort by score
         result_list = list(result)
