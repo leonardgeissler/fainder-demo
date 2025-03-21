@@ -9,93 +9,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from lark import UnexpectedInput
 from loguru import logger
 
+from backend.app_state import ApplicationState
 from backend.config import (
     CacheInfo,
     ColumnHighlights,
     ColumnSearchError,
-    CroissantStoreType,
     DocumentHighlights,
     FainderError,
     IndexingError,
     MessageResponse,
-    Metadata,
     QueryRequest,
     QueryResponse,
-    Settings,
-    configure_logging,
 )
-from backend.croissant_store import Document, get_croissant_store
-from backend.engine import Engine
-from backend.indexing import (
-    generate_embedding_index,
-    generate_fainder_indices,
-    generate_metadata,
-)
-from backend.indices import FainderIndex, HnswIndex, TantivyIndex
-from backend.util import load_json
+from backend.croissant_store import Document
 
 logger.info("Starting backend")
+app_state = ApplicationState()
+app_state.initialize()
 
-# Load global variables to store persistent objects
-settings = Settings()  # type: ignore
-
-# NOTE: Potentially add more modules here if they are not intercepted by loguru
-configure_logging(
-    settings.log_level,
-    modules=[
-        "fastapi",
-        "fastapi_cli",
-        "fastapi_cli.cli",
-        "fastapi_cli.discover",
-        "uvicorn",
-        "uvicorn.access",
-        "uvicorn.error",
-    ],
-)
-
-logger.info("Loading metadata")
-metadata = Metadata(**load_json(settings.metadata_path))
-
-logger.info("Initializing Croissant store")
-croissant_store = get_croissant_store(
-    store_type=settings.croissant_store_type,
-    base_path=settings.croissant_path,
-    doc_to_path=metadata.doc_to_path,
-    dataset_slug=settings.dataset_slug,
-    cache_size=settings.croissant_cache_size,
-)
-
-logger.info("Initializing tantivy index")
-tantivy_index = TantivyIndex(settings.tantivy_path)
-
-logger.info("Initializing Fainder index")
-fainder_index = FainderIndex(
-    rebinning_path=settings.rebinning_index_path,
-    conversion_path=settings.conversion_index_path,
-    histogram_path=settings.histogram_path,
-)
-
-logger.info("Initializing HNSW index")
-hnsw_index = HnswIndex(
-    settings.hnsw_index_path,
-    metadata,
-    model=settings.embedding_model,
-    use_embeddings=settings.use_embeddings,
-    ef=settings.hnsw_ef,
-)
-
-logger.info("Initializing engine")
-engine = Engine(
-    tantivy_index=tantivy_index,
-    fainder_index=fainder_index,
-    hnsw_index=hnsw_index,
-    metadata=metadata,
-    cache_size=settings.query_cache_size,
-    min_usability_score=settings.min_usability_score,
-    rank_by_usability=settings.rank_by_usability,
-)
-
-logger.info("Initializing FastAPI app")
+logger.info("Starting FastAPI app")
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -158,7 +90,7 @@ async def query(request: QueryRequest) -> QueryResponse:
 
     try:
         start_time = time.perf_counter()
-        doc_ids, (doc_highlights, col_highlights) = engine.execute(
+        doc_ids, (doc_highlights, col_highlights) = app_state.engine.execute(
             query=request.query,
             fainder_mode=request.fainder_mode,
             enable_highlighting=request.enable_highlighting,
@@ -170,7 +102,7 @@ async def query(request: QueryRequest) -> QueryResponse:
         paginated_doc_ids = doc_ids[start_idx:end_idx]
         total_pages = (len(doc_ids) + request.per_page - 1) // request.per_page
 
-        docs = croissant_store.get_documents(paginated_doc_ids)
+        docs = app_state.croissant_store.get_documents(paginated_doc_ids)
         if request.enable_highlighting:
             # Make a deep copy of the documents to avoid modifying the original
             docs = copy.deepcopy(docs)
@@ -225,7 +157,7 @@ async def upload_files(files: list[UploadFile]) -> MessageResponse:
     try:
         for file in files:
             content = await file.read()
-            croissant_store.add_document(orjson.loads(content))
+            app_state.croissant_store.add_document(orjson.loads(content))
             logger.debug(f"Uploaded file: {file.filename}")
 
         logger.info(f"{len(files)} files uploaded successfully")
@@ -243,51 +175,7 @@ async def update_indices() -> MessageResponse:
         # NOTE: Our approach increases memory usage since we load the new indices without deleting
         # the old ones, we should consider optimizing this in the future
 
-        # Generate indices
-        hists, name_to_vector, documents, tantivy_index = generate_metadata(
-            croissant_path=settings.croissant_path,
-            metadata_path=settings.metadata_path,
-            tantivy_path=settings.tantivy_path,
-            return_documents=settings.croissant_store_type == CroissantStoreType.DICT,
-        )
-        generate_embedding_index(
-            name_to_vector=name_to_vector,
-            output_path=settings.embedding_path,
-            model_name=settings.embedding_model,
-            batch_size=settings.embedding_batch_size,
-            ef_construction=settings.hnsw_ef_construction,
-            n_bidirectional_links=settings.hnsw_n_bidirectional_links,
-        )
-        generate_fainder_indices(
-            hists=hists,
-            output_path=settings.fainder_path,
-            n_clusters=settings.fainder_n_clusters,
-            bin_budget=settings.fainder_bin_budget,
-            alpha=settings.fainder_alpha,
-            transform=settings.fainder_transform,
-            algorithm=settings.fainder_cluster_algorithm,
-        )
-
-        # Delete metadata variables before we load the entire metadata again to save memory
-        del hists, name_to_vector, documents
-
-        # Update global variables
-        metadata = Metadata(**load_json(settings.metadata_path))
-        croissant_store.replace_documents(metadata.doc_to_path)
-
-        fainder_index.update(
-            rebinning_path=settings.rebinning_index_path,
-            conversion_path=settings.conversion_index_path,
-            histogram_path=settings.histogram_path,
-        )
-        hnsw_index.update(path=settings.hnsw_index_path, metadata=metadata)
-        engine.update_indices(
-            fainder_index=fainder_index,
-            tantivy_index=tantivy_index,
-            hnsw_index=hnsw_index,
-            metadata=metadata,
-        )
-
+        app_state.update_indices()
         logger.info("Indices updated successfully")
         return MessageResponse(message="Indices updated successfully")
     except IndexingError as e:
@@ -301,13 +189,13 @@ async def update_indices() -> MessageResponse:
 @app.get("/cache_statistics")
 async def cache_statistics() -> CacheInfo:
     """Return statistics about the query result cache."""
-    return engine.cache_info()
+    return app_state.engine.cache_info()
 
 
 @app.get("/clear_cache")
 async def clear_cache() -> MessageResponse:
     """Clear the query result cache."""
-    engine.clear_cache()
+    app_state.engine.clear_cache()
     logger.info("Cache cleared successfully")
     return MessageResponse(message="Cache cleared successfully")
 
