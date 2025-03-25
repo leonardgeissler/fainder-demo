@@ -209,20 +209,29 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
         self.read_groups[id(tree)] = [0]
         self.visit_topdown(tree)
 
+    def _create_group_id(self) -> int:
+        """Create a new group ID."""
+        return max(self.write_groups.values()) + 1
+
     def __default__(self, tree: ParseTree) -> None:
         # Set attributes for all children using the parent's values
+        logger.trace(f"Processing default node: {tree}")
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             write_group = self.write_groups[id(tree)]
             read_group = self.read_groups[id(tree)]
-
-            self.parent_write_group[write_group] = write_group
 
             for child in tree.children:
                 # Store in our dictionaries rather than on the objects directly
                 self.write_groups[id(child)] = write_group
                 self.read_groups[id(child)] = read_group
+                logger.trace(
+                    f"Child {child} has write group {write_group} and read group {read_group}"
+                )
+        else:
+            logger.warning(f"Node {tree} does not have write or read groups")
 
     def query(self, tree: ParseTree) -> None:
+        logger.trace(f"Processing query node: {tree}")
         # Set attributes for query node and children
         self.write_groups[id(tree)] = 0
         self.read_groups[id(tree)] = [0]
@@ -234,6 +243,7 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
             self.read_groups[id(child)] = [0]
 
     def conjunction(self, tree: ParseTree) -> None:
+        logger.trace(f"Processing conjunction node: {tree}")
         # For conjunction, all children read and write to the same groups
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             write_group = self.write_groups[id(tree)]
@@ -243,28 +253,37 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
                 self.write_groups[id(child)] = write_group
                 self.read_groups[id(child)] = read_group
                 self.parent_write_group[write_group] = write_group
+        else:
+            logger.warning(f"Node {tree} does not have write or read groups")
 
     def disjunction(self, tree: ParseTree) -> None:
+        logger.trace(f"Processing disjunction node: {tree}")
         # For disjunction, give each child a new write group and add to read groups
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
-            write_group = self.write_groups[id(tree)]
+            parent_write_group = self.write_groups[id(tree)]
 
             for child in tree.children:
-                write_group += 1
-                self.write_groups[id(child)] = write_group
-                self.read_groups[id(child)] = [write_group]
-                self.parent_write_group[write_group] = write_group
+                current_write_group = self._create_group_id()
+                self.write_groups[id(child)] = current_write_group
+                self.read_groups[id(child)] = [current_write_group]
+                self.parent_write_group[current_write_group] = parent_write_group
+        else:
+            logger.warning(f"Node {tree} does not have write or read groups")
 
     def negation(self, tree: ParseTree) -> None:
+        logger.trace(f"Processing negation node: {tree}")
         # For negation, increment the write group and add to read groups
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
-            write_group = self.write_groups[id(tree)] + 1
-            read_groups = [*self.read_groups[id(tree)], write_group]
+            parent_group = self.write_groups[id(tree)]
+            new_group = self._create_group_id()
+            read_groups = [*self.read_groups[id(tree)], new_group]
 
             for child in tree.children:
-                self.write_groups[id(child)] = write_group
+                self.write_groups[id(child)] = new_group
                 self.read_groups[id(child)] = read_groups
-                self.parent_write_group[write_group] = write_group - 1
+                self.parent_write_group[new_group] = parent_group
+        else:
+            logger.warning(f"Node {tree} does not have write or read groups")
 
 
 class IntermediateResults:
@@ -362,14 +381,14 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         """Process histogram IDs from read group and update the accumulated set."""
         intermediate_hist_ids = self.intermediate_results[read_group].hist_ids
         if intermediate_hist_ids is None:
-            return hist_ids
+            return None
 
         if self._exceeds_filtering_limit(intermediate_hist_ids, "hist_ids"):
-            return None
+            raise ValueError("Exceeded filtering limit for histogram IDs")
 
         hist_ids |= intermediate_hist_ids
         if self._exceeds_filtering_limit(hist_ids, "hist_ids"):
-            return None
+            raise ValueError("Exceeded filtering limit for histogram IDs")
 
         return hist_ids
 
@@ -377,14 +396,14 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         """Process column IDs from read group and update the histogram IDs."""
         intermediate_col_ids = self.intermediate_results[read_group].col_ids
         if intermediate_col_ids is None:
-            return hist_ids
+            return None
 
         if self._exceeds_filtering_limit(intermediate_col_ids, "col_ids"):
-            return None
+            raise ValueError("Exceeded filtering limit for column IDs")
 
         new_hist_ids = hist_ids | col_to_hist_ids(intermediate_col_ids, self.metadata.col_to_hist)
         if self._exceeds_filtering_limit(new_hist_ids, "hist_ids"):
-            return None
+            raise ValueError("Exceeded filtering limit for histogram IDs")
 
         return new_hist_ids
 
@@ -392,21 +411,22 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         """Process document IDs from read group and update the histogram IDs."""
         intermediate_doc_ids = self.intermediate_results[read_group].doc_ids
         if intermediate_doc_ids is None:
-            return hist_ids
+            return None
 
         if self._exceeds_filtering_limit(intermediate_doc_ids, "doc_ids"):
-            return None
+            raise ValueError("Exceeded filtering limit for document IDs")
 
         col_ids = doc_to_col_ids(intermediate_doc_ids, self.metadata.doc_to_cols)
         new_hist_ids = hist_ids | col_to_hist_ids(col_ids, self.metadata.col_to_hist)
         if self._exceeds_filtering_limit(new_hist_ids, "hist_ids"):
-            return None
+            raise ValueError("Exceeded filtering limit for histogram IDs")
 
         return new_hist_ids
 
     def _get_hist_ids_from_read_groups(self, read_groups: list[int]) -> set[uint32] | None:
         """Get the hist IDs from the read groups. Return None if the stop point is reached."""
         hist_ids: set[uint32] = set()
+        results = False
         if len(read_groups) == 0:
             return hist_ids
 
@@ -414,24 +434,29 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             if len(self.intermediate_results) <= read_group:
                 return None
 
-            # Process histogram IDs
-            result = self._process_hist_ids(read_group, hist_ids)
-            if result is None:
-                return None
-            hist_ids = result
+            try:
+                # Process histogram IDs
+                result_hist = self._process_hist_ids(read_group, hist_ids)
+                if result_hist is not None:
+                    hist_ids = result_hist
+                    results = True
 
-            # Process column IDs
-            result = self._process_col_ids(read_group, hist_ids)
-            if result is None:
-                return None
-            hist_ids = result
+                # Process column IDs
+                result_col = self._process_col_ids(read_group, hist_ids)
+                if result_col is not None:
+                    hist_ids = result_col
+                    results = True
 
-            # Process document IDs
-            result = self._process_doc_ids(read_group, hist_ids)
-            if result is None:
+                # Process document IDs
+                result_doc = self._process_doc_ids(read_group, hist_ids)
+                if result_doc is not None:
+                    hist_ids = result_doc
+                    results = True
+            except ValueError:
                 return None
-            hist_ids = result
 
+        if not results:
+            return None
         logger.trace(f"Hist IDs: {hist_ids}")
         return hist_ids
 
@@ -440,7 +465,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         node_id = id(node)
         if node_id in self.write_groups:
             return self.write_groups[node_id]
-        logger.warning(f"Node {node} does not have a write group")
+        logger.warning(f"Node {node} does not have a write group with id {node_id}")
         logger.warning(f"Write groups: {self.write_groups}")
         raise ValueError("Node does not have a write group")
 
@@ -520,6 +545,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         write_group = self._get_write_group(items[0])
         if hist_filter is not None and len(hist_filter) == 0:
             return set(), write_group
+        logger.trace(f"Hist filter: {hist_filter}")
         result_hists = self.fainder_index.search(
             percentile, comparison, reference, self.fainder_mode, hist_filter
         )
@@ -624,6 +650,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         """Start processing the parse tree."""
         self.write_groups = {}
         self.read_groups = {}
+        logger.trace(tree.pretty())
         groups = IntermediaryResultGroups()
         groups.apply(tree)
         self.write_groups = groups.write_groups

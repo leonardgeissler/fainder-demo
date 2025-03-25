@@ -68,10 +68,8 @@ def test_execute(
     logger.info(performance_log)
 
     # Verify results are consistent
-    assert (
-        set(default_result)
-        == set(no_merging_result)
-        == set(expected_result)
-        == set(no_opt_result)
-        == set(prefiltering_result)
-    )
+    # Verify all results match the expected result
+    assert set(default_result) == set(expected_result)
+    assert set(no_merging_result) == set(expected_result)
+    assert set(no_opt_result) == set(expected_result)
+    assert set(prefiltering_result) == set(expected_result)
