@@ -201,6 +201,7 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
         # Use dictionaries to store attributes for both Tree and Token objects
         self.write_groups: dict[int, int] = {}
         self.read_groups: dict[int, list[int]] = {}
+        self.parent_write_group: dict[int, int] = {}  # node write group to parent write group
 
     def apply(self, tree: ParseTree) -> None:
         # Initialize the root node with group 0
@@ -214,6 +215,8 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
             write_group = self.write_groups[id(tree)]
             read_group = self.read_groups[id(tree)]
 
+            self.parent_write_group[write_group] = write_group
+
             for child in tree.children:
                 # Store in our dictionaries rather than on the objects directly
                 self.write_groups[id(child)] = write_group
@@ -223,6 +226,7 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
         # Set attributes for query node and children
         self.write_groups[id(tree)] = 0
         self.read_groups[id(tree)] = [0]
+        self.parent_write_group[0] = 0
 
         # Set same attributes for all children
         for child in tree.children:
@@ -238,6 +242,7 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
             for child in tree.children:
                 self.write_groups[id(child)] = write_group
                 self.read_groups[id(child)] = read_group
+                self.parent_write_group[write_group] = write_group
 
     def disjunction(self, tree: ParseTree) -> None:
         # For disjunction, give each child a new write group and add to read groups
@@ -248,6 +253,7 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
                 write_group += 1
                 self.write_groups[id(child)] = write_group
                 self.read_groups[id(child)] = [write_group]
+                self.parent_write_group[write_group] = write_group
 
     def negation(self, tree: ParseTree) -> None:
         # For negation, increment the write group and add to read groups
@@ -258,6 +264,7 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
             for child in tree.children:
                 self.write_groups[id(child)] = write_group
                 self.read_groups[id(child)] = read_groups
+                self.parent_write_group[write_group] = write_group - 1
 
 
 class IntermediateResults:
@@ -279,6 +286,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
     intermediate_results: list[IntermediateResults]
     write_groups: dict[int, int]  # Maps node ID to write group
     read_groups: dict[int, list[int]]  # Maps node ID to read groups
+    parent_write_group: dict[int, int]  # Maps write group to parent write group
 
     def __init__(
         self,
@@ -298,6 +306,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         self.write_groups = {}
         self.intermediate_results = []
         self.read_groups = {}
+        self.parent_write_group = {}
         self.min_usability_score = min_usability_score
         self.rank_by_usability = rank_by_usability
 
@@ -444,6 +453,14 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         logger.warning(f"Read groups: {self.read_groups}")
         raise ValueError("Node does not have read groups")
 
+    def _get_parent_write_group(self, write_group: int) -> int:
+        """Get the parent write group for a write group."""
+        if write_group in self.parent_write_group:
+            return self.parent_write_group[write_group]
+        logger.warning(f"Write group {write_group} does not have a parent write group")
+        logger.warning(f"Parent write groups: {self.parent_write_group}")
+        raise ValueError("Write group does not have a parent write group")
+
     ### Operator implementations ###
 
     def keyword_op(self, items: list[Token]) -> tuple[set[int], Highlights, int]:
@@ -458,8 +475,9 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         result.doc_ids = set(result_docs)
         write_group = self._get_write_group(items[0])
         self._update_intermediate_results(result, write_group)
+        parent_write_group = self._get_parent_write_group(write_group)
 
-        return set(result_docs), (highlights, set()), write_group
+        return set(result_docs), (highlights, set()), parent_write_group
 
     def col_op(self, items: list[tuple[set[uint32], int]]) -> tuple[set[int], Highlights, int]:
         logger.trace(f"Evaluating column term: {items}")
@@ -472,10 +490,11 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         intermediate = IntermediateResults()
         intermediate.doc_ids = doc_ids
         self._update_intermediate_results(intermediate, write_group)
+        parent_write_group = self._get_parent_write_group(write_group)
         if self.enable_highlighting:
-            return doc_ids, ({}, col_ids), write_group
+            return doc_ids, ({}, col_ids), parent_write_group
 
-        return doc_ids, ({}, set()), write_group
+        return doc_ids, ({}, set()), parent_write_group
 
     def name_op(self, items: list[Token]) -> tuple[set[uint32], int]:
         logger.trace(f"Evaluating column term: {items}")
@@ -488,7 +507,8 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         intermediate.col_ids = result
         write_group = self._get_write_group(items[0])
         self._update_intermediate_results(intermediate, write_group)
-        return result, write_group
+        parent_write_group = self._get_parent_write_group(write_group)
+        return result, parent_write_group
 
     def percentile_op(self, items: list[Token]) -> tuple[set[uint32], int]:
         logger.trace(f"Evaluating percentile term: {items}")
@@ -507,7 +527,8 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         intermediate = IntermediateResults()
         intermediate.hist_ids = result_hists
         self._update_intermediate_results(intermediate, write_group)
-        return result, write_group
+        parent_write_group = self._get_parent_write_group(write_group)
+        return result, parent_write_group
 
     def conjunction(
         self, items: list[tuple[set[int], Highlights, int]] | list[tuple[set[uint32], int]]
@@ -529,9 +550,10 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             intermediate.col_ids = result
         write_group = items[0][2] if len(items[0]) == 3 else items[0][1]
         self._update_intermediate_results(intermediate, write_group)
+        parent_write_group = self._get_parent_write_group(write_group)
         if isinstance(result, tuple):
-            return result[0], result[1], write_group
-        return result, write_group
+            return result[0], result[1], parent_write_group
+        return result, parent_write_group
 
     def disjunction(
         self, items: list[tuple[set[int], Highlights, int]] | list[tuple[set[uint32], int]]
@@ -552,11 +574,11 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         else:
             intermediate.col_ids = result
         write_group = items[0][2] if len(items[0]) == 3 else items[0][1]
-        write_group = write_group - 1  # Very important!
         self._update_intermediate_results(intermediate, write_group)
+        parent_write_group = self._get_parent_write_group(write_group)
         if isinstance(result, tuple):
-            return result[0], result[1], write_group
-        return result, write_group
+            return result[0], result[1], parent_write_group
+        return result, parent_write_group
 
     def negation(
         self, items: list[tuple[set[int], Highlights, int]] | list[tuple[set[uint32], int]]
@@ -567,12 +589,12 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             raise ValueError("Negation term must have exactly one item")
         if len(items[0]) == 3:
             to_negate, _, write_group = items[0]
-            write_group = write_group - 1  # Very important!
             all_docs = set(self.metadata.doc_to_cols.keys())
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
             col_highlights: ColumnHighlights = set()
-            result = (all_docs - to_negate, (doc_highlights, col_highlights), write_group)
+            parent_write_group = self._get_parent_write_group(write_group)
+            result = (all_docs - to_negate, (doc_highlights, col_highlights), parent_write_group)
             intermediate = IntermediateResults()
             intermediate.doc_ids = result[0]
             self._update_intermediate_results(intermediate, write_group)
@@ -586,7 +608,8 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             intermediate = IntermediateResults()
             intermediate.col_ids = result_col
             self._update_intermediate_results(intermediate, write_group_cols)
-            return result_col, write_group_cols
+            parent_write_group_cols = self._get_parent_write_group(write_group_cols)
+            return result_col, parent_write_group_cols
 
         raise ValueError("Negation term must have exactly one item")
 
@@ -605,8 +628,10 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         groups.apply(tree)
         self.write_groups = groups.write_groups
         self.read_groups = groups.read_groups
-        logger.warning(f"Write groups: {self.write_groups}")
-        logger.warning(f"Read groups: {self.read_groups}")
+        self.parent_write_group = groups.parent_write_group
+        logger.trace(f"Write groups: {self.write_groups}")
+        logger.trace(f"Read groups: {self.read_groups}")
+        logger.trace(f"Parent write groups: {self.parent_write_group}")
         return self.transform(tree)
 
 
