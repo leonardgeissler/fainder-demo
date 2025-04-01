@@ -386,7 +386,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         if self._exceeds_filtering_limit(intermediate_hist_ids, "hist_ids"):
             raise ValueError("Exceeded filtering limit for histogram IDs")
 
-        hist_ids |= intermediate_hist_ids
+        hist_ids.intersection_update(intermediate_hist_ids)
         if self._exceeds_filtering_limit(hist_ids, "hist_ids"):
             raise ValueError("Exceeded filtering limit for histogram IDs")
 
@@ -401,11 +401,11 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         if self._exceeds_filtering_limit(intermediate_col_ids, "col_ids"):
             raise ValueError("Exceeded filtering limit for column IDs")
 
-        new_hist_ids = hist_ids | col_to_hist_ids(intermediate_col_ids, self.metadata.col_to_hist)
-        if self._exceeds_filtering_limit(new_hist_ids, "hist_ids"):
+        hist_ids.intersection_update(col_to_hist_ids(intermediate_col_ids, self.metadata.col_to_hist))
+        if self._exceeds_filtering_limit(hist_ids, "hist_ids"):
             raise ValueError("Exceeded filtering limit for histogram IDs")
 
-        return new_hist_ids
+        return hist_ids
 
     def _process_doc_ids(self, read_group: int, hist_ids: set[uint32]) -> set[uint32] | None:
         """Process document IDs from read group and update the histogram IDs."""
@@ -417,11 +417,11 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             raise ValueError("Exceeded filtering limit for document IDs")
 
         col_ids = doc_to_col_ids(intermediate_doc_ids, self.metadata.doc_to_cols)
-        new_hist_ids = hist_ids | col_to_hist_ids(col_ids, self.metadata.col_to_hist)
-        if self._exceeds_filtering_limit(new_hist_ids, "hist_ids"):
+        hist_ids.intersection_update(col_to_hist_ids(col_ids, self.metadata.col_to_hist))
+        if self._exceeds_filtering_limit(hist_ids, "hist_ids"):
             raise ValueError("Exceeded filtering limit for histogram IDs")
 
-        return new_hist_ids
+        return hist_ids
 
     def _get_hist_ids_from_read_groups(self, read_groups: list[int]) -> set[uint32] | None:
         """Get the hist IDs from the read groups. Return None if the stop point is reached."""
