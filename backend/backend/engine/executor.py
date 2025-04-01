@@ -268,7 +268,7 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
             for child in tree.children:
                 current_write_group = self._create_group_id()
                 self.write_groups[id(child)] = current_write_group
-                self.read_groups[id(child)] = [current_write_group] + parent_read_groups
+                self.read_groups[id(child)] = [current_write_group, *parent_read_groups]
                 self.parent_write_group[current_write_group] = parent_write_group
         else:
             logger.warning(f"Node {tree} does not have write or read groups")
@@ -299,32 +299,41 @@ class IntermediateResult:
     col_ids: set[uint32] | None = None
     hist_ids: set[uint32] | None = None
 
-    def build_hist_filter(self, metadata: Metadata, fainder_mode: FainderMode) -> set[uint32] | None:
+    def build_hist_filter(
+        self, metadata: Metadata, fainder_mode: FainderMode
+    ) -> set[uint32] | None:
         """Build a histogram filter from the intermediate results."""
         if self.hist_ids is not None:
-            if (self._exceeds_filtering_limit(self.hist_ids, "hist_ids", fainder_mode)):
+            if self._exceeds_filtering_limit(self.hist_ids, "hist_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for histogram IDs")
             return self.hist_ids
         if self.col_ids is not None:
-            if (self._exceeds_filtering_limit(self.col_ids, "col_ids", fainder_mode)):
+            if self._exceeds_filtering_limit(self.col_ids, "col_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for column IDs")
             return col_to_hist_ids(self.col_ids, metadata.col_to_hist)
         if self.doc_ids is not None:
-            if (self._exceeds_filtering_limit(self.doc_ids, "doc_ids", fainder_mode)):
+            if self._exceeds_filtering_limit(self.doc_ids, "doc_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for document IDs")
             col_ids = doc_to_col_ids(self.doc_ids, metadata.doc_to_cols)
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
         return None
 
     def _exceeds_filtering_limit(
-        self, ids: set[uint32] | set[int], id_type: Literal["hist_ids", "col_ids", "doc_ids"], fainder_mode: FainderMode
+        self,
+        ids: set[uint32] | set[int],
+        id_type: Literal["hist_ids", "col_ids", "doc_ids"],
+        fainder_mode: FainderMode,
     ) -> bool:
         """Check if the number of IDs exceeds the filtering limit for the current mode."""
         return len(ids) > filtering_stop_points[fainder_mode][id_type]
-    
+
     def __str__(self) -> str:
         """String representation of the intermediate result."""
-        return f"IntermediateResult(doc_ids={self.doc_ids}, col_ids={self.col_ids}, hist_ids={self.hist_ids})"
+        return f"""IntermediateResult(
+        doc_ids={self.doc_ids},
+        col_ids={self.col_ids},
+        hist_ids={self.hist_ids}
+        )"""
 
 
 class IntermediateResults:
@@ -342,13 +351,15 @@ class IntermediateResults:
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
         self.results[write_group] = IntermediateResult()
         self.results[write_group].col_ids = col_ids.copy()
-    
+
     def add_doc_id_results(self, write_group: int, doc_ids: set[int]) -> None:
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
         self.results[write_group] = IntermediateResult()
         self.results[write_group].doc_ids = doc_ids.copy()
 
-    def build_filter(self, read_groups: list[int], metadata: Metadata, fainder_mode: FainderMode) -> set[uint32] | None:
+    def build_filter(
+        self, read_groups: list[int], metadata: Metadata, fainder_mode: FainderMode
+    ) -> set[uint32] | None:
         """Build a histogram filter from the intermediate results."""
         hist_ids: set[uint32] = set()
         first = True
@@ -361,10 +372,12 @@ class IntermediateResults:
                 return None
 
             try:
-                logger.trace(f"Processing read group {read_group} with results {self.results[read_group]}")
+                logger.trace(
+                    f"Processing read group {read_group} with results {self.results[read_group]}"
+                )
                 intermediate = self.results[read_group].build_hist_filter(metadata, fainder_mode)
                 if intermediate is not None:
-                    logger.trace(f"intermediate {intermediate}" )
+                    logger.trace(f"intermediate {intermediate}")
                     if first:
                         hist_ids = intermediate
                         first = False
@@ -375,6 +388,7 @@ class IntermediateResults:
 
         logger.trace(f"Hist IDs: {hist_ids}")
         return hist_ids if not first else None
+
 
 class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor):
     """Uses prefiltering to reduce the number of documents before executing the query."""
@@ -432,7 +446,6 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         for i, doc_id in enumerate(doc_ids):
             self.scores[doc_id] += scores[i]
 
-
     def _get_write_group(self, node: ParseTree | Token) -> int:
         """Get the write group for a node."""
         node_id = id(node)
@@ -469,10 +482,9 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         )
         self.updates_scores(result_docs, scores)
 
-
         write_group = self._get_write_group(items[0])
         self.intermediate_results.add_doc_id_results(write_group, set(result_docs))
-        
+
         parent_write_group = self._get_parent_write_group(write_group)
 
         return set(result_docs), (highlights, set()), parent_write_group
@@ -511,7 +523,9 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         percentile = float(items[0])
         comparison: str = items[1]
         reference = float(items[2])
-        hist_filter = self.intermediate_results.build_filter(self._get_read_groups(items[0]), self.metadata, self.fainder_mode)
+        hist_filter = self.intermediate_results.build_filter(
+            self._get_read_groups(items[0]), self.metadata, self.fainder_mode
+        )
         logger.trace(f"Hist filter: {hist_filter}")
         write_group = self._get_write_group(items[0])
         if hist_filter is not None and len(hist_filter) == 0:
@@ -542,7 +556,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             self.intermediate_results.add_doc_id_results(write_group, result[0])
         else:
             self.intermediate_results.add_col_id_results(write_group, result)
-        
+
         parent_write_group = self._get_parent_write_group(write_group)
         if isinstance(result, tuple):
             return result[0], result[1], parent_write_group
@@ -567,7 +581,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             self.intermediate_results.add_doc_id_results(write_group, result[0])
         else:
             self.intermediate_results.add_col_id_results(write_group, result)
-        
+
         parent_write_group = self._get_parent_write_group(write_group)
         if isinstance(result, tuple):
             return result[0], result[1], parent_write_group

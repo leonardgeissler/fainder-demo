@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from loguru import logger
 
-from backend.config import Metadata, Settings, ExecutorType
+from backend.config import ExecutorType, Metadata, Settings
 from backend.engine import Engine, Parser
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
@@ -101,6 +101,7 @@ def prefiltering_engine() -> Engine:
         cache_size=-1,
         executor_type=ExecutorType.PREFILTERING,
     )
+
 
 @pytest.fixture(scope="module")
 def parser() -> Parser:
