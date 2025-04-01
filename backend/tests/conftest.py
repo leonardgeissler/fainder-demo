@@ -30,12 +30,12 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
     logger.add(
         sys.stdout,
         format="{time:HH:mm:ss} | {level: >5} | {file}:{line} | <level>{message}</level>",
-        level="DEBUG",
+        level="TRACE",
     )
     logger.add(
         "logs/test_{time:YYYY-MM-DD HH:mm:ss}.log",
         format="{time:HH:mm:ss} | {level: >5} | {file}:{line} | {message}",
-        level="DEBUG",
+        level="TRACE",
     )
 
     yield

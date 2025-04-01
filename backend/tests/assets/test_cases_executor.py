@@ -416,7 +416,7 @@ EXECUTOR_CASES: dict[str, dict[str, ExecutorCase]] = {
             ),
         },
         "2": {
-            "query": "NOT kw('germany') AND (col(pp(0.99;ge;10000000)) OR kw('germany'))",
+            "query": "NOT kw('germany') AND (col(pp(0.99;ge;10000000)) OR kw('weather'))",
             "expected": [2],
             "parse_tree": Tree(
                 Token("RULE", "query"),
@@ -451,7 +451,7 @@ EXECUTOR_CASES: dict[str, dict[str, ExecutorCase]] = {
                                     ),
                                     Tree(
                                         Token("RULE", "keyword_op"),
-                                        [Token("STRING", "'germany'")],
+                                        [Token("STRING", "'weather'")],
                                     ),
                                 ],
                             ),
@@ -461,7 +461,7 @@ EXECUTOR_CASES: dict[str, dict[str, ExecutorCase]] = {
             ),
         },
         "3": {
-            "query": "(NOT kw('germany') AND col(pp(0.99;ge;10000000))) OR kw('germany')",
+            "query": "(NOT kw('germany') AND col(pp(0.99;ge;10000000))) OR kw('weather')",
             "expected": [0, 2],
             "parse_tree": Tree(
                 Token("RULE", "query"),
@@ -496,7 +496,7 @@ EXECUTOR_CASES: dict[str, dict[str, ExecutorCase]] = {
                                     ),
                                 ],
                             ),
-                            Tree(Token("RULE", "keyword_op"), [Token("STRING", "'germany'")]),
+                            Tree(Token("RULE", "keyword_op"), [Token("STRING", "'weather'")]),
                         ],
                     )
                 ],
