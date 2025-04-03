@@ -6,14 +6,14 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
-from backend.indices.keyword_op import TantivyIndex
 import pytest
 from loguru import logger
 
-from backend.indices.name_op import HnswIndex as ColumnIndex
-from backend.config import Metadata, Settings, ExecutorType
-from backend.indices.percentile_op import FainderIndex
+from backend.config import ExecutorType, Metadata, Settings
 from backend.engine import Engine
+from backend.indices.keyword_op import TantivyIndex
+from backend.indices.name_op import HnswIndex as ColumnIndex
+from backend.indices.percentile_op import FainderIndex
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -31,7 +31,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
 
     performance_log_dir = Path("logs/performance")
     performance_log_dir.mkdir(exist_ok=True)
-    
+
     # Create directory for profiling logs
     profiling_log_dir = Path("logs/profiling")
     profiling_log_dir.mkdir(exist_ok=True)
@@ -39,8 +39,8 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
     profiling_raw_dir.mkdir(exist_ok=True)
 
     # Create CSV performance log file and write headers
-    timestamp_str = time.strftime('%Y%m%d_%H%M%S')
-    
+    timestamp_str = time.strftime("%Y%m%d_%H%M%S")
+
     csv_log_path = performance_log_dir / f"performance_metrics_{timestamp_str}.csv"
     with csv_log_path.open("w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -60,7 +60,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
                 "id_str",
             ]
         )
-    
+
     # Create CSV profiling log file and write headers
     profile_csv_log_path = profiling_log_dir / f"profiling_metrics_{timestamp_str}.csv"
     with profile_csv_log_path.open("w", newline="") as csvfile:
@@ -102,10 +102,9 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
     pytest.csv_log_path = csv_log_path  # type: ignore
     pytest.profile_csv_log_path = profile_csv_log_path  # type: ignore
 
-    yield
+    return
 
     # Teardown code
-    pass
 
 
 @pytest.fixture(scope="module")
@@ -120,31 +119,29 @@ def engines() -> tuple[Engine, Engine, Engine]:
         histogram_path=settings.histogram_path,
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
-    return Engine(
-        tantivy_index=TantivyIndex(
-            index_path=str(settings.tantivy_path), recreate=False
+    return (
+        Engine(
+            tantivy_index=TantivyIndex(index_path=str(settings.tantivy_path), recreate=False),
+            fainder_index=fainder_index,
+            hnsw_index=column_index,
+            metadata=metadata,
+            cache_size=0,
+            executor_type=ExecutorType.SIMPLE,
         ),
-        fainder_index=fainder_index,
-        hnsw_index=column_index,
-        metadata=metadata,
-        cache_size=0,
-        executor_type=ExecutorType.SIMPLE
-    ), Engine(
-        tantivy_index=TantivyIndex(
-            index_path=str(settings.tantivy_path), recreate=False
+        Engine(
+            tantivy_index=TantivyIndex(index_path=str(settings.tantivy_path), recreate=False),
+            fainder_index=fainder_index,
+            hnsw_index=column_index,
+            metadata=metadata,
+            cache_size=0,
+            executor_type=ExecutorType.PREFILTERING,
         ),
-        fainder_index=fainder_index,
-        hnsw_index=column_index,
-        metadata=metadata,
-        cache_size=0,
-        executor_type=ExecutorType.PREFILTERING
-    ), Engine(
-        tantivy_index=TantivyIndex(
-            index_path=str(settings.tantivy_path), recreate=False
+        Engine(
+            tantivy_index=TantivyIndex(index_path=str(settings.tantivy_path), recreate=False),
+            fainder_index=fainder_index,
+            hnsw_index=column_index,
+            metadata=metadata,
+            cache_size=0,
+            executor_type=ExecutorType.PARALLEL,
         ),
-        fainder_index=fainder_index,
-        hnsw_index=column_index,
-        metadata=metadata,
-        cache_size=0,
-        executor_type=ExecutorType.PARALLEL
     )

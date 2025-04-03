@@ -21,7 +21,7 @@ DEFAULT_COL_NAMES: Final[list[str]] = [
     "country",
 ]
 
-DEFAULT_KS: Final[list[int]]= [0, 1, 3, 5]
+DEFAULT_KS: Final[list[int]] = [0, 1, 3, 5]
 
 
 # Percentile related constants

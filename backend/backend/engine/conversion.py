@@ -1,5 +1,6 @@
-from numpy.typing import NDArray
 from numpy import uint32
+from numpy.typing import NDArray
+
 
 def doc_to_col_ids(doc_ids: set[int], doc_to_cols: dict[int, set[int]]) -> set[uint32]:
     return {

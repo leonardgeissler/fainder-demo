@@ -4,16 +4,16 @@ from pathlib import Path
 from typing import Any
 
 from .constants import (
+    DEFAULT_COL_NAMES,
     DEFAULT_KEYWORDS,
-    DEFAULT_THRESHOLDS,
+    DEFAULT_KS,
     DEFAULT_OPERATORS,
     DEFAULT_PERCENTILES,
+    DEFAULT_THRESHOLDS,
     LOGICAL_OPERATORS,
     MAX_NUM_QUERY_PER_NUM_TERMS,
     MAX_NUM_TERMS_QUERY,
     MIN_NUM_TERMS_QUERY,
-    DEFAULT_COL_NAMES,
-    DEFAULT_KS
 )
 
 
@@ -40,6 +40,7 @@ def generate_simple_keyword_queries(
         for i, word in enumerate(keywords)
     }
 
+
 def generate_percentile_terms(
     percentile_values: list[float] = DEFAULT_PERCENTILES,
     thresholds: list[int] = DEFAULT_THRESHOLDS,
@@ -58,7 +59,7 @@ def generate_percentile_terms(
     for op in operators:
         for threshold in thresholds:
             for percentile in percentile_values:
-                terms.append(f"pp({percentile};{op};{threshold})")
+                terms.extend(f"pp({percentile};{op};{threshold})")
 
     return terms
 
@@ -119,7 +120,7 @@ def keyword_combinations(
 
     # Generate all possible combinations of keywords
     helper: list[int] = []
-    for i in range(0, len(keywords)):
+    for i in range(len(keywords)):
         helper.append(i)
     query_counter = 1
     for operator in operators:
@@ -168,7 +169,7 @@ def percentile_term_combinations(
 
     # Generate all possible combinations of terms
     helper: list[int] = []
-    for i in range(0, len(terms)):
+    for i in range(len(terms)):
         helper.append(i)
 
     query_counter = 1
@@ -203,9 +204,9 @@ def mixed_term_combinations_with_fixed_structure(
     operators: list[str] = LOGICAL_OPERATORS,
 ) -> dict[str, dict[str, Any]]:
     # query structure: kw('test') AND col(name('age',1) AND pp(0.5;le;2000))
-    
+
     queries: dict[str, dict[str, Any]] = {}
-    
+
     query_counter = 1
     for operator in operators:
         for keyword in keywords:
@@ -218,14 +219,12 @@ def mixed_term_combinations_with_fixed_structure(
                             "ids": [
                                 {"keyword_id": keyword},
                                 {"percentile_id": percentile},
-                                {"column_id": (column_name, k)}
+                                {"column_id": (column_name, k)},
                             ],
                         }
                         query_counter += 1
 
     return queries
-    
-
 
 
 def generate_all_test_cases() -> dict[str, Any]:
@@ -236,14 +235,14 @@ def generate_all_test_cases() -> dict[str, Any]:
     keyword_combinations_queries = keyword_combinations(DEFAULT_KEYWORDS)
     percentile_combinations_queries = percentile_term_combinations(percentile_terms)
 
-    mixed_term_combinations_with_fixed_structure_queries = mixed_term_combinations_with_fixed_structure(
-        DEFAULT_KEYWORDS, percentile_terms
+    mixed_term_combinations_with_fixed_structure_queries = (
+        mixed_term_combinations_with_fixed_structure(DEFAULT_KEYWORDS, percentile_terms)
     )
 
     return {
         "base_keyword_queries": {"queries": keywordsqueries},
-        #"base_percentile_queries": {"queries": percentilequeries,},
-        "percentile_combinations": {"queries": percentile_combinations_queries,},
+        # "base_percentile_queries": {"queries": percentilequeries,},
+        "percentile_combinations": {"queries": percentile_combinations_queries},
         "mixed_combinations_with_fixed_structure": {
             "queries": mixed_term_combinations_with_fixed_structure_queries,
         },

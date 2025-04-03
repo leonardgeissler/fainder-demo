@@ -18,6 +18,8 @@ def test_execute(
     test_case: ExecutorCase,
     engine: Engine,
     prefiltering_engine: Engine,
+    parallel_engine: Engine,
+    parallel_prefiltering_engine: Engine,
 ) -> None:
     query = test_case["query"]
     expected_result = test_case["expected"]
@@ -54,6 +56,20 @@ def test_execute(
     )
     prefiltering_time = time.perf_counter() - exec_start
 
+    exec_start = time.perf_counter()
+    parallel_result, _ = parallel_engine.execute(
+        query,
+        enable_highlighting=False,
+    )
+    parallel_time = time.perf_counter() - exec_start
+
+    exec_start = time.perf_counter()
+    parallel_prefiltering_result, _ = parallel_prefiltering_engine.execute(
+        query,
+        enable_highlighting=False,
+    )
+    parallel_prefiltering_time = time.perf_counter() - exec_start
+
     # Log timing information in a structured format
     performance_log = {
         "test_type": "executor",
@@ -64,6 +80,8 @@ def test_execute(
         "no_merging_time": no_merging_time,
         "no_opt_time": no_opt_time,
         "prefiltering_time": prefiltering_time,
+        "parallel_time": parallel_time,
+        "parallel_prefiltering_time": parallel_prefiltering_time,
     }
     logger.info(performance_log)
 
@@ -73,3 +91,5 @@ def test_execute(
     assert set(no_merging_result) == set(expected_result)
     assert set(no_opt_result) == set(expected_result)
     assert set(prefiltering_result) == set(expected_result)
+    assert set(parallel_result) == set(expected_result)
+    assert set(parallel_prefiltering_result) == set(expected_result)
