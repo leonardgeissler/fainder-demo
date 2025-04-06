@@ -108,7 +108,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
 
 
 @pytest.fixture(scope="module")
-def engines() -> tuple[Engine, Engine, Engine]:
+def engines() -> tuple[Engine, Engine, Engine, Engine]:
     settings = Settings()  # type: ignore # uses the environment variables
     with settings.metadata_path.open() as file:
         metadata = Metadata(**json.load(file))
@@ -143,5 +143,14 @@ def engines() -> tuple[Engine, Engine, Engine]:
             metadata=metadata,
             cache_size=0,
             executor_type=ExecutorType.PARALLEL,
+        ),
+        Engine
+        (
+            tantivy_index=TantivyIndex(index_path=str(settings.tantivy_path), recreate=False),
+            fainder_index=fainder_index,
+            hnsw_index=column_index,
+            metadata=metadata,
+            cache_size=0,
+            executor_type=ExecutorType.PARALLEL_PREFILTERING,
         ),
     )

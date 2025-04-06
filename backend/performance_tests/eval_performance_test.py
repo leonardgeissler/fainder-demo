@@ -211,9 +211,9 @@ def test_performance(
     category: str,
     test_name: str,
     test_case: dict[str, Any],
-    engines: tuple[Engine, Engine, Engine],
+    engines: tuple[Engine, Engine, Engine, Engine],
 ) -> None:
-    simple_engine, perfiltering_engine, parallel_engine = engines
+    simple_engine, perfiltering_engine, parallel_engine, parallel_prefiltering_engine = engines
     query = test_case["query"]
     ids = test_case.get("ids", [])
     keyword_id = test_case.get("keyword_id")
@@ -229,6 +229,7 @@ def test_performance(
         "simple": {"engine": simple_engine},
         "perfiltering": {"engine": perfiltering_engine},
         "parallel": {"engine": parallel_engine},
+        "parallel_prefiltering": {"engine": parallel_prefiltering_engine},
     }
 
     for mode in FAINDER_MODES:
