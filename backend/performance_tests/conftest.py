@@ -2,9 +2,7 @@ import csv
 import json
 import sys
 import time
-from collections.abc import Generator
 from pathlib import Path
-from typing import Any
 
 import pytest
 from loguru import logger
@@ -17,7 +15,7 @@ from backend.indices.percentile_op import FainderIndex
 
 
 @pytest.fixture(autouse=True, scope="module")
-def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[reportUnusedFunction]
+def _setup_and_teardown() -> None:  # pyright: ignore[reportUnusedFunction]
     """
     Generic setup and teardown fixture that runs before and after each test.
     """
@@ -144,8 +142,7 @@ def engines() -> tuple[Engine, Engine, Engine, Engine]:
             cache_size=0,
             executor_type=ExecutorType.PARALLEL,
         ),
-        Engine
-        (
+        Engine(
             tantivy_index=TantivyIndex(index_path=str(settings.tantivy_path), recreate=False),
             fainder_index=fainder_index,
             hnsw_index=column_index,

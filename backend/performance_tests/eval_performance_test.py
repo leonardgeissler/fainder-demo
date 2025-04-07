@@ -16,11 +16,18 @@ from .generate_eval_test_cases import generate_all_test_cases
 
 TEST_CASES = generate_all_test_cases()
 
+DISABLE_PROFILING = True
+
 
 def execute_with_profiling(
     evaluator: Engine, query: str, params: dict[str, Any], mode: str
 ) -> tuple[Any, float, io.StringIO]:
     """Execute a query with profiling and timing."""
+    if DISABLE_PROFILING:
+        start_time = time.time()
+        result, _ = evaluator.execute(query, fainder_mode=mode)
+        end_time = time.time()
+        return result, end_time - start_time, io.StringIO()
     pr = cProfile.Profile()
     pr.enable()
 
@@ -54,7 +61,7 @@ def save_profiling_stats(
     lines = stats_str.strip().split("\n")
 
     # Extract function data
-    function_stats = []
+    function_stats: list[dict[str, Any]] = []
     header_found = False
     for line in lines:
         # Skip lines until we find the header
@@ -125,7 +132,7 @@ def save_profiling_stats(
         debug_dir
         / f"profile_{category}_{test_name}_{scenario}_{fainder_mode}_{int(time.time())}.txt"
     )
-    with open(debug_file, "w") as f:
+    with debug_file.open("w") as f:
         f.write(stats_str)
 
 
@@ -152,9 +159,10 @@ def run_evaluation_scenarios(
         results[scenario_name] = result
 
         # Save profiling statistics
-        save_profiling_stats(
-            stats_io, profile_csv_path, category, test_name, query, scenario_name, mode
-        )
+        if not DISABLE_PROFILING:
+            save_profiling_stats(
+                stats_io, profile_csv_path, category, test_name, query, scenario_name, mode
+            )
 
     # Check if all results are consistent
     first_result = next(iter(results.values()))

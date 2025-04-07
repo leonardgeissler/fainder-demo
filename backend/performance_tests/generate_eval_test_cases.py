@@ -58,8 +58,9 @@ def generate_percentile_terms(
 
     for op in operators:
         for threshold in thresholds:
-            for percentile in percentile_values:
-                terms.extend(f"pp({percentile};{op};{threshold})")
+            terms.extend(
+                [f"pp({percentile};{op};{threshold})" for percentile in percentile_values]
+            )
 
     return terms
 
@@ -119,9 +120,8 @@ def keyword_combinations(
     queries: dict[str, dict[str, Any]] = {}
 
     # Generate all possible combinations of keywords
-    helper: list[int] = []
-    for i in range(len(keywords)):
-        helper.append(i)
+    helper = list(range(len(keywords)))
+
     query_counter = 1
     for operator in operators:
         # Generate combinations for each length from 2 to max_terms
@@ -168,9 +168,7 @@ def percentile_term_combinations(
     queries: dict[str, dict[str, Any]] = {}
 
     # Generate all possible combinations of terms
-    helper: list[int] = []
-    for i in range(len(terms)):
-        helper.append(i)
+    helper = list(range(len(terms)))
 
     query_counter = 1
     for operator in operators:
@@ -180,9 +178,7 @@ def percentile_term_combinations(
             for combination in combinations(helper, num_terms):
                 if len(combination) == 0:
                     continue
-                combination_terms: list[str] = []
-                for term in combination:
-                    combination_terms.append(terms[term])
+                combination_terms = [terms[term] for term in combination]
                 query = f" {operator} ".join(combination_terms)
                 query = wrap_term(query)
                 queries[f"percentile_combination_{operator}_{query_counter}"] = {
@@ -213,7 +209,10 @@ def mixed_term_combinations_with_fixed_structure(
             for percentile in terms:
                 for column_name in column_names:
                     for k in ks:
-                        query = f"kw('{keyword}') AND col(name('{column_name}';{k}) AND pp({percentile})"
+                        query = (
+                            f"kw('{keyword}') {operator} "
+                            f"col(name('{column_name}';{k}) {operator} {percentile})"
+                        )
                         queries[f"mixed_combination_{operator}_{query_counter}"] = {
                             "query": query,
                             "ids": [
@@ -232,7 +231,7 @@ def generate_all_test_cases() -> dict[str, Any]:
     percentile_terms = generate_percentile_terms()
     percentilequeries = generate_percentile_queries()
 
-    keyword_combinations_queries = keyword_combinations(DEFAULT_KEYWORDS)
+    # keyword_combinations_queries = keyword_combinations(DEFAULT_KEYWORDS)
     percentile_combinations_queries = percentile_term_combinations(percentile_terms)
 
     mixed_term_combinations_with_fixed_structure_queries = (
@@ -241,7 +240,7 @@ def generate_all_test_cases() -> dict[str, Any]:
 
     return {
         "base_keyword_queries": {"queries": keywordsqueries},
-        # "base_percentile_queries": {"queries": percentilequeries,},
+        "base_percentile_queries": {"queries": percentilequeries},
         "percentile_combinations": {"queries": percentile_combinations_queries},
         "mixed_combinations_with_fixed_structure": {
             "queries": mixed_term_combinations_with_fixed_structure_queries,

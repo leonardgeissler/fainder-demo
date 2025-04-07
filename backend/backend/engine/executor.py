@@ -544,20 +544,32 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         parent_write_group = self._get_parent_write_group(write_group)
         return result, parent_write_group
 
+    def _clean_items(
+        self, items: list[tuple[set[int], Highlights, int]] | list[tuple[set[uint32], int]]
+    ) -> tuple[list[tuple[set[int], Highlights]] | list[set[uint32]], int]:
+        """Clean the items to remove the write group and return the cleaned items."""
+        doc_items: list[tuple[set[int], Highlights]] = []
+        col_items: list[set[uint32]] = []
+        for item in items:
+            if len(item) == 3:
+                doc_items.append((item[0], item[1]))
+            else:
+                col_items.append(item[0])
+        if len(doc_items) > 0 and len(col_items) > 0:
+            raise ValueError("Cannot mix document and column items")
+        write_group = items[0][2] if len(items[0]) == 3 else items[0][1]
+        if len(doc_items) > 0:
+            return doc_items, write_group
+        return col_items, write_group
+
     def conjunction(
         self, items: list[tuple[set[int], Highlights, int]] | list[tuple[set[uint32], int]]
     ) -> tuple[set[int], Highlights, int] | tuple[set[uint32], int]:
         logger.trace(f"Evaluating conjunction with items: {items}")
 
-        clean_items: list[tuple[set[int], Highlights]] | list[set[uint32]] = []
-        for item in items:
-            if len(item) == 3:
-                clean_items.append((item[0], item[1]))  # type: ignore
-            else:
-                clean_items.append(item[0])  # type: ignore
+        clean_items, write_group = self._clean_items(items)
 
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
-        write_group = items[0][2] if len(items[0]) == 3 else items[0][1]
         if isinstance(result, tuple):
             self.intermediate_results.add_doc_id_results(write_group, result[0])
         else:
@@ -573,15 +585,9 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
     ) -> tuple[set[int], Highlights, int] | tuple[set[uint32], int]:
         logger.trace(f"Evaluating disjunction with items: {items}")
 
-        clean_items: list[tuple[set[int], Highlights]] | list[set[uint32]] = []
-        for item in items:
-            if len(item) == 3:
-                clean_items.append((item[0], item[1]))  # type: ignore
-            else:
-                clean_items.append(item[0])  # type: ignore
+        clean_items, write_group = self._clean_items(items)
 
         result = junction(clean_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
-        write_group = items[0][2] if len(items[0]) == 3 else items[0][1]
 
         if isinstance(result, tuple):
             self.intermediate_results.add_doc_id_results(write_group, result[0])
@@ -766,11 +772,52 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         # Return future (non-blocking)
         return future
 
-    def _resolve_item(self, item: Future[T] | T) -> T:
+    def _resolve_item(
+        self,
+        item: Future[tuple[set[int], Highlights]]
+        | tuple[set[int], Highlights]
+        | Future[set[uint32]]
+        | set[uint32],
+    ) -> tuple[set[int], Highlights] | set[uint32]:
         """Resolve item if it's a Future, otherwise return the item itself"""
         if isinstance(item, Future):
             return item.result()
         return item
+
+    def _resolve_col_result(self, item: Future[set[uint32]] | set[uint32]) -> set[uint32]:
+        """Resolve item if it's a Future, otherwise return the item itself"""
+        if isinstance(item, Future):
+            return item.result()
+        return item
+
+    def _resolve_doc_result(
+        self, item: Future[tuple[set[int], Highlights]] | tuple[set[int], Highlights]
+    ) -> tuple[set[int], Highlights]:
+        """Resolve item if it's a Future, otherwise return the item itself"""
+        if isinstance(item, Future):
+            return item.result()
+        return item
+
+    def _resolve_items(
+        self,
+        items: list[tuple[set[int], Highlights] | Future[tuple[set[int], Highlights]]]
+        | list[set[uint32] | Future[set[uint32]]],
+    ) -> list[tuple[set[int], Highlights]] | list[set[uint32]]:
+        """Resolve all items in the list if they are futures"""
+        doc_results: list[tuple[set[int], Highlights]] = []
+        col_results: list[set[uint32]] = []
+        for item in items:
+            clean_item = self._resolve_item(item)
+            if isinstance(clean_item, tuple):
+                doc_results.append(self._resolve_doc_result(clean_item))
+            else:
+                col_results.append(self._resolve_col_result(clean_item))
+        if len(doc_results) > 0:
+            assert len(col_results) == 0
+            return doc_results
+        assert len(col_results) > 0
+        assert len(doc_results) == 0
+        return col_results
 
     def col_op(
         self, items: list[set[uint32] | Future[set[uint32]]]
@@ -781,7 +828,7 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
             raise ValueError("Column term must have exactly one item")
 
         # Get actual result if it's a future
-        col_ids = self._resolve_item(items[0])
+        col_ids = self._resolve_col_result(items[0])
 
         doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
         if self.enable_highlighting:
@@ -797,7 +844,9 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         logger.trace(f"Evaluating conjunction with items: {items}")
 
         # Resolve all futures in items
-        resolved_items = [self._resolve_item(item) for item in items]
+        resolved_items: list[tuple[set[int], Highlights]] | list[set[uint32]] = (
+            self._resolve_items(items)
+        )
 
         return junction(resolved_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
 
@@ -809,11 +858,15 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         logger.trace(f"Evaluating disjunction with items: {items}")
 
         # Resolve all futures in items
-        resolved_items = [self._resolve_item(item) for item in items]
+        resolved_items = self._resolve_items(items)
 
         return junction(resolved_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
 
-    def negation(self, items: list[T]) -> T:
+    def negation(
+        self,
+        items: list[tuple[set[int], Highlights] | Future[tuple[set[int], Highlights]]]
+        | list[set[uint32] | Future[set[uint32]]],
+    ) -> tuple[set[int], Highlights] | set[uint32]:
         logger.trace(f"Evaluating negation with {len(items)} items")
 
         if len(items) != 1:
@@ -844,7 +897,7 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
             raise ValueError("Query must have exactly one item")
 
         # Resolve the item if it's a future
-        item = self._resolve_item(items[0])
+        item = self._resolve_doc_result(items[0])
 
         # Shutdown the thread pool after the query is complete
         self._thread_pool.shutdown(wait=True)
@@ -961,21 +1014,33 @@ class IntermediateResultFuture:
 
         return self._build_hist_filter_future(metadata, fainder_mode)
 
+    def __str__(self) -> str:
+        """String representation of the intermediate result."""
+        return f"""IntermediateResultFuture(
+        write_group={self.write_group},
+        doc_ids={self.doc_ids},
+        col_ids={self.col_ids},
+        hist_ids={self.hist_ids}
+        kw_result_futures={self.kw_result_futures},
+        column_result_futures={self.column_result_futures},
+        pp_result_futures={self.pp_result_futures}
+        )"""
+
 
 class IntermidateResultsFuture:
     """Stores futures and results for intermediate results during parallel execution."""
 
-    def __init__(self) -> None:
+    def __init__(self, fainder_mode: FainderMode) -> None:
         self.results: dict[int, IntermediateResultFuture] = {}
+        self.fainder_mode = fainder_mode
 
     def _exceeds_filtering_limit(
         self,
         ids: set[uint32] | set[int],
         id_type: Literal["hist_ids", "col_ids", "doc_ids"],
-        fainder_mode: FainderMode,
     ) -> bool:
         """Check if the number of IDs exceeds the filtering limit for the current mode."""
-        return len(ids) > filtering_stop_points[fainder_mode][id_type]
+        return len(ids) > filtering_stop_points[self.fainder_mode][id_type]
 
     def add_kw_result(
         self, write_group: int, future: Future[tuple[set[int], Highlights, int]]
@@ -1001,21 +1066,21 @@ class IntermidateResultsFuture:
         """Add column IDs to the intermediate result."""
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(write_group)
-        self.results[write_group].col_ids = col_ids.copy()
+        self.results[write_group].col_ids = col_ids
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
 
     def add_doc_ids(self, write_group: int, doc_ids: set[int]) -> None:
         """Add document IDs to the intermediate result."""
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(write_group)
-        self.results[write_group].doc_ids = doc_ids.copy()
+        self.results[write_group].doc_ids = doc_ids
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
 
     def add_hist_ids(self, write_group: int, hist_ids: set[uint32]) -> None:
         """Add histogram IDs to the intermediate result."""
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(write_group)
-        self.results[write_group].hist_ids = hist_ids.copy()
+        self.results[write_group].hist_ids = hist_ids
         logger.trace(f"Adding histogram IDs to write group {write_group}: {hist_ids}")
 
     def get_hist_filter(
@@ -1081,7 +1146,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         self.hnsw_index = hnsw_index
         self.metadata = metadata
         self.write_groups = {}
-        self.intermediate_results = IntermidateResultsFuture()
+        self.intermediate_results = IntermidateResultsFuture(fainder_mode=fainder_mode)
         self.read_groups = {}
         self.parent_write_group = {}
         self.min_usability_score = min_usability_score
@@ -1098,7 +1163,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         self.scores = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
-        self.intermediate_results = IntermidateResultsFuture()
+        self.intermediate_results = IntermidateResultsFuture(fainder_mode=fainder_mode)
         self.parent_write_group = {}
         self.write_groups = {}
         self.read_groups = {}
@@ -1138,6 +1203,37 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         logger.warning(f"Write group {write_group} does not have a parent write group")
         logger.warning(f"Parent write groups: {self.parent_write_group}")
         raise ValueError("Write group does not have a parent write group")
+
+    def _resolve_items(
+        self,
+        items: list[tuple[set[int], Highlights, int] | Future[tuple[set[int], Highlights, int]]]
+        | list[tuple[set[uint32], int] | Future[tuple[set[uint32], int]]],
+    ) -> tuple[list[tuple[set[int], Highlights]] | list[set[uint32]], int]:
+        """Resolve items from futures."""
+        doc_results: list[tuple[set[int], Highlights]] = []
+        col_results: list[set[uint32]] = []
+        write_group: int = 0
+        for item in items:
+            if isinstance(item, Future):
+                resolved_item = item.result()
+                if len(resolved_item) == 3:
+                    doc_results.append((resolved_item[0], resolved_item[1]))
+                    write_group = resolved_item[2]
+                else:
+                    col_results.append(resolved_item[0])
+                    write_group = resolved_item[1]
+            else:
+                if len(item) == 3:
+                    doc_results.append((item[0], item[1]))
+                    write_group = item[2]
+                else:
+                    col_results.append(item[0])
+                    write_group = item[1]
+        if len(doc_results) > 0 and len(col_results) > 0:
+            raise ValueError("Cannot mix document and column results")
+        if len(doc_results) > 0:
+            return doc_results, write_group
+        return col_results, write_group
 
     ### Threaded task methods ###
 
@@ -1241,16 +1337,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
     ) -> tuple[set[int], Highlights, int] | tuple[set[uint32], int]:
         logger.trace(f"Evaluating conjunction with items: {items}")
 
-        clean_items: list[tuple[set[int], Highlights]] | list[set[uint32]] = []
-        write_group: int = 0
-        for item in items:
-            clean_item = item.result() if isinstance(item, Future) else item
-            if len(clean_item) == 3:
-                clean_items.append((clean_item[0], clean_item[1]))  # type: ignore
-                write_group = clean_item[2]
-            else:
-                clean_items.append(clean_item[0])  # type: ignore
-                write_group = clean_item[1]
+        clean_items, write_group = self._resolve_items(items)
 
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
 
@@ -1271,16 +1358,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
     ) -> tuple[set[int], Highlights, int] | tuple[set[uint32], int]:
         logger.trace(f"Evaluating disjunction with items: {items}")
 
-        clean_items: list[tuple[set[int], Highlights]] | list[set[uint32]] = []
-        write_group: int = 0
-        for item in items:
-            clean_item = item.result() if isinstance(item, Future) else item
-            if len(clean_item) == 3:
-                clean_items.append((clean_item[0], clean_item[1]))  # type: ignore
-                write_group = clean_item[2]
-            else:
-                clean_items.append(clean_item[0])  # type: ignore
-                write_group = clean_item[1]
+        clean_items, write_group = self._resolve_items(items)
 
         result = junction(clean_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
 
