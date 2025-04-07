@@ -295,6 +295,15 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
             logger.warning(f"Node {tree} does not have write or read groups")
 
 
+def exceeds_filtering_limit(
+    ids: set[uint32] | set[int],
+    id_type: Literal["hist_ids", "col_ids", "doc_ids"],
+    fainder_mode: FainderMode,
+) -> bool:
+    """Check if the number of IDs exceeds the filtering limit for the current mode."""
+    return len(ids) > filtering_stop_points[fainder_mode][id_type]
+
+
 class IntermediateResult:
     """Intermediate results for prefiltering.
     Only one of doc_ids, col_ids, or hist_ids should be set.
@@ -310,28 +319,19 @@ class IntermediateResult:
     ) -> set[uint32] | None:
         """Build a histogram filter from the intermediate results."""
         if self.hist_ids is not None:
-            if self._exceeds_filtering_limit(self.hist_ids, "hist_ids", fainder_mode):
+            if exceeds_filtering_limit(self.hist_ids, "hist_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for histogram IDs")
             return self.hist_ids
         if self.col_ids is not None:
-            if self._exceeds_filtering_limit(self.col_ids, "col_ids", fainder_mode):
+            if exceeds_filtering_limit(self.col_ids, "col_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for column IDs")
             return col_to_hist_ids(self.col_ids, metadata.col_to_hist)
         if self.doc_ids is not None:
-            if self._exceeds_filtering_limit(self.doc_ids, "doc_ids", fainder_mode):
+            if exceeds_filtering_limit(self.doc_ids, "doc_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for document IDs")
             col_ids = doc_to_col_ids(self.doc_ids, metadata.doc_to_cols)
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
         return None
-
-    def _exceeds_filtering_limit(
-        self,
-        ids: set[uint32] | set[int],
-        id_type: Literal["hist_ids", "col_ids", "doc_ids"],
-        fainder_mode: FainderMode,
-    ) -> bool:
-        """Check if the number of IDs exceeds the filtering limit for the current mode."""
-        return len(ids) > filtering_stop_points[fainder_mode][id_type]
 
     def __str__(self) -> str:
         """String representation of the intermediate result."""
@@ -345,23 +345,33 @@ class IntermediateResult:
 class IntermediateResults:
     """Intermediate results for prefiltering."""
 
-    def __init__(self) -> None:
+    def __init__(self, fainder_mode: FainderMode) -> None:
         self.results: dict[int, IntermediateResult] = {}
+        self.fainder_mode = fainder_mode
 
     def add_hist_id_results(self, write_group: int, hist_ids: set[uint32]) -> None:
         logger.trace(f"Adding histogram IDs to write group {write_group}: {hist_ids}")
+        if exceeds_filtering_limit(hist_ids, "hist_ids", self.fainder_mode):
+            self.results.pop(write_group, None)
+            return
         self.results[write_group] = IntermediateResult()
-        self.results[write_group].hist_ids = hist_ids.copy()
+        self.results[write_group].hist_ids = hist_ids
 
     def add_col_id_results(self, write_group: int, col_ids: set[uint32]) -> None:
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
+        if exceeds_filtering_limit(col_ids, "col_ids", self.fainder_mode):
+            self.results.pop(write_group, None)
+            return
         self.results[write_group] = IntermediateResult()
-        self.results[write_group].col_ids = col_ids.copy()
+        self.results[write_group].col_ids = col_ids
 
     def add_doc_id_results(self, write_group: int, doc_ids: set[int]) -> None:
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
+        if exceeds_filtering_limit(doc_ids, "doc_ids", self.fainder_mode):
+            self.results.pop(write_group, None)
+            return
         self.results[write_group] = IntermediateResult()
-        self.results[write_group].doc_ids = doc_ids.copy()
+        self.results[write_group].doc_ids = doc_ids
 
     def build_filter(
         self, read_groups: list[int], metadata: Metadata, fainder_mode: FainderMode
@@ -422,7 +432,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         self.hnsw_index = hnsw_index
         self.metadata = metadata
         self.write_groups = {}
-        self.intermediate_results = IntermediateResults()
+        self.intermediate_results = IntermediateResults(fainder_mode)
         self.read_groups = {}
         self.parent_write_group = {}
         self.min_usability_score = min_usability_score
@@ -439,7 +449,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         self.scores = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
-        self.intermediate_results = IntermediateResults()
+        self.intermediate_results = IntermediateResults(fainder_mode)
         self.write_groups = {}
         self.read_groups = {}
 
@@ -503,7 +513,10 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         col_ids = items[0][0]
         write_group = items[0][1]
         doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
-        self.intermediate_results.add_col_id_results(write_group, col_ids)
+        if exceeds_filtering_limit(doc_ids, "doc_ids", self.fainder_mode):
+            self.intermediate_results.results.pop(write_group, None)
+        else:
+            self.intermediate_results.add_doc_id_results(write_group, doc_ids)
         parent_write_group = self._get_parent_write_group(write_group)
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids), parent_write_group
@@ -532,15 +545,18 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         hist_filter = self.intermediate_results.build_filter(
             self._get_read_groups(items[0]), self.metadata, self.fainder_mode
         )
-        logger.trace(f"Hist filter: {hist_filter}")
         write_group = self._get_write_group(items[0])
         if hist_filter is not None and len(hist_filter) == 0:
             return set(), write_group
+        logger.debug(f"Hist filter length: {len(hist_filter) if hist_filter else 'None'}")
         result_hists = self.fainder_index.search(
             percentile, comparison, reference, self.fainder_mode, hist_filter
         )
         result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
-        self.intermediate_results.add_col_id_results(write_group, result)
+        if exceeds_filtering_limit(result, "col_ids", self.fainder_mode):
+            self.intermediate_results.results.pop(write_group, None)
+        else:
+            self.intermediate_results.add_col_id_results(write_group, result)
         parent_write_group = self._get_parent_write_group(write_group)
         return result, parent_write_group
 
