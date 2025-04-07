@@ -226,6 +226,50 @@ def mixed_term_combinations_with_fixed_structure(
     return queries
 
 
+def multiple_percentile_combinations(
+    percentile_combinations: dict[str, dict[str, Any]],
+    operators: list[str] = LOGICAL_OPERATORS,
+    min_terms: int = MIN_NUM_TERMS_QUERY,
+    max_terms: int = MAX_NUM_TERMS_QUERY,
+    num_query_per_num_terms: int = MAX_NUM_QUERY_PER_NUM_TERMS,
+) -> dict[str, dict[str, Any]]:
+    """
+    Combines multiple different percentile combinations into a single query.
+
+    Args:
+        percentile_combinations: Dictionary of percentile combinations
+        operators: List of logical operators to use
+    """
+    queries: dict[str, dict[str, Any]] = {}
+
+    for operator in operators:
+        for i in range(min_terms, max_terms + 1):
+            h = 0
+            for j in range(1, len(percentile_combinations) + 1):
+                if j < i:
+                    continue
+                combination = list(combinations(percentile_combinations.keys(), j))
+                for k in range(len(combination)):
+                    if len(combination[k]) == 0:
+                        continue
+                    combination_terms = [
+                        percentile_combinations[term]["query"] for term in combination[k]
+                    ]
+                    query = f" {operator} ".join(combination_terms)
+                    query = wrap_term(query)
+                    queries[f"multiple_percentile_combination_{operator}_{i}_{k}"] = {
+                        "query": query,
+                        "ids": [percentile_combinations[term]["ids"] for term in combination[k]],
+                    }
+                    h += 1
+                    if h > num_query_per_num_terms:
+                        break
+                if h > num_query_per_num_terms:
+                    break
+
+    return queries
+
+
 def generate_all_test_cases() -> dict[str, Any]:
     keywordsqueries = generate_simple_keyword_queries(DEFAULT_KEYWORDS)
     percentile_terms = generate_percentile_terms()
@@ -238,14 +282,29 @@ def generate_all_test_cases() -> dict[str, Any]:
         mixed_term_combinations_with_fixed_structure(DEFAULT_KEYWORDS, percentile_terms)
     )
 
-    return {
+    multiple_percentile_combinations_queries = multiple_percentile_combinations(
+        percentile_combinations_queries
+    )
+
+    test_cases = {
         "base_keyword_queries": {"queries": keywordsqueries},
         "base_percentile_queries": {"queries": percentilequeries},
         "percentile_combinations": {"queries": percentile_combinations_queries},
         "mixed_combinations_with_fixed_structure": {
             "queries": mixed_term_combinations_with_fixed_structure_queries,
         },
+        "multiple_percentile_combinations": {
+            "queries": multiple_percentile_combinations_queries,
+        },
     }
+
+    output = Path("test_cases/performance_test_cases.json")
+
+    output.parent.mkdir(exist_ok=True)
+    with output.open("w") as f:
+        json.dump(test_cases, f, indent=2)
+
+    return test_cases
 
 
 def save_test_cases(output_path: Path) -> None:
