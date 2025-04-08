@@ -20,7 +20,7 @@ from backend.config import (
     Highlights,
     Metadata,
 )
-from backend.engine.constants import filtering_stop_points
+from backend.engine.constants import FILTERING_STOP_POINTS
 from backend.engine.conversion import (
     col_to_doc_ids,
     col_to_hist_ids,
@@ -297,11 +297,11 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
 
 def exceeds_filtering_limit(
     ids: set[uint32] | set[int],
-    id_type: Literal["hist_ids", "col_ids", "doc_ids"],
+    id_type: Literal["num_hist_ids", "num_col_ids", "num_doc_ids"],
     fainder_mode: FainderMode,
 ) -> bool:
     """Check if the number of IDs exceeds the filtering limit for the current mode."""
-    return len(ids) > filtering_stop_points[fainder_mode][id_type]
+    return len(ids) > FILTERING_STOP_POINTS[fainder_mode][id_type]
 
 
 class IntermediateResult:
@@ -319,15 +319,15 @@ class IntermediateResult:
     ) -> set[uint32] | None:
         """Build a histogram filter from the intermediate results."""
         if self.hist_ids is not None:
-            if exceeds_filtering_limit(self.hist_ids, "hist_ids", fainder_mode):
+            if exceeds_filtering_limit(self.hist_ids, "num_hist_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for histogram IDs")
             return self.hist_ids
         if self.col_ids is not None:
-            if exceeds_filtering_limit(self.col_ids, "col_ids", fainder_mode):
+            if exceeds_filtering_limit(self.col_ids, "num_col_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for column IDs")
             return col_to_hist_ids(self.col_ids, metadata.col_to_hist)
         if self.doc_ids is not None:
-            if exceeds_filtering_limit(self.doc_ids, "doc_ids", fainder_mode):
+            if exceeds_filtering_limit(self.doc_ids, "num_doc_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for document IDs")
             col_ids = doc_to_col_ids(self.doc_ids, metadata.doc_to_cols)
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
@@ -351,7 +351,7 @@ class IntermediateResults:
 
     def add_hist_id_results(self, write_group: int, hist_ids: set[uint32]) -> None:
         logger.trace(f"Adding histogram IDs to write group {write_group}: {hist_ids}")
-        if exceeds_filtering_limit(hist_ids, "hist_ids", self.fainder_mode):
+        if exceeds_filtering_limit(hist_ids, "num_hist_ids", self.fainder_mode):
             self.results.pop(write_group, None)
             return
         self.results[write_group] = IntermediateResult()
@@ -359,7 +359,7 @@ class IntermediateResults:
 
     def add_col_id_results(self, write_group: int, col_ids: set[uint32]) -> None:
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
-        if exceeds_filtering_limit(col_ids, "col_ids", self.fainder_mode):
+        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
             self.results.pop(write_group, None)
             return
         self.results[write_group] = IntermediateResult()
@@ -367,7 +367,7 @@ class IntermediateResults:
 
     def add_doc_id_results(self, write_group: int, doc_ids: set[int]) -> None:
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
-        if exceeds_filtering_limit(doc_ids, "doc_ids", self.fainder_mode):
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
             self.results.pop(write_group, None)
             return
         self.results[write_group] = IntermediateResult()
@@ -513,7 +513,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         col_ids = items[0][0]
         write_group = items[0][1]
         doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
-        if exceeds_filtering_limit(doc_ids, "doc_ids", self.fainder_mode):
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
             self.intermediate_results.results.pop(write_group, None)
         else:
             self.intermediate_results.add_doc_id_results(write_group, doc_ids)
@@ -553,7 +553,7 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             percentile, comparison, reference, self.fainder_mode, hist_filter
         )
         result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
-        if exceeds_filtering_limit(result, "col_ids", self.fainder_mode):
+        if exceeds_filtering_limit(result, "num_col_ids", self.fainder_mode):
             self.intermediate_results.results.pop(write_group, None)
         else:
             self.intermediate_results.add_col_id_results(write_group, result)
@@ -961,29 +961,20 @@ class IntermediateResultFuture:
         """Add a future that will resolve to histogram IDs"""
         self.pp_result_futures.append(future)
 
-    def _exceeds_filtering_limit(
-        self,
-        ids: set[uint32] | set[int],
-        id_type: Literal["hist_ids", "col_ids", "doc_ids"],
-        fainder_mode: FainderMode,
-    ) -> bool:
-        """Check if the number of IDs exceeds the filtering limit for the current mode."""
-        return len(ids) > filtering_stop_points[fainder_mode][id_type]
-
     def _build_hist_filter_resolved(
         self, metadata: Metadata, fainder_mode: FainderMode
     ) -> set[uint32] | None:
         if self.doc_ids is not None:
-            if self._exceeds_filtering_limit(self.doc_ids, "doc_ids", fainder_mode):
+            if exceeds_filtering_limit(self.doc_ids, "num_doc_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for document IDs")
             col_ids = doc_to_col_ids(self.doc_ids, metadata.doc_to_cols)
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
         if self.col_ids is not None:
-            if self._exceeds_filtering_limit(self.col_ids, "col_ids", fainder_mode):
+            if exceeds_filtering_limit(self.col_ids, "num_col_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for column IDs")
             return col_to_hist_ids(self.col_ids, metadata.col_to_hist)
         if self.hist_ids is not None:
-            if self._exceeds_filtering_limit(self.hist_ids, "hist_ids", fainder_mode):
+            if exceeds_filtering_limit(self.hist_ids, "num_hist_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for histogram IDs")
             return self.hist_ids
         return None
@@ -995,7 +986,7 @@ class IntermediateResultFuture:
         first = True
         for kw_future in self.kw_result_futures:
             doc_ids, _, _ = kw_future.result()
-            if self._exceeds_filtering_limit(doc_ids, "doc_ids", fainder_mode):
+            if exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for document IDs")
             col_ids = doc_to_col_ids(doc_ids, metadata.doc_to_cols)
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
@@ -1007,7 +998,7 @@ class IntermediateResultFuture:
 
         for col_future in self.column_result_futures:
             col_ids, _ = col_future.result()
-            if self._exceeds_filtering_limit(col_ids, "col_ids", fainder_mode):
+            if exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for column IDs")
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
             if first:
@@ -1049,14 +1040,6 @@ class IntermidateResultsFuture:
     def __init__(self, fainder_mode: FainderMode) -> None:
         self.results: dict[int, IntermediateResultFuture] = {}
         self.fainder_mode = fainder_mode
-
-    def _exceeds_filtering_limit(
-        self,
-        ids: set[uint32] | set[int],
-        id_type: Literal["hist_ids", "col_ids", "doc_ids"],
-    ) -> bool:
-        """Check if the number of IDs exceeds the filtering limit for the current mode."""
-        return len(ids) > filtering_stop_points[self.fainder_mode][id_type]
 
     def add_kw_result(
         self, write_group: int, future: Future[tuple[set[int], Highlights, int]]

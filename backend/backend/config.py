@@ -33,7 +33,7 @@ IntegerArray = Annotated[
 ]
 
 
-class ExecutorType(Enum):
+class ExecutorType(str, Enum):
     """Enum representing different executor types for query execution."""
 
     SIMPLE = "simple"

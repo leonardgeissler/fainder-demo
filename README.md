@@ -53,7 +53,7 @@ CROISSANT_CACHE_SIZE=128     # Size of the Croissant store cache (only relevant 
 QUERY_CACHE_SIZE=128                # Maximum number of query results to cache
 MIN_USABILITY_SCORE=0.0             # Minimum usability threshold for query results
 RANK_BY_USABILITY=True              # Boolean to enable/disable usability
-EXECUTOR_TYPE=simple         # Query executor implementation (simple or prefiltering)
+EXECUTOR_TYPE=simple                # Query executor implementation (simple, prefiltering or parallel)
 
 # Fainder
 FAINDER_N_CLUSTERS=50               # Number of index clusters
@@ -138,5 +138,5 @@ If you want to use Docker for development, you can use the following command to 
 components in development mode:
 
 ```bash
-FASTAPI_MODE=dev NUXT_MODE=dev docker compose up --build --watch
+COMPOSE_BAKE=true FASTAPI_MODE=dev NUXT_MODE=dev docker compose up --build --watch
 ```

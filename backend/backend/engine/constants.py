@@ -3,34 +3,33 @@ from typing import TypedDict
 from backend.config import FainderMode
 
 
-# sizes at which point to stop prefiltering per Fainder mode
 class FilteringStopPointsConfig(TypedDict):
-    doc_ids: int
-    col_ids: int
-    hist_ids: int
+    """sizes at which point to stop prefiltering per Fainder mode"""
+
+    num_doc_ids: int
+    num_col_ids: int
+    num_hist_ids: int
 
 
-FilteringStopPointsMap = dict[FainderMode, FilteringStopPointsConfig]
-
-filtering_stop_points: dict[FainderMode, FilteringStopPointsConfig] = {
+FILTERING_STOP_POINTS: dict[FainderMode, FilteringStopPointsConfig] = {
     FainderMode.LOW_MEMORY: {
-        "doc_ids": 50000,
-        "col_ids": 500000,
-        "hist_ids": 500000,
+        "num_doc_ids": 50000,
+        "num_col_ids": 500000,
+        "num_hist_ids": 500000,
     },
     FainderMode.FULL_PRECISION: {
-        "doc_ids": 50000,
-        "col_ids": 500000,
-        "hist_ids": 500000,
+        "num_doc_ids": 50000,
+        "num_col_ids": 500000,
+        "num_hist_ids": 500000,
     },
     FainderMode.FULL_RECALL: {
-        "doc_ids": 50000,
-        "col_ids": 500000,
-        "hist_ids": 500000,
+        "num_doc_ids": 50000,
+        "num_col_ids": 500000,
+        "num_hist_ids": 500000,
     },
     FainderMode.EXACT: {
-        "doc_ids": 100000,
-        "col_ids": 1000000,
-        "hist_ids": 1000000,
+        "num_doc_ids": 100000,
+        "num_col_ids": 1000000,
+        "num_hist_ids": 1000000,
     },
 }
