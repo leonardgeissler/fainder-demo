@@ -20,7 +20,7 @@ from backend.config import (
     Highlights,
     Metadata,
 )
-from backend.engine.constants import filtering_stop_points
+from backend.engine.constants import FILTERING_STOP_POINTS
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 T = TypeVar("T", tuple[set[int], Highlights], set[uint32])
@@ -304,15 +304,15 @@ class IntermediateResult:
     ) -> set[uint32] | None:
         """Build a histogram filter from the intermediate results."""
         if self.hist_ids is not None:
-            if self._exceeds_filtering_limit(self.hist_ids, "hist_ids", fainder_mode):
+            if self._exceeds_filtering_limit(self.hist_ids, "num_hist_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for histogram IDs")
             return self.hist_ids
         if self.col_ids is not None:
-            if self._exceeds_filtering_limit(self.col_ids, "col_ids", fainder_mode):
+            if self._exceeds_filtering_limit(self.col_ids, "num_col_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for column IDs")
             return col_to_hist_ids(self.col_ids, metadata.col_to_hist)
         if self.doc_ids is not None:
-            if self._exceeds_filtering_limit(self.doc_ids, "doc_ids", fainder_mode):
+            if self._exceeds_filtering_limit(self.doc_ids, "num_doc_ids", fainder_mode):
                 raise ValueError("Exceeded filtering limit for document IDs")
             col_ids = doc_to_col_ids(self.doc_ids, metadata.doc_to_cols)
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
@@ -321,11 +321,11 @@ class IntermediateResult:
     def _exceeds_filtering_limit(
         self,
         ids: set[uint32] | set[int],
-        id_type: Literal["hist_ids", "col_ids", "doc_ids"],
+        id_type: Literal["num_hist_ids", "num_col_ids", "num_doc_ids"],
         fainder_mode: FainderMode,
     ) -> bool:
         """Check if the number of IDs exceeds the filtering limit for the current mode."""
-        return len(ids) > filtering_stop_points[fainder_mode][id_type]
+        return len(ids) > FILTERING_STOP_POINTS[fainder_mode][id_type]
 
     def __str__(self) -> str:
         """String representation of the intermediate result."""

@@ -23,11 +23,11 @@ class Engine:
         self.parser = Parser()
         self.optimizer = create_optimizer(executor_type)
         self.executor = create_executor(
-            executor_type,
-            tantivy_index,
-            fainder_index,
-            hnsw_index,
-            metadata,
+            executor_type=executor_type,
+            tantivy_index=tantivy_index,
+            fainder_index=fainder_index,
+            hnsw_index=hnsw_index,
+            metadata=metadata,
             min_usability_score=min_usability_score,
             rank_by_usability=rank_by_usability,
         )
@@ -47,11 +47,11 @@ class Engine:
         metadata: Metadata,
     ) -> None:
         self.executor = create_executor(
-            self.executor_type,
-            tantivy_index,
-            fainder_index,
-            hnsw_index,
-            metadata,
+            executor_type=self.executor_type,
+            tantivy_index=tantivy_index,
+            fainder_index=fainder_index,
+            hnsw_index=hnsw_index,
+            metadata=metadata,
             min_usability_score=self.min_usability_score,
             rank_by_usability=self.rank_by_usability,
         )

@@ -45,7 +45,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
 
 
 @pytest.fixture(scope="module")
-def engine() -> Engine:
+def default_engine() -> Engine:
     settings = Settings(
         data_dir=Path(__file__).parent / "assets",
         collection_name="toy_collection",

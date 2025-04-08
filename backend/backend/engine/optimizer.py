@@ -44,8 +44,6 @@ class Optimizer:
     - Cost-based sorting of sibling operators
     - Keyword merging
 
-    Planned optimizations include:
-    - Pre-filtering for conjuctions based on intermediate results
     """
 
     def __init__(
@@ -77,8 +75,12 @@ def create_optimizer(
     cost_sorting: bool = True,
     keyword_merging: bool = True,
 ) -> Optimizer:
+    """
+    Creates an optimizer based on the executor type.
+    """
     if executor_type == ExecutorType.PREFILTERING:
         return Optimizer(cost_sorting=True, keyword_merging=True)
+    # TODO: Handle other executor types properly
     return Optimizer(cost_sorting=cost_sorting, keyword_merging=keyword_merging)
 
 
