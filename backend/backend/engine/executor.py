@@ -1,3 +1,4 @@
+import os
 import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -686,7 +687,7 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         enable_highlighting: bool = False,
         min_usability_score: float = 0.0,
         rank_by_usability: bool = True,
-        max_workers: int = 4,
+        max_workers: int = os.cpu_count() or 1,
     ) -> None:
         self.tantivy_index = tantivy_index
         self.fainder_index = fainder_index
@@ -1138,7 +1139,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         enable_highlighting: bool = False,
         min_usability_score: float = 0.0,
         rank_by_usability: bool = True,
-        max_workers: int = 4,
+        max_workers: int = os.cpu_count() or 1,
     ) -> None:
         self.tantivy_index = tantivy_index
         self.fainder_index = fainder_index
@@ -1455,6 +1456,7 @@ def create_executor(
     enable_highlighting: bool = False,
     min_usability_score: float = 0.0,
     rank_by_usability: bool = True,
+    max_workers: int = os.cpu_count() or 1,
 ) -> Executor:
     """Factory function to create the appropriate executor based on the executor type."""
     if executor_type == ExecutorType.SIMPLE:
@@ -1489,6 +1491,7 @@ def create_executor(
             enable_highlighting=enable_highlighting,
             min_usability_score=min_usability_score,
             rank_by_usability=rank_by_usability,
+            max_workers=max_workers,
         )
     if executor_type == ExecutorType.PARALLEL_PREFILTERING:
         return ParallelPrefilteringExecutor(
@@ -1500,6 +1503,7 @@ def create_executor(
             enable_highlighting=enable_highlighting,
             min_usability_score=min_usability_score,
             rank_by_usability=rank_by_usability,
+            max_workers=max_workers,
         )
 
     raise ValueError(f"Unknown executor type: {executor_type}")

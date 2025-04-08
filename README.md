@@ -53,7 +53,8 @@ CROISSANT_CACHE_SIZE=128     # Size of the Croissant store cache (only relevant 
 QUERY_CACHE_SIZE=128                # Maximum number of query results to cache
 MIN_USABILITY_SCORE=0.0             # Minimum usability threshold for query results
 RANK_BY_USABILITY=True              # Boolean to enable/disable usability
-EXECUTOR_TYPE=simple                # Query executor implementation (simple, prefiltering or parallel)
+EXECUTOR_TYPE=simple                # Query executor implementation (simple, prefiltering, parallel or prefiltering_parallel)
+MAX_WORKERS=os.cpu_count()  or 1    # Number of threads for parallel execution
 
 # Fainder
 FAINDER_N_CLUSTERS=50               # Number of index clusters

@@ -68,6 +68,10 @@ def default_engine() -> Engine:
         hnsw_index=hnsw_index,
         metadata=metadata,
         cache_size=-1,
+        min_usability_score=settings.min_usability_score,
+        rank_by_usability=settings.rank_by_usability,
+        executor_type=settings.executor_type,
+        max_workers=settings.max_workers,
     )
 
 
@@ -96,6 +100,9 @@ def prefiltering_engine() -> Engine:
         metadata=metadata,
         cache_size=-1,
         executor_type=ExecutorType.PREFILTERING,
+        min_usability_score=settings.min_usability_score,
+        rank_by_usability=settings.rank_by_usability,
+        max_workers=settings.max_workers,
     )
 
 
@@ -124,6 +131,9 @@ def parallel_engine() -> Engine:
         metadata=metadata,
         cache_size=-1,
         executor_type=ExecutorType.PARALLEL,
+        min_usability_score=settings.min_usability_score,
+        rank_by_usability=settings.rank_by_usability,
+        max_workers=settings.max_workers,
     )
 
 
@@ -152,6 +162,9 @@ def parallel_prefiltering_engine() -> Engine:
         metadata=metadata,
         cache_size=-1,
         executor_type=ExecutorType.PARALLEL_PREFILTERING,
+        min_usability_score=settings.min_usability_score,
+        rank_by_usability=settings.rank_by_usability,
+        max_workers=settings.max_workers,
     )
 
 
