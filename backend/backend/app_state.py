@@ -164,6 +164,9 @@ class ApplicationState:
             hnsw_index=hnsw_index,
             metadata=metadata,
             cache_size=settings.query_cache_size,
+            min_usability_score=settings.min_usability_score,
+            rank_by_usability=settings.rank_by_usability,
+            executor_type=settings.executor_type,
         )
         return metadata, croissant_store, tantivy_index, fainder_index, hnsw_index, engine
 
@@ -234,6 +237,9 @@ class ApplicationState:
             hnsw_index=hnsw_index,
             metadata=metadata,
             cache_size=settings.query_cache_size,
+            min_usability_score=settings.min_usability_score,
+            rank_by_usability=settings.rank_by_usability,
+            executor_type=settings.executor_type,
         )
 
         return metadata, croissant_store, tantivy_index, fainder_index, hnsw_index, engine

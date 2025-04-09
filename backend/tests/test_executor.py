@@ -12,37 +12,47 @@ from .assets.test_cases_executor import EXECUTOR_CASES, ExecutorCase
     ("category", "test_name", "test_case"),
     [(cat, name, case) for cat, cases in EXECUTOR_CASES.items() for name, case in cases.items()],
 )
-def test_execute(category: str, test_name: str, test_case: ExecutorCase, engine: Engine) -> None:
+def test_execute(
+    category: str,
+    test_name: str,
+    test_case: ExecutorCase,
+    default_engine: Engine,
+    prefiltering_engine: Engine,
+) -> None:
     query = test_case["query"]
     expected_result = test_case["expected"]
 
     # Execute with all configurations
-    engine.optimizer = Optimizer()
+    default_engine.optimizer = Optimizer()
     exec_start = time.perf_counter()
-    default_result, _ = engine.execute(
+    default_result, _ = default_engine.execute(
         query,
         enable_highlighting=False,
-        enable_filtering=False,
     )
     default_time = time.perf_counter() - exec_start
 
-    engine.optimizer = Optimizer(cost_sorting=True, keyword_merging=False)
+    default_engine.optimizer = Optimizer(cost_sorting=True, keyword_merging=False)
     exec_start = time.perf_counter()
-    no_merging_result, _ = engine.execute(
+    no_merging_result, _ = default_engine.execute(
         query,
         enable_highlighting=False,
-        enable_filtering=False,
     )
     no_merging_time = time.perf_counter() - exec_start
 
-    engine.optimizer = Optimizer(cost_sorting=False, keyword_merging=False)
+    default_engine.optimizer = Optimizer(cost_sorting=False, keyword_merging=False)
     exec_start = time.perf_counter()
-    no_opt_result, _ = engine.execute(
+    no_opt_result, _ = default_engine.execute(
         query,
         enable_highlighting=False,
-        enable_filtering=False,
     )
     no_opt_time = time.perf_counter() - exec_start
+
+    exec_start = time.perf_counter()
+    prefiltering_result, _ = prefiltering_engine.execute(
+        query,
+        enable_highlighting=False,
+    )
+    prefiltering_time = time.perf_counter() - exec_start
 
     # Log timing information in a structured format
     performance_log = {
@@ -53,10 +63,13 @@ def test_execute(category: str, test_name: str, test_case: ExecutorCase, engine:
         "default_time": default_time,
         "no_merging_time": no_merging_time,
         "no_opt_time": no_opt_time,
+        "prefiltering_time": prefiltering_time,
     }
     logger.info(performance_log)
 
     # Verify results are consistent
-    assert (
-        set(default_result) == set(no_merging_result) == set(expected_result) == set(no_opt_result)
-    )
+    # Verify all results match the expected result
+    assert set(default_result) == set(expected_result)
+    assert set(no_merging_result) == set(expected_result)
+    assert set(no_opt_result) == set(expected_result)
+    assert set(prefiltering_result) == set(expected_result)

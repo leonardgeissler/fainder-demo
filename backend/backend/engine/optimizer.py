@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 from lark import ParseTree, Token, Tree, Visitor
 from loguru import logger
 
+from backend.config import ExecutorType
+
 if TYPE_CHECKING:
     from lark.tree import Branch
 
@@ -42,15 +44,12 @@ class Optimizer:
     - Cost-based sorting of sibling operators
     - Keyword merging
 
-    Planned optimizations include:
-    - Pre-filtering for conjuctions based on intermediate results
     """
 
     def __init__(
         self,
         cost_sorting: bool = True,
         keyword_merging: bool = True,
-        intermediate_filtering: bool = False,
     ) -> None:
         self.opt_rules: list[OptimizationRule] = [QuoteRemover()]
         if cost_sorting:
@@ -61,9 +60,6 @@ class Optimizer:
                     "Using keyword merging without cost sorting may lead to suboptimal results"
                 )
             self.opt_rules.append(MergeKeywords())
-        if intermediate_filtering:
-            logger.warning("Intermediate filtering not yet implemented")
-            self.opt_rules.append(ParentAnnotator())
 
     def optimize(self, tree: ParseTree) -> ParseTree:
         """
@@ -72,6 +68,20 @@ class Optimizer:
         for rule in self.opt_rules:
             rule.apply(tree)
         return tree
+
+
+def create_optimizer(
+    executor_type: ExecutorType,
+    cost_sorting: bool = True,
+    keyword_merging: bool = True,
+) -> Optimizer:
+    """
+    Creates an optimizer based on the executor type.
+    """
+    if executor_type == ExecutorType.PREFILTERING:
+        return Optimizer(cost_sorting=True, keyword_merging=True)
+    # TODO: Handle other executor types properly
+    return Optimizer(cost_sorting=cost_sorting, keyword_merging=keyword_merging)
 
 
 class QuoteRemover(Visitor[Token], OptimizationRule):

@@ -1,10 +1,10 @@
 from functools import lru_cache
 
-from backend.config import CacheInfo, FainderMode, Metadata
+from backend.config import CacheInfo, ExecutorType, FainderMode, Metadata
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .executor import Executor, Highlights
-from .optimizer import Optimizer
+from .executor import Highlights, create_executor
+from .optimizer import create_optimizer
 from .parser import Parser
 
 
@@ -18,10 +18,12 @@ class Engine:
         cache_size: int = 128,
         min_usability_score: float = 0.0,
         rank_by_usability: bool = True,
+        executor_type: ExecutorType = ExecutorType.SIMPLE,
     ) -> None:
         self.parser = Parser()
-        self.optimizer = Optimizer()
-        self.executor = Executor(
+        self.optimizer = create_optimizer(executor_type)
+        self.executor = create_executor(
+            executor_type=executor_type,
             tantivy_index=tantivy_index,
             fainder_index=fainder_index,
             hnsw_index=hnsw_index,
@@ -29,6 +31,9 @@ class Engine:
             min_usability_score=min_usability_score,
             rank_by_usability=rank_by_usability,
         )
+        self.min_usability_score = min_usability_score
+        self.rank_by_usability = rank_by_usability
+        self.executor_type = executor_type
 
         # NOTE: Don't use lru_cache on methods
         # See https://docs.astral.sh/ruff/rules/cached-instance-method/ for details
@@ -41,7 +46,15 @@ class Engine:
         hnsw_index: HnswIndex,
         metadata: Metadata,
     ) -> None:
-        self.executor = Executor(tantivy_index, fainder_index, hnsw_index, metadata)
+        self.executor = create_executor(
+            executor_type=self.executor_type,
+            tantivy_index=tantivy_index,
+            fainder_index=fainder_index,
+            hnsw_index=hnsw_index,
+            metadata=metadata,
+            min_usability_score=self.min_usability_score,
+            rank_by_usability=self.rank_by_usability,
+        )
         self.clear_cache()
 
     def clear_cache(self) -> None:
@@ -56,10 +69,9 @@ class Engine:
         query: str,
         fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
         enable_highlighting: bool = False,
-        enable_filtering: bool = False,
     ) -> tuple[list[int], Highlights]:
         # Reset state for new query
-        self.executor.reset(fainder_mode, enable_highlighting, enable_filtering)
+        self.executor.reset(fainder_mode, enable_highlighting)
 
         # Parse query
         parse_tree = self.parser.parse(query)
@@ -68,7 +80,7 @@ class Engine:
         parse_tree = self.optimizer.optimize(parse_tree)
 
         # Execute query
-        result, highlights = self.executor.transform(parse_tree)
+        result, highlights = self.executor.execute(parse_tree)
 
         # Sort by score
         result_list = list(result)

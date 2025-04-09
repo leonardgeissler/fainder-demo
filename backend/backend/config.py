@@ -33,6 +33,14 @@ IntegerArray = Annotated[
 ]
 
 
+class ExecutorType(str, Enum):
+    """Enum representing different executor types for query execution."""
+
+    SIMPLE = "simple"
+    PREFILTERING = "prefiltering"
+    PARALLEL = "parallel"
+
+
 class CroissantStoreType(str, Enum):
     DICT = "dict"
     FILE = "file"
@@ -76,6 +84,7 @@ class Settings(BaseSettings):
     query_cache_size: int = 128
     min_usability_score: float = 0.0
     rank_by_usability: bool = True
+    executor_type: ExecutorType = ExecutorType.SIMPLE
 
     # Fainder settings
     fainder_n_clusters: int = 50

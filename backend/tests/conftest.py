@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from loguru import logger
 
-from backend.config import Metadata, Settings
+from backend.config import ExecutorType, Metadata, Settings
 from backend.engine import Engine, Parser
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
@@ -30,12 +30,12 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
     logger.add(
         sys.stdout,
         format="{time:HH:mm:ss} | {level: >5} | {file}:{line} | <level>{message}</level>",
-        level="DEBUG",
+        level="TRACE",
     )
     logger.add(
         "logs/test_{time:YYYY-MM-DD HH:mm:ss}.log",
         format="{time:HH:mm:ss} | {level: >5} | {file}:{line} | {message}",
-        level="DEBUG",
+        level="TRACE",
     )
 
     yield
@@ -45,7 +45,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
 
 
 @pytest.fixture(scope="module")
-def engine() -> Engine:
+def default_engine() -> Engine:
     settings = Settings(
         data_dir=Path(__file__).parent / "assets",
         collection_name="toy_collection",
@@ -70,6 +70,36 @@ def engine() -> Engine:
         hnsw_index=hnsw_index,
         metadata=metadata,
         cache_size=-1,
+    )
+
+
+@pytest.fixture(scope="module")
+def prefiltering_engine() -> Engine:
+    settings = Settings(
+        data_dir=Path(__file__).parent / "assets",
+        collection_name="toy_collection",
+        _env_file=None,  # type: ignore
+    )
+
+    with settings.metadata_path.open() as file:
+        metadata = Metadata(**json.load(file))
+
+    tantivy_index = TantivyIndex(index_path=settings.tantivy_path, recreate=False)
+    # Fainder indices for testing are generated with the following parameters:
+    # n_clusters = 23, bin_budget = 230, alpha = 1, transform = None,
+    fainder_index = FainderIndex(
+        rebinning_path=settings.rebinning_index_path,
+        conversion_path=settings.conversion_index_path,
+        histogram_path=settings.histogram_path,
+    )
+    hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
+    return Engine(
+        tantivy_index=tantivy_index,
+        fainder_index=fainder_index,
+        hnsw_index=hnsw_index,
+        metadata=metadata,
+        cache_size=-1,
+        executor_type=ExecutorType.PREFILTERING,
     )
 
 
