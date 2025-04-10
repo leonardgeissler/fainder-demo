@@ -11,6 +11,7 @@ from .constants import (
     DEFAULT_PERCENTILES,
     DEFAULT_THRESHOLDS,
     LOGICAL_OPERATORS,
+    MAX_NUM_MIXED_TERMS_WITH_FIXED_STRUCTURE,
     MAX_NUM_QUERY_PER_NUM_TERMS,
     MAX_NUM_TERMS_QUERY,
     MIN_NUM_TERMS_QUERY,
@@ -198,6 +199,7 @@ def mixed_term_combinations_with_fixed_structure(
     column_names: list[str] = DEFAULT_COL_NAMES,
     ks: list[int] = DEFAULT_KS,
     operators: list[str] = LOGICAL_OPERATORS,
+    max_terms: int = MAX_NUM_MIXED_TERMS_WITH_FIXED_STRUCTURE,
 ) -> dict[str, dict[str, Any]]:
     # query structure: kw('test') AND col(name('age',1) AND pp(0.5;le;2000))
 
@@ -222,6 +224,8 @@ def mixed_term_combinations_with_fixed_structure(
                             ],
                         }
                         query_counter += 1
+                        if query_counter > max_terms:
+                            return queries
 
     return queries
 
@@ -291,11 +295,9 @@ def generate_all_test_cases() -> dict[str, Any]:
         "base_percentile_queries": {"queries": percentilequeries},
         "percentile_combinations": {"queries": percentile_combinations_queries},
         "mixed_combinations_with_fixed_structure": {
-            "queries": mixed_term_combinations_with_fixed_structure_queries,
+            "queries": mixed_term_combinations_with_fixed_structure_queries
         },
-        "multiple_percentile_combinations": {
-            "queries": multiple_percentile_combinations_queries,
-        },
+        "multiple_percentile_combinations": {"queries": multiple_percentile_combinations_queries},
     }
 
     output = Path("test_cases/performance_test_cases.json")

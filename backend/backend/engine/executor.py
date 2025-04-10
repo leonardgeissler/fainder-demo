@@ -210,10 +210,11 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
         self.read_groups: dict[int, list[int]] = {}
         self.parent_write_group: dict[int, int] = {}  # node write group to parent write group
 
-    def apply(self, tree: ParseTree) -> None:
+    def apply(self, tree: ParseTree, parrallel: bool = False) -> None:
         # Initialize the root node with group 0
         self.write_groups[id(tree)] = 0
         self.read_groups[id(tree)] = [0]
+        self.parrallel = parrallel
         self.visit_topdown(tree)
 
     def _create_group_id(self) -> int:
@@ -292,6 +293,36 @@ class IntermediaryResultGroups(Visitor_Recursive[Token]):
                 self.write_groups[id(child)] = new_group
                 self.read_groups[id(child)] = read_groups
                 self.parent_write_group[new_group] = parent_group
+        else:
+            logger.warning(f"Node {tree} does not have write or read groups")
+
+    def col_op(self, tree: ParseTree) -> None:
+        # Set attributes for all children using the parent's values
+        logger.trace(f"Processing col node: {tree}")
+        if id(tree) in self.write_groups and id(tree) in self.read_groups:
+            if self.parrallel:
+                # For parallel processing, treat col_op as a disjunction
+                parent_write_group = self.write_groups[id(tree)]
+                parent_read_groups = self.read_groups[id(tree)].copy()
+                parent_read_groups.remove(parent_write_group)
+
+                for child in tree.children:
+                    current_write_group = self._create_group_id()
+                    self.write_groups[id(child)] = current_write_group
+                    self.read_groups[id(child)] = [current_write_group, *parent_read_groups]
+                    self.parent_write_group[current_write_group] = parent_write_group
+            else:
+                # For sequential processing, all children read and write to the same groups
+                write_group = self.write_groups[id(tree)]
+                read_groups = self.read_groups[id(tree)]
+
+                for child in tree.children:
+                    # Store in our dictionaries rather than on the objects directly
+                    self.write_groups[id(child)] = write_group
+                    self.read_groups[id(child)] = read_groups
+                    logger.trace(
+                        f"Child {child} has write group {write_group} and read group {read_groups}"
+                    )
         else:
             logger.warning(f"Node {tree} does not have write or read groups")
 
@@ -1008,6 +1039,8 @@ class IntermediateResultFuture:
             else:
                 hist_ids.intersection_update(new_hist_ids)
 
+        # not resolve the pp_result_futures
+
         if first:
             return None
         return hist_ids
@@ -1425,7 +1458,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         self.read_groups = {}
         logger.trace(tree.pretty())
         groups = IntermediaryResultGroups()
-        groups.apply(tree)
+        groups.apply(tree, True)
         # Create a new thread pool for this execution
         self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
         self.write_groups = groups.write_groups

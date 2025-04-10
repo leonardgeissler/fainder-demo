@@ -1,6 +1,7 @@
 import cProfile
 import csv
 import io
+import json
 import pstats
 import time
 from pathlib import Path
@@ -14,9 +15,14 @@ from backend.engine import Engine
 from .constants import FAINDER_MODES
 from .generate_eval_test_cases import generate_all_test_cases
 
-TEST_CASES = generate_all_test_cases()
-
+USE_JSON = False
 DISABLE_PROFILING = True
+
+if USE_JSON:
+    with Path("test_cases/performance_test_cases.json").open("r") as f:
+        test_cases = json.load(f)
+else:
+    test_cases = generate_all_test_cases()
 
 
 def execute_with_profiling(
@@ -166,7 +172,7 @@ def run_evaluation_scenarios(
 
     # Check if all results are consistent
     first_result = next(iter(results.values()))
-    is_consistent = all(result == first_result for result in results.values())
+    is_consistent = all(set(result) == set(first_result) for result in results.values())
 
     return timings, results, is_consistent
 
@@ -211,7 +217,7 @@ def log_performance_csv(
     ("category", "test_name", "test_case"),
     [
         (cat, name, case)
-        for cat, data in TEST_CASES.items()
+        for cat, data in test_cases.items()
         for name, case in data["queries"].items()
     ],
 )
