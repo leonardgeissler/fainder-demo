@@ -951,10 +951,6 @@ class IntermediateResultFuture:
     def __init__(
         self, write_group: int, doc_ids: set[int] | None = None, col_ids: set[uint32] | None = None
     ) -> None:
-        if doc_ids is None and col_ids is None:
-            raise ValueError("doc_ids and col_ids cannot both be None")
-        if doc_ids is not None and col_ids is not None:
-            raise ValueError("doc_ids and col_ids cannot both be set")
         # resolved results trump futures
         self.write_group = write_group
         self.kw_result_futures: list[Future[tuple[set[int], Highlights, int]]] = []
