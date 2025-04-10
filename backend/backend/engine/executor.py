@@ -712,6 +712,19 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         self._thread_results = {}
         self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
 
+    def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
+        """Start processing the parse tree."""
+        # Create a new thread pool for this execution
+        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
+        self._thread_results = {}
+
+        result = self.transform(tree)
+
+        # Make sure to shut down the thread pool
+        self._thread_pool.shutdown(wait=True)
+
+        return result
+
     def updates_scores(self, doc_ids: Sequence[int], scores: Sequence[float]) -> None:
         logger.trace(f"Updating scores for {len(doc_ids)} documents")
 
@@ -923,24 +936,25 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
 
         return item
 
-    def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
-        """Start processing the parse tree."""
-        # Create a new thread pool for this execution
-        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
-        self._thread_results = {}
 
-        result = self.transform(tree)
+class ExceededFilteringLimitError(Exception):
+    """Custom exception for exceeding filtering limits."""
 
-        # Make sure to shut down the thread pool
-        self._thread_pool.shutdown(wait=True)
-
-        return result
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
 
 
 class IntermediateResultFuture:
     """Stores futures and results for intermediate results during parallel execution."""
 
-    def __init__(self, write_group: int) -> None:
+    def __init__(
+        self, write_group: int, doc_ids: set[int] | None = None, col_ids: set[uint32] | None = None
+    ) -> None:
+        if doc_ids is None and col_ids is None:
+            raise ValueError("doc_ids and col_ids cannot both be None")
+        if doc_ids is not None and col_ids is not None:
+            raise ValueError("doc_ids and col_ids cannot both be set")
         # resolved results trump futures
         self.write_group = write_group
         self.kw_result_futures: list[Future[tuple[set[int], Highlights, int]]] = []
@@ -948,9 +962,8 @@ class IntermediateResultFuture:
         self.pp_result_futures: list[Future[tuple[set[uint32], int]]] = []
 
         # Store resolved results only one of these should be set
-        self.doc_ids: set[int] | None = None
-        self.col_ids: set[uint32] | None = None
-        self.hist_ids: set[uint32] | None = None
+        self._col_ids: set[uint32] | None = col_ids
+        self._doc_ids: set[int] | None = doc_ids
 
     def add_doc_future(self, future: Future[tuple[set[int], Highlights, int]]) -> None:
         """Add a future that will resolve to document IDs"""
@@ -964,22 +977,26 @@ class IntermediateResultFuture:
         """Add a future that will resolve to histogram IDs"""
         self.pp_result_futures.append(future)
 
+    def add_col_ids(self, col_ids: set[uint32]) -> None:
+        self._col_ids = col_ids
+        self._doc_ids = None
+
+    def add_doc_ids(self, doc_ids: set[int]) -> None:
+        self._doc_ids = doc_ids
+        self._col_ids = None
+
     def _build_hist_filter_resolved(
         self, metadata: Metadata, fainder_mode: FainderMode
     ) -> set[uint32] | None:
-        if self.doc_ids is not None:
-            if exceeds_filtering_limit(self.doc_ids, "num_doc_ids", fainder_mode):
-                raise ValueError("Exceeded filtering limit for document IDs")
-            col_ids = doc_to_col_ids(self.doc_ids, metadata.doc_to_cols)
+        if self._doc_ids is not None:
+            if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", fainder_mode):
+                raise ExceededFilteringLimitError("Exceeded filtering limit for document IDs")
+            col_ids = doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
-        if self.col_ids is not None:
-            if exceeds_filtering_limit(self.col_ids, "num_col_ids", fainder_mode):
-                raise ValueError("Exceeded filtering limit for column IDs")
-            return col_to_hist_ids(self.col_ids, metadata.col_to_hist)
-        if self.hist_ids is not None:
-            if exceeds_filtering_limit(self.hist_ids, "num_hist_ids", fainder_mode):
-                raise ValueError("Exceeded filtering limit for histogram IDs")
-            return self.hist_ids
+        if self._col_ids is not None:
+            if exceeds_filtering_limit(self._col_ids, "num_col_ids", fainder_mode):
+                raise ExceededFilteringLimitError("Exceeded filtering limit for column IDs")
+            return col_to_hist_ids(self._col_ids, metadata.col_to_hist)
         return None
 
     def _build_hist_filter_future(
@@ -990,7 +1007,7 @@ class IntermediateResultFuture:
         for kw_future in self.kw_result_futures:
             doc_ids, _, _ = kw_future.result()
             if exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
-                raise ValueError("Exceeded filtering limit for document IDs")
+                raise ExceededFilteringLimitError("Exceeded filtering limit for document IDs")
             col_ids = doc_to_col_ids(doc_ids, metadata.doc_to_cols)
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
             if first:
@@ -1002,7 +1019,7 @@ class IntermediateResultFuture:
         for col_future in self.column_result_futures:
             col_ids, _ = col_future.result()
             if exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
-                raise ValueError("Exceeded filtering limit for column IDs")
+                raise ExceededFilteringLimitError("Exceeded filtering limit for column IDs")
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
             if first:
                 hist_ids = new_hist_ids
@@ -1027,26 +1044,23 @@ class IntermediateResultFuture:
         return self._build_hist_filter_future(metadata, fainder_mode)
 
     def __str__(self) -> str:
-        """String representation of the intermediate result."""
-        return f"""IntermediateResultFuture(
-        write_group={self.write_group},
-        doc_ids={self.doc_ids},
-        col_ids={self.col_ids},
-        hist_ids={self.hist_ids}
-        kw_result_futures={self.kw_result_futures},
-        column_result_futures={self.column_result_futures},
-        pp_result_futures={self.pp_result_futures}
-        )"""
+        """String representation of the intermediate result future."""
+        return (
+            f"IntermediateResultFuture(\n\twrite_group={self.write_group},"
+            f"\n\tdoc_ids={self._doc_ids},\n\tcol_ids={self._col_ids},\n\t,"
+            f"\n\tkw_futures={len(self.kw_result_futures)},\n\t"
+            f"col_futures={len(self.column_result_futures)},\n\tpp_futures={len(self.pp_result_futures)}\n)"
+        )
 
 
-class IntermidateResultsFuture:
+class IntermediateResultStoreFuture:
     """Stores futures and results for intermediate results during parallel execution."""
 
     def __init__(self, fainder_mode: FainderMode) -> None:
         self.results: dict[int, IntermediateResultFuture] = {}
         self.fainder_mode = fainder_mode
 
-    def add_kw_result(
+    def add_future_kw_result(
         self, write_group: int, future: Future[tuple[set[int], Highlights, int]]
     ) -> None:
         """Add a future that will resolve to document IDs"""
@@ -1054,13 +1068,17 @@ class IntermidateResultsFuture:
             self.results[write_group] = IntermediateResultFuture(write_group)
         self.results[write_group].add_doc_future(future)
 
-    def add_col_result(self, write_group: int, future: Future[tuple[set[uint32], int]]) -> None:
+    def add_future_col_result(
+        self, write_group: int, future: Future[tuple[set[uint32], int]]
+    ) -> None:
         """Add a future that will resolve to column IDs"""
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(write_group)
         self.results[write_group].add_col_future(future)
 
-    def add_hist_result(self, write_group: int, future: Future[tuple[set[uint32], int]]) -> None:
+    def add_future_hist_result(
+        self, write_group: int, future: Future[tuple[set[uint32], int]]
+    ) -> None:
         """Add a future that will resolve to histogram IDs"""
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(write_group)
@@ -1069,32 +1087,24 @@ class IntermidateResultsFuture:
     def add_col_ids(self, write_group: int, col_ids: set[uint32]) -> None:
         """Add column IDs to the intermediate result."""
         if write_group not in self.results:
-            self.results[write_group] = IntermediateResultFuture(write_group)
-        self.results[write_group].col_ids = col_ids
+            self.results[write_group] = IntermediateResultFuture(write_group, col_ids=col_ids)
+        self.results[write_group].add_col_ids(col_ids)
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
 
     def add_doc_ids(self, write_group: int, doc_ids: set[int]) -> None:
         """Add document IDs to the intermediate result."""
         if write_group not in self.results:
-            self.results[write_group] = IntermediateResultFuture(write_group)
-        self.results[write_group].doc_ids = doc_ids
+            self.results[write_group] = IntermediateResultFuture(write_group, doc_ids=doc_ids)
+        self.results[write_group].add_doc_ids(doc_ids)
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
-
-    def add_hist_ids(self, write_group: int, hist_ids: set[uint32]) -> None:
-        """Add histogram IDs to the intermediate result."""
-        if write_group not in self.results:
-            self.results[write_group] = IntermediateResultFuture(write_group)
-        self.results[write_group].hist_ids = hist_ids
-        logger.trace(f"Adding histogram IDs to write group {write_group}: {hist_ids}")
 
     def get_hist_filter(
         self, read_groups: list[int], metadata: Metadata, fainder_mode: FainderMode
     ) -> set[uint32] | None:
         """Build a histogram filter from the intermediate results."""
-        hist_ids: set[uint32] = set()
-        first = True
+        hist_filter: set[uint32] | None = None
         if len(read_groups) == 0:
-            return hist_ids
+            return hist_filter
 
         logger.trace(f"read groups {read_groups}")
         for read_group in read_groups:
@@ -1108,16 +1118,16 @@ class IntermidateResultsFuture:
                 intermediate = self.results[read_group].build_hist_filter(metadata, fainder_mode)
                 if intermediate is not None:
                     logger.trace(f"intermediate {intermediate}")
-                    if first:
-                        hist_ids = intermediate
-                        first = False
+                    if hist_filter is None:
+                        hist_filter = intermediate
                     else:
-                        hist_ids.intersection_update(intermediate)
-            except ValueError:
+                        hist_filter &= intermediate
+
+            except ExceededFilteringLimitError:
                 return None
 
-        logger.trace(f"Hist IDs: {hist_ids}")
-        return hist_ids if not first else None
+        logger.trace(f"Hist filter: {hist_filter}")
+        return hist_filter
 
 
 class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor):
@@ -1128,7 +1138,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
 
     fainder_mode: FainderMode
     scores: dict[int, float]
-    intermediate_results: IntermidateResultsFuture
+    intermediate_results: IntermediateResultStoreFuture
     write_groups: dict[int, int]  # Maps node ID to write group
     read_groups: dict[int, list[int]]  # Maps node ID to read groups
     parent_write_group: dict[int, int]  # Maps write group to parent write group
@@ -1150,7 +1160,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         self.hnsw_index = hnsw_index
         self.metadata = metadata
         self.write_groups = {}
-        self.intermediate_results = IntermidateResultsFuture(fainder_mode=fainder_mode)
+        self.intermediate_results = IntermediateResultStoreFuture(fainder_mode=fainder_mode)
         self.read_groups = {}
         self.parent_write_group = {}
         self.min_usability_score = min_usability_score
@@ -1167,11 +1177,37 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         self.scores = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
-        self.intermediate_results = IntermidateResultsFuture(fainder_mode=fainder_mode)
+        self.intermediate_results = IntermediateResultStoreFuture(fainder_mode=fainder_mode)
         self.parent_write_group = {}
         self.write_groups = {}
         self.read_groups = {}
         self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
+
+    def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
+        """Start processing the parse tree."""
+        self.write_groups = {}
+        self.read_groups = {}
+        logger.trace(tree.pretty())
+        groups = ResultGroupAnnotator()
+        groups.apply(tree, parrallel=True)
+        # Create a new thread pool for this execution
+        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
+        self.write_groups = groups.write_groups
+        self.read_groups = groups.read_groups
+        self.parent_write_group = groups.parent_write_group
+        logger.trace(f"Write groups: {self.write_groups}")
+        logger.trace(f"Read groups: {self.read_groups}")
+        logger.trace(f"Parent write groups: {self.parent_write_group}")
+        # create intermediate results for all write groups
+        for write_group in self.write_groups.values():
+            self.intermediate_results.results[write_group] = IntermediateResultFuture(write_group)
+
+        result = self.transform(tree)
+
+        # Make sure to shut down the thread pool
+        self._thread_pool.shutdown(wait=True)
+
+        return result
 
     def updates_scores(self, doc_ids: Sequence[int], scores: Sequence[float]) -> None:
         logger.trace(f"Updating scores for {len(doc_ids)} documents")
@@ -1290,7 +1326,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         future = self._thread_pool.submit(self._keyword_task, items[0])
 
         write_group = self._get_write_group(items[0])
-        self.intermediate_results.add_kw_result(write_group, future)
+        self.intermediate_results.add_future_kw_result(write_group, future)
         return future
 
     def name_op(self, items: list[Token]) -> Future[tuple[set[uint32], int]]:
@@ -1302,7 +1338,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         # Submit task to thread pool and store the future with a unique ID
         future = self._thread_pool.submit(self._name_task, column, k)
         write_group = self._get_write_group(items[0])
-        self.intermediate_results.add_col_result(write_group, future)
+        self.intermediate_results.add_future_col_result(write_group, future)
         return future
 
     def percentile_op(self, items: list[Token]) -> Future[tuple[set[uint32], int]]:
@@ -1310,7 +1346,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         # Submit task to thread pool and store the future with a unique ID
         future = self._thread_pool.submit(self._percentile_task, items)
         write_group = self._get_write_group(items[0])
-        self.intermediate_results.add_hist_result(write_group, future)
+        self.intermediate_results.add_future_hist_result(write_group, future)
         return future
 
     def col_op(
@@ -1422,32 +1458,6 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         if len(items) != 1:
             raise ValueError("Query must have exactly one item")
         return clean_item[0], clean_item[1]
-
-    def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
-        """Start processing the parse tree."""
-        self.write_groups = {}
-        self.read_groups = {}
-        logger.trace(tree.pretty())
-        groups = ResultGroupAnnotator()
-        groups.apply(tree, parrallel=True)
-        # Create a new thread pool for this execution
-        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
-        self.write_groups = groups.write_groups
-        self.read_groups = groups.read_groups
-        self.parent_write_group = groups.parent_write_group
-        logger.trace(f"Write groups: {self.write_groups}")
-        logger.trace(f"Read groups: {self.read_groups}")
-        logger.trace(f"Parent write groups: {self.parent_write_group}")
-        # create intermediate results for all write groups
-        for write_group in self.write_groups.values():
-            self.intermediate_results.results[write_group] = IntermediateResultFuture(write_group)
-
-        result = self.transform(tree)
-
-        # Make sure to shut down the thread pool
-        self._thread_pool.shutdown(wait=True)
-
-        return result
 
 
 def create_executor(
