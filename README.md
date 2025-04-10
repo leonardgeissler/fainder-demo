@@ -23,7 +23,7 @@ The repository is structured as follows:
 ```bash
 fainder/
 ├── backend  # main component for query parsing, optimization, and execution
-├── data  # placeholder for dataset profiles and index files
+├── docs  # documentation about system design and implementation
 ├── scripts  # scripts for installing and starting components
 └── ui  # user interface
 ```
