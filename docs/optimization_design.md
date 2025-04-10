@@ -74,8 +74,8 @@ This executor combines the benefits of both threading and prefiltering approache
 - Integrates threading capabilities with prefilter optimization
 - Requires cost-based sorting and keyword merging before execution
 - Hybrid approach:
-  - Combines and resolves filter construction for percentile predicates
-  - Uses threading for all other nodes
+  - Uses threading for all leaf nodes
+  - Combines and resolves for filter construction for percentile predicates all relevant nodes except other percentile predicates
 
 #### Performance Characteristics
 - Combines advantages of both threaded and prefilter executors
