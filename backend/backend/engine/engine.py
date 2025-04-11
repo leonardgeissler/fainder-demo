@@ -1,10 +1,10 @@
 import os
 from functools import lru_cache
 
-from backend.config import CacheInfo, ExecutorType, FainderMode, Metadata
+from backend.config import CacheInfo, ExecutorType, FainderMode, Highlights, Metadata
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .executor import Highlights, create_executor
+from .executor.executor import create_executor
 from .optimizer import create_optimizer
 from .parser import Parser
 
