@@ -80,6 +80,7 @@ class SimpleExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor):
         min_usability_score: float = 0.0,
         rank_by_usability: bool = True,
     ) -> None:
+        super().__init__(visit_tokens=False)
         self.tantivy_index = tantivy_index
         self.fainder_index = fainder_index
         self.hnsw_index = hnsw_index
@@ -209,8 +210,16 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         self.parent_write_group: dict[int, int] = {}  # node write group to parent write group
         self.current_write_group = 0
 
-    def apply(self, tree: ParseTree, parrallel: bool = False) -> None:
-        self.parrallel = parrallel
+    def apply(self, tree: ParseTree, parallel: bool = False) -> None:
+        """
+        Apply the visitor to the parse tree.
+        For parallel processing, col_op is treated as a disjunction to
+        allow for parallel exceution of percentile predicates.
+        Args:
+            tree: The parse tree to visit.
+            parallel: True if the query will be excuted in parallel.
+        """
+        self.parallel = parallel
         self.visit_topdown(tree)
 
     def _create_group_id(self) -> int:
@@ -297,7 +306,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         # Set attributes for all children using the parent's values
         logger.trace(f"Processing col node: {tree}")
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
-            if self.parrallel:
+            if self.parallel:
                 # For parallel processing, treat col_op as a disjunction
                 parent_write_group = self.write_groups[id(tree)]
                 parent_read_groups = self.read_groups[id(tree)].copy()
@@ -674,11 +683,6 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
     """This transformer evaluates a parse tree bottom-up
     and computes the query result in parallel using Threading."""
 
-    fainder_mode: FainderMode
-    scores: dict[int, float]
-    _thread_pool: ThreadPoolExecutor
-    _thread_results: dict[int, Any]
-
     def __init__(
         self,
         tantivy_index: TantivyIndex,
@@ -709,14 +713,12 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         self.scores = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
-        self._thread_results = {}
-        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
 
     def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
         """Start processing the parse tree."""
         # Create a new thread pool for this execution
         self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
-        self._thread_results = {}
+        self._thread_results: dict[int, Any] = {}
 
         result = self.transform(tree)
 
@@ -812,23 +814,17 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         | set[uint32],
     ) -> tuple[set[int], Highlights] | set[uint32]:
         """Resolve item if it's a Future, otherwise return the item itself"""
-        if isinstance(item, Future):
-            return item.result()
-        return item
+        return item.result() if isinstance(item, Future) else item
 
     def _resolve_col_result(self, item: Future[set[uint32]] | set[uint32]) -> set[uint32]:
-        """Resolve item if it's a Future, otherwise return the item itself"""
-        if isinstance(item, Future):
-            return item.result()
-        return item
+        """Resolve column result from a Future if needed"""
+        return item.result() if isinstance(item, Future) else item
 
     def _resolve_doc_result(
         self, item: Future[tuple[set[int], Highlights]] | tuple[set[int], Highlights]
     ) -> tuple[set[int], Highlights]:
-        """Resolve item if it's a Future, otherwise return the item itself"""
-        if isinstance(item, Future):
-            return item.result()
-        return item
+        """Resolve document result from a Future if needed"""
+        return item.result() if isinstance(item, Future) else item
 
     def _resolve_items(
         self,
@@ -838,17 +834,19 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         """Resolve all items in the list if they are futures"""
         doc_results: list[tuple[set[int], Highlights]] = []
         col_results: list[set[uint32]] = []
+
         for item in items:
-            clean_item = self._resolve_item(item)
-            if isinstance(clean_item, tuple):
-                doc_results.append(self._resolve_doc_result(clean_item))
+            resolved = self._resolve_item(item)
+            if isinstance(resolved, tuple):
+                doc_results.append(resolved)
             else:
-                col_results.append(self._resolve_col_result(clean_item))
-        if len(doc_results) > 0:
-            assert len(col_results) == 0
+                col_results.append(resolved)
+
+        # We should only have one type of result
+        if doc_results and col_results:
+            raise ValueError("Cannot mix document and column results")
+        if doc_results:
             return doc_results
-        assert len(col_results) > 0
-        assert len(doc_results) == 0
         return col_results
 
     def col_op(
@@ -1132,13 +1130,6 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
     It also uses prefiltering to reduce the number of documents
     before executing the query for percentile predicates."""
 
-    fainder_mode: FainderMode
-    scores: dict[int, float]
-    intermediate_results: IntermediateResultStoreFuture
-    write_groups: dict[int, int]  # Maps node ID to write group
-    read_groups: dict[int, list[int]]  # Maps node ID to read groups
-    parent_write_group: dict[int, int]  # Maps write group to parent write group
-
     def __init__(
         self,
         tantivy_index: TantivyIndex,
@@ -1155,10 +1146,10 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         self.fainder_index = fainder_index
         self.hnsw_index = hnsw_index
         self.metadata = metadata
-        self.write_groups = {}
         self.intermediate_results = IntermediateResultStoreFuture(fainder_mode=fainder_mode)
-        self.read_groups = {}
-        self.parent_write_group = {}
+        self.write_groups: dict[int, int] = {}
+        self.read_groups: dict[int, list[int]] = {}
+        self.parent_write_group: dict[int, int] = {}
         self.min_usability_score = min_usability_score
         self.rank_by_usability = rank_by_usability
         self.max_workers = max_workers
@@ -1174,10 +1165,6 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
         self.intermediate_results = IntermediateResultStoreFuture(fainder_mode=fainder_mode)
-        self.parent_write_group = {}
-        self.write_groups = {}
-        self.read_groups = {}
-        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
 
     def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
         """Start processing the parse tree."""
@@ -1185,7 +1172,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         self.read_groups = {}
         logger.trace(tree.pretty())
         groups = ResultGroupAnnotator()
-        groups.apply(tree, parrallel=True)
+        groups.apply(tree, parallel=True)
         # Create a new thread pool for this execution
         self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
         self.write_groups = groups.write_groups

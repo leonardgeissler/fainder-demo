@@ -56,6 +56,8 @@ def default_engine() -> Engine:
         metadata = Metadata(**json.load(file))
 
     tantivy_index = TantivyIndex(index_path=settings.tantivy_path, recreate=False)
+    # Fainder indices for testing are generated with the following parameters:
+    # n_clusters = 23, bin_budget = 230, alpha = 1, transform = None,
     fainder_index = FainderIndex(
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
@@ -87,6 +89,8 @@ def prefiltering_engine() -> Engine:
         metadata = Metadata(**json.load(file))
 
     tantivy_index = TantivyIndex(index_path=settings.tantivy_path, recreate=False)
+    # Fainder indices for testing are generated with the following parameters:
+    # n_clusters = 23, bin_budget = 230, alpha = 1, transform = None,
     fainder_index = FainderIndex(
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
@@ -118,6 +122,8 @@ def parallel_engine() -> Engine:
         metadata = Metadata(**json.load(file))
 
     tantivy_index = TantivyIndex(index_path=settings.tantivy_path, recreate=False)
+    # Fainder indices for testing are generated with the following parameters:
+    # n_clusters = 23, bin_budget = 230, alpha = 1, transform = None,
     fainder_index = FainderIndex(
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
@@ -149,6 +155,8 @@ def parallel_prefiltering_engine() -> Engine:
         metadata = Metadata(**json.load(file))
 
     tantivy_index = TantivyIndex(index_path=settings.tantivy_path, recreate=False)
+    # Fainder indices for testing are generated with the following parameters:
+    # n_clusters = 23, bin_budget = 230, alpha = 1, transform = None,
     fainder_index = FainderIndex(
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
