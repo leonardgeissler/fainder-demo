@@ -82,9 +82,6 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         for doc_id, score in zip(doc_ids, scores, strict=True):
             self.scores[doc_id] += score
 
-        for i, doc_id in enumerate(doc_ids):
-            self.scores[doc_id] += scores[i]
-
     ### Threaded task methods ###
 
     def _keyword_task(self, token: Token) -> tuple[set[int], Highlights]:
