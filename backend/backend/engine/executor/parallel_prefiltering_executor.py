@@ -442,7 +442,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
             write_group = items[0][1]
 
         doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
-        self.intermediate_results.add_col_ids(write_group, col_ids)
+        self.intermediate_results.add_doc_ids(write_group, doc_ids)
         parent_write_group = self._get_parent_write_group(write_group)
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids), parent_write_group

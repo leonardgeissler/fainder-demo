@@ -844,6 +844,74 @@ EXECUTOR_CASES: dict[str, dict[str, ExecutorCase]] = {
                 ],
             ),
         },
+        "multiple_pp_in_parallel": {
+            "query": (
+                "col(pp(0.5;ge;100) AND pp(0.9;ge;100)) AND col(pp(0.5;ge;100) AND pp(0.5;le;100))"
+            ),
+            "expected": [0, 1, 2],
+            "parse_tree": Tree(
+                Token("RULE", "query"),
+                [
+                    Tree(
+                        "conjunction",
+                        [
+                            Tree(
+                                Token("RULE", "col_op"),
+                                [
+                                    Tree(
+                                        "conjunction",
+                                        [
+                                            Tree(
+                                                Token("RULE", "percentile_op"),
+                                                [
+                                                    Token("FLOAT", "0.5"),
+                                                    Token("COMPARISON", "ge"),
+                                                    Token("SIGNED_NUMBER", "100"),
+                                                ],
+                                            ),
+                                            Tree(
+                                                Token("RULE", "percentile_op"),
+                                                [
+                                                    Token("FLOAT", "0.9"),
+                                                    Token("COMPARISON", "ge"),
+                                                    Token("SIGNED_NUMBER", "100"),
+                                                ],
+                                            ),
+                                        ],
+                                    )
+                                ],
+                            ),
+                            Tree(
+                                Token("RULE", "col_op"),
+                                [
+                                    Tree(
+                                        "conjunction",
+                                        [
+                                            Tree(
+                                                Token("RULE", "percentile_op"),
+                                                [
+                                                    Token("FLOAT", "0.5"),
+                                                    Token("COMPARISON", "ge"),
+                                                    Token("SIGNED_NUMBER", "100"),
+                                                ],
+                                            ),
+                                            Tree(
+                                                Token("RULE", "percentile_op"),
+                                                [
+                                                    Token("FLOAT", "0.5"),
+                                                    Token("COMPARISON", "le"),
+                                                    Token("SIGNED_NUMBER", "100"),
+                                                ],
+                                            ),
+                                        ],
+                                    )
+                                ],
+                            ),
+                        ],
+                    )
+                ],
+            ),
+        },
     },
 }
 
