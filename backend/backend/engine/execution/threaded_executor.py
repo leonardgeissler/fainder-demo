@@ -78,48 +78,34 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
 
         return result
 
-    ### Threaded task methods ###
-
-    def _keyword_task(self, token: Token) -> tuple[set[int], Highlights]:
-        """Task function for keyword search to be run in a thread"""
-        logger.trace(f"Thread executing keyword search for: {token}")
-        result_docs, scores, highlights = self.tantivy_index.search(
-            token, self.enable_highlighting, self.min_usability_score, self.rank_by_usability
-        )
-        self.updates_scores(result_docs, scores)
-        return set(result_docs), (highlights, set())
-
-    def _name_task(self, column: Token, k: int) -> set[uint32]:
-        """Task function for column name search to be run in a thread"""
-        logger.trace(f"Thread executing column name search for: {column}")
-        return self.hnsw_index.search(column, k, None)
-
-    def _percentile_task(
-        self, percentile: float, comparison: str, reference: float
-    ) -> set[uint32]:
-        """Task function for percentile search to be run in a thread"""
-        logger.trace(
-            f"Thread executing percentile search with {percentile} {comparison} {reference}"
-        )
-        result_hists = self.fainder_index.search(
-            percentile, comparison, reference, self.fainder_mode
-        )
-        return hist_to_col_ids(result_hists, self.metadata.hist_to_col)
-
     ### Operator implementations ###
 
     def keyword_op(self, items: list[Token]) -> Future[tuple[set[int], Highlights]]:
+        def _keyword_task(token: Token) -> tuple[set[int], Highlights]:
+            """Task function for keyword search to be run in a thread"""
+            logger.trace(f"Thread executing keyword search for: {token}")
+            result_docs, scores, highlights = self.tantivy_index.search(
+                token, self.enable_highlighting, self.min_usability_score, self.rank_by_usability
+            )
+            self.updates_scores(result_docs, scores)
+            return set(result_docs), (highlights, set())
+
         logger.trace(f"Starting threaded keyword search for: {items}")
 
         # Submit task to thread pool and store the future with a unique ID
         task_id = id(items[0])
-        future = self._thread_pool.submit(self._keyword_task, items[0])
+        future = self._thread_pool.submit(_keyword_task, items[0])
         self._thread_results[task_id] = future
 
         # Get result from future (immediate, non-blocking as result might not be ready yet)
         return future
 
     def name_op(self, items: list[Token]) -> Future[set[uint32]]:
+        def _name_task(column: Token, k: int) -> set[uint32]:
+            """Task function for column name search to be run in a thread"""
+            logger.trace(f"Thread executing column name search for: {column}")
+            return self.hnsw_index.search(column, k, None)
+
         logger.trace(f"Starting threaded column name search for: {items}")
 
         column = items[0]
@@ -127,13 +113,23 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
 
         # Submit task to thread pool and store the future with a unique ID
         task_id = id(items[0])
-        future = self._thread_pool.submit(self._name_task, column, k)
+        future = self._thread_pool.submit(_name_task, column, k)
         self._thread_results[task_id] = future
 
         # Return future (non-blocking)
         return future
 
     def percentile_op(self, items: list[Token]) -> Future[set[uint32]]:
+        def _percentile_task(percentile: float, comparison: str, reference: float) -> set[uint32]:
+            """Task function for percentile search to be run in a thread"""
+            logger.trace(
+                f"Thread executing percentile search with {percentile} {comparison} {reference}"
+            )
+            result_hists = self.fainder_index.search(
+                percentile, comparison, reference, self.fainder_mode
+            )
+            return hist_to_col_ids(result_hists, self.metadata.hist_to_col)
+
         logger.trace(f"Starting threaded percentile search for: {items}")
 
         percentile = float(items[0])
@@ -142,7 +138,7 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
 
         # Submit task to thread pool and store the future with a unique ID
         task_id = id(items[0])
-        future = self._thread_pool.submit(self._percentile_task, percentile, comparison, reference)
+        future = self._thread_pool.submit(_percentile_task, percentile, comparison, reference)
         self._thread_results[task_id] = future
 
         # Return future (non-blocking)

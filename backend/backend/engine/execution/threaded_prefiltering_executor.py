@@ -336,76 +336,75 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
             return doc_results, write_group
         return col_results, write_group
 
-    ### Threaded task methods ###
-
-    def _keyword_task(self, token: Token) -> tuple[set[int], Highlights, int]:
-        """Task function for keyword search to be run in a thread"""
-        logger.trace(f"Thread executing keyword search for: {token}")
-        write_group = self._get_write_group(token)
-        result_docs, scores, highlights = self.tantivy_index.search(
-            token, self.enable_highlighting, self.min_usability_score, self.rank_by_usability
-        )
-        self.updates_scores(result_docs, scores)
-        parent_write_group = self._get_parent_write_group(write_group)
-        return set(result_docs), (highlights, set()), parent_write_group
-
-    def _name_task(self, column: Token, k: int) -> tuple[set[uint32], int]:
-        """Task function for column name search to be run in a thread"""
-        logger.trace(f"Thread executing column name search for: {column}")
-        write_group = self._get_write_group(column)
-        parent_write_group = self._get_parent_write_group(write_group)
-        return self.hnsw_index.search(column, k, None), parent_write_group
-
-    def _percentile_task(self, items: list[Token]) -> tuple[set[uint32], int]:
-        """Task function for percentile search to be run in a thread"""
-        percentile = float(items[0])
-        comparison: str = items[1]
-        reference = float(items[2])
-        logger.trace(
-            f"Thread executing percentile search with {percentile} {comparison} {reference}"
-        )
-        hist_filter = self.intermediate_results.get_hist_filter(
-            self._get_read_groups(items[0]), self.metadata, self.fainder_mode
-        )
-        logger.trace(f"Hist filter: {hist_filter}")
-        write_group = self._get_write_group(items[0])
-        if hist_filter is not None and len(hist_filter) == 0:
-            return set(), write_group
-        result_hists = self.fainder_index.search(
-            percentile, comparison, reference, self.fainder_mode, hist_filter
-        )
-        result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
-        parent_write_group = self._get_parent_write_group(write_group)
-        return result, parent_write_group
-
     ### Operator implementations ###
 
     def keyword_op(self, items: list[Token]) -> Future[tuple[set[int], Highlights, int]]:
+        def _keyword_task(token: Token) -> tuple[set[int], Highlights, int]:
+            """Task function for keyword search to be run in a thread"""
+            logger.trace(f"Thread executing keyword search for: {token}")
+            write_group = self._get_write_group(token)
+            result_docs, scores, highlights = self.tantivy_index.search(
+                token, self.enable_highlighting, self.min_usability_score, self.rank_by_usability
+            )
+            self.updates_scores(result_docs, scores)
+            parent_write_group = self._get_parent_write_group(write_group)
+            return set(result_docs), (highlights, set()), parent_write_group
+
         logger.trace(f"Evaluating keyword term: {items}")
 
         # Submit task to thread pool and store the future with a unique ID
-        future = self._thread_pool.submit(self._keyword_task, items[0])
+        future = self._thread_pool.submit(_keyword_task, items[0])
 
         write_group = self._get_write_group(items[0])
         self.intermediate_results.add_future_kw_result(write_group, future)
         return future
 
     def name_op(self, items: list[Token]) -> Future[tuple[set[uint32], int]]:
+        def _name_task(column: Token, k: int) -> tuple[set[uint32], int]:
+            """Task function for column name search to be run in a thread"""
+            logger.trace(f"Thread executing column name search for: {column}")
+            write_group = self._get_write_group(column)
+            parent_write_group = self._get_parent_write_group(write_group)
+            return self.hnsw_index.search(column, k, None), parent_write_group
+
         logger.trace(f"Evaluating column term: {items}")
 
         column = items[0]
         k = int(items[1])
 
         # Submit task to thread pool and store the future with a unique ID
-        future = self._thread_pool.submit(self._name_task, column, k)
+        future = self._thread_pool.submit(_name_task, column, k)
         write_group = self._get_write_group(items[0])
         self.intermediate_results.add_future_col_result(write_group, future)
         return future
 
     def percentile_op(self, items: list[Token]) -> Future[tuple[set[uint32], int]]:
+        def _percentile_task(items: list[Token]) -> tuple[set[uint32], int]:
+            """Task function for percentile search to be run in a thread"""
+            percentile = float(items[0])
+            comparison: str = items[1]
+            reference = float(items[2])
+            logger.trace(
+                f"Thread executing percentile search with {percentile} {comparison} {reference}"
+            )
+            hist_filter = self.intermediate_results.get_hist_filter(
+                self._get_read_groups(items[0]), self.metadata, self.fainder_mode
+            )
+            logger.trace(f"Hist filter: {hist_filter}")
+            write_group = self._get_write_group(items[0])
+            if hist_filter is not None and len(hist_filter) == 0:
+                return set(), write_group
+            result_hists = self.fainder_index.search(
+                percentile, comparison, reference, self.fainder_mode, hist_filter
+            )
+            result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
+            parent_write_group = self._get_parent_write_group(write_group)
+            return result, parent_write_group
+
         logger.trace(f"Evaluating percentile term: {items}")
+
         # Submit task to thread pool and store the future with a unique ID
-        future = self._thread_pool.submit(self._percentile_task, items)
+        future = self._thread_pool.submit(_percentile_task, items)
         write_group = self._get_write_group(items[0])
         self.intermediate_results.add_future_hist_result(write_group, future)
         return future
