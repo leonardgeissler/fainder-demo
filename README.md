@@ -1,12 +1,4 @@
-<!-- markdownlint-disable MD028 -->
-<!-- markdownlint-disable MD033 -->
-<div align="center">
-  <picture>
-    <img alt="Fainder logo" src="https://github.com/user-attachments/assets/b9cbde14-ca5a-4eae-b7b9-a4821735ea83" height="200">
-  </picture>
-</div>
-
-#
+# ![Fainder Demo](docs/logo.png)
 
 ![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Flbhm%2Ffainder-demo%2Fmain%2Fpyproject.toml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -21,9 +13,9 @@ index for distribution-aware dataset search. The demo consists of two components
 The repository is structured as follows:
 
 ```bash
-fainder/
+fainder-demo/
 ├── backend  # main component for query parsing, optimization, and execution
-├── data  # placeholder for dataset profiles and index files
+├── docs  # documentation about system design and implementation
 ├── scripts  # scripts for installing and starting components
 └── ui  # user interface
 ```
@@ -81,11 +73,14 @@ LOG_LEVEL=INFO                      # Logging level (TRACE, DEBUG, INFO, WARNING
 ### Data Preparation
 
 You only need to bring a collection of Croissant files enriched with statistical information to
-use our demo. All index data structures are generated automatically by the backend. For that, you
+use our prototype yourself. See our documentation on the [Croissant schema extensions](docs/schema_specification.md)
+that we define as part of the demo. To reproduce the dataset collection used in our paper, see the
+[dataset-scrapers](https://github.com/lbhm/dataset-scrapers) repository.
+
+All index data structures are generated automatically by the backend. For that, you
 must place your Croissant files into a folder and set the `DATA_DIR` and `COLLECTION_NAME`
 accordingly (see above, we recommend `./data/<collection_name/croissant` if you want to use the
 Docker setup).
-
 The backend automatically generates the necessary index files for Fainder, HNSW, and Tantivy if
 the respective folders do not exist. In order to recreate the indices, delete the folders and
 restart the application or call the `/update_indices` endpoint.
@@ -100,7 +95,7 @@ Build and start the demo:
 docker compose up --build
 ```
 
-To stop the containers, hit `Ctrl+C` or run:
+To stop the containers, press `Ctrl+C` or run:
 
 ```bash
 docker compose down
@@ -128,8 +123,7 @@ scripts/install.sh
 > The `pre-commit` configuration expects that you installed the Python dependencies in a virtual
 > environment at `backend/.venv`. If you use a different location, you have to adjust the
 > configuration accordingly.
-
-> [!NOTE]
+>
 > `eslint` and `vue-tsc` are currently not integrated into the `pre-commit` hooks.
 > Therefore, you should run `npm run lint` and `npm run typecheck` before committing UI changes.
 
