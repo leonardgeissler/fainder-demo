@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 from collections.abc import Sequence
 from enum import Enum
@@ -59,10 +58,9 @@ class Metadata(BaseModel):
     doc_to_cols: dict[int, set[int]]
     doc_to_path: list[str]
     col_to_doc: IntegerArray
-    col_to_hist: dict[int, int]  # Must be a dict, not every column has a histogram
-    hist_to_col: IntegerArray
     name_to_vector: dict[str, int]
     vector_to_cols: dict[int, set[int]]
+    cutoff_hists: int
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -87,7 +85,6 @@ class Settings(BaseSettings):
     min_usability_score: float = 0.0
     rank_by_usability: bool = True
     executor_type: ExecutorType = ExecutorType.SIMPLE
-    max_workers: int = os.cpu_count() or 1
 
     # Fainder settings
     fainder_n_clusters: int = 50

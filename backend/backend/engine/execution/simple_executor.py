@@ -7,7 +7,7 @@ from loguru import logger
 from numpy import uint32
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
-from backend.engine.conversion import col_to_doc_ids, hist_to_col_ids
+from backend.engine.conversion import col_to_doc_ids
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 from .common import ColResult, DocResult, TResult, junction
@@ -89,10 +89,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         comparison: str = items[1]
         reference = float(items[2])
 
-        result_hists = self.fainder_index.search(
-            percentile, comparison, reference, self.fainder_mode
-        )
-        return hist_to_col_ids(result_hists, self.metadata.hist_to_col)
+        return self.fainder_index.search(percentile, comparison, reference, self.fainder_mode)
 
     def conjunction(self, items: Sequence[TResult]) -> TResult:
         logger.trace(f"Evaluating conjunction with items: {items}")
