@@ -1,5 +1,4 @@
 from collections import defaultdict
-from collections.abc import Sequence
 from operator import and_, or_
 
 from lark import ParseTree, Token, Transformer
@@ -21,12 +20,8 @@ from backend.engine.conversion import (
 )
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .helper import (
-    Executor,
-    ResultGroupAnnotator,
-    exceeds_filtering_limit,
-    junction,
-)
+from .common import ResultGroupAnnotator, exceeds_filtering_limit, junction
+from .executor import Executor
 
 
 class IntermediateResult:
@@ -163,15 +158,6 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         self.write_groups: dict[int, int] = {}
         self.read_groups: dict[int, list[int]] = {}
         self.parent_write_group: dict[int, int] = {}
-
-    def updates_scores(self, doc_ids: Sequence[int], scores: Sequence[float]) -> None:
-        logger.trace(f"Updating scores for {len(doc_ids)} documents")
-
-        for doc_id, score in zip(doc_ids, scores, strict=True):
-            self.scores[doc_id] += score
-
-        for i, doc_id in enumerate(doc_ids):
-            self.scores[doc_id] += scores[i]
 
     def _get_write_group(self, node: ParseTree | Token) -> int:
         """Get the write group for a node."""

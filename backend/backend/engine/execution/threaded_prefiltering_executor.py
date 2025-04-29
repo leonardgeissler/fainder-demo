@@ -1,6 +1,5 @@
 import os
 from collections import defaultdict
-from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from operator import and_, or_
 
@@ -23,20 +22,8 @@ from backend.engine.conversion import (
 )
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .helper import (
-    Executor,
-    ResultGroupAnnotator,
-    exceeds_filtering_limit,
-    junction,
-)
-
-
-class ExceededFilteringLimitError(Exception):
-    """Custom exception for exceeding filtering limits."""
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
+from .common import ResultGroupAnnotator, exceeds_filtering_limit, junction
+from .executor import Executor
 
 
 class IntermediateResultFuture:
@@ -80,12 +67,12 @@ class IntermediateResultFuture:
     ) -> set[uint32] | None:
         if self._doc_ids is not None:
             if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", fainder_mode):
-                raise ExceededFilteringLimitError("Exceeded filtering limit for document IDs")
+                return None
             col_ids = doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
         if self._col_ids is not None:
             if exceeds_filtering_limit(self._col_ids, "num_col_ids", fainder_mode):
-                raise ExceededFilteringLimitError("Exceeded filtering limit for column IDs")
+                return None
             return col_to_hist_ids(self._col_ids, metadata.col_to_hist)
         return None
 
@@ -97,7 +84,7 @@ class IntermediateResultFuture:
         for kw_future in self.kw_result_futures:
             doc_ids, _, _ = kw_future.result()
             if exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
-                raise ExceededFilteringLimitError("Exceeded filtering limit for document IDs")
+                return None
             col_ids = doc_to_col_ids(doc_ids, metadata.doc_to_cols)
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
             if first:
@@ -109,7 +96,7 @@ class IntermediateResultFuture:
         for col_future in self.column_result_futures:
             col_ids, _ = col_future.result()
             if exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
-                raise ExceededFilteringLimitError("Exceeded filtering limit for column IDs")
+                return None
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
             if first:
                 hist_ids = new_hist_ids
@@ -201,20 +188,19 @@ class IntermediateResultStoreFuture:
             if read_group not in self.results:
                 return None
 
-            try:
-                logger.trace(
-                    f"Processing read group {read_group} with results {self.results[read_group]}"
-                )
-                intermediate = self.results[read_group].build_hist_filter(metadata, fainder_mode)
-                if intermediate is not None:
-                    logger.trace(f"intermediate {intermediate}")
-                    if hist_filter is None:
-                        hist_filter = intermediate
-                    else:
-                        hist_filter &= intermediate
+            logger.trace(
+                f"Processing read group {read_group} with results {self.results[read_group]}"
+            )
+            intermediate = self.results[read_group].build_hist_filter(metadata, fainder_mode)
 
-            except ExceededFilteringLimitError:
+            if intermediate is None:
                 return None
+
+            logger.trace(f"intermediate {intermediate}")
+            if hist_filter is None:
+                hist_filter = intermediate
+            else:
+                hist_filter &= intermediate
 
         logger.trace(f"Hist filter: {hist_filter}")
         return hist_filter
@@ -249,8 +235,15 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         self.min_usability_score = min_usability_score
         self.rank_by_usability = rank_by_usability
         self.max_workers = max_workers
+        # Create a new thread pool for this execution
+        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
 
         self.reset(fainder_mode, enable_highlighting)
+
+    def __del__(self) -> None:
+        """Clean up the thread pool when the executor is deleted."""
+        self._thread_pool.shutdown(wait=True)
+        logger.debug("Thread pool shut down")
 
     def reset(
         self,
@@ -269,8 +262,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         logger.trace(tree.pretty())
         groups = ResultGroupAnnotator()
         groups.apply(tree, parallel=True)
-        # Create a new thread pool for this execution
-        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
+
         self.write_groups = groups.write_groups
         self.read_groups = groups.read_groups
         self.parent_write_group = groups.parent_write_group
@@ -283,19 +275,9 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
 
         result = self.transform(tree)
 
-        # Make sure to shut down the thread pool
-        self._thread_pool.shutdown(wait=True)
+        logger.trace(f"Final result: {result}")
 
         return result
-
-    def updates_scores(self, doc_ids: Sequence[int], scores: Sequence[float]) -> None:
-        logger.trace(f"Updating scores for {len(doc_ids)} documents")
-
-        for doc_id, score in zip(doc_ids, scores, strict=True):
-            self.scores[doc_id] += score
-
-        for i, doc_id in enumerate(doc_ids):
-            self.scores[doc_id] += scores[i]
 
     def _get_write_group(self, node: ParseTree | Token) -> int:
         """Get the write group for a node."""

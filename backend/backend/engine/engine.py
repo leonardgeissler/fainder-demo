@@ -4,7 +4,7 @@ from functools import lru_cache
 from backend.config import CacheInfo, ExecutorType, FainderMode, Highlights, Metadata
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .executor.executor import create_executor
+from .execution.factory import create_executor
 from .optimizer import create_optimizer
 from .parser import Parser
 

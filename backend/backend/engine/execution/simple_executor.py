@@ -1,5 +1,4 @@
 from collections import defaultdict
-from collections.abc import Sequence
 from operator import and_, or_
 
 from lark import ParseTree, Token, Transformer
@@ -19,11 +18,8 @@ from backend.engine.conversion import (
 )
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .helper import (
-    Executor,
-    T,
-    junction,
-)
+from .common import junction
+from .executor import Executor, T
 
 
 class SimpleExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor):
@@ -65,15 +61,6 @@ class SimpleExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor):
     def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
         """Start processing the parse tree."""
         return self.transform(tree)
-
-    def updates_scores(self, doc_ids: Sequence[int], scores: Sequence[float]) -> None:
-        logger.trace(f"Updating scores for {len(doc_ids)} documents")
-
-        for doc_id, score in zip(doc_ids, scores, strict=True):
-            self.scores[doc_id] += score
-
-        for i, doc_id in enumerate(doc_ids):
-            self.scores[doc_id] += scores[i]
 
     ### Operator implementations ###
 

@@ -7,13 +7,13 @@ from backend.config import (
 )
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .helper import (
+from .executor import (
     Executor,
 )
-from .parallel_prefiltering_executor import ParallelPrefilteringExecutor
 from .prefiltering_executor import PrefilteringExecutor
 from .simple_executor import SimpleExecutor
 from .threaded_executor import ThreadedExecutor
+from .threaded_prefiltering_executor import ParallelPrefilteringExecutor
 
 
 def create_executor(
@@ -52,7 +52,7 @@ def create_executor(
                 min_usability_score=min_usability_score,
                 rank_by_usability=rank_by_usability,
             )
-        case ExecutorType.PARALLEL:
+        case ExecutorType.THREADED:
             return ThreadedExecutor(
                 tantivy_index=tantivy_index,
                 fainder_index=fainder_index,
@@ -64,7 +64,7 @@ def create_executor(
                 rank_by_usability=rank_by_usability,
                 max_workers=max_workers,
             )
-        case ExecutorType.PARALLEL_PREFILTERING:
+        case ExecutorType.THREADED_PREFILTERING:
             return ParallelPrefilteringExecutor(
                 tantivy_index=tantivy_index,
                 fainder_index=fainder_index,

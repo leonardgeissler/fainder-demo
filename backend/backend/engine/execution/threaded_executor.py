@@ -1,6 +1,5 @@
 import os
 from collections import defaultdict
-from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from operator import and_, or_
 from typing import Any
@@ -22,10 +21,8 @@ from backend.engine.conversion import (
 )
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .helper import (
-    Executor,
-    junction,
-)
+from .common import junction
+from .executor import Executor
 
 
 class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor):
@@ -72,18 +69,14 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
     def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
         """Start processing the parse tree."""
         # Create a new thread pool for this execution
-        
+
         self._thread_results: dict[int, Any] = {}
 
         result = self.transform(tree)
 
+        logger.debug("Result of query execution: ", result)
+
         return result
-
-    def updates_scores(self, doc_ids: Sequence[int], scores: Sequence[float]) -> None:
-        logger.trace(f"Updating scores for {len(doc_ids)} documents")
-
-        for doc_id, score in zip(doc_ids, scores, strict=True):
-            self.scores[doc_id] += score
 
     ### Threaded task methods ###
 
@@ -276,6 +269,4 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
             raise ValueError("Query must have exactly one item")
 
         # Resolve the item if it's a future
-        item = self._resolve_doc_result(items[0])
-
-        return item
+        return self._resolve_doc_result(items[0])

@@ -39,8 +39,8 @@ class ExecutorType(str, Enum):
 
     SIMPLE = "simple"
     PREFILTERING = "prefiltering"
-    PARALLEL = "parallel"
-    PARALLEL_PREFILTERING = "parallel_prefiltering"
+    THREADED = "threaded"
+    THREADED_PREFILTERING = "threaded_prefiltering"
 
 
 class CroissantStoreType(str, Enum):

@@ -1,5 +1,4 @@
 import re
-from abc import ABC, abstractmethod
 from collections.abc import Callable
 from functools import reduce
 from typing import Any, Literal, TypeGuard, TypeVar
@@ -13,45 +12,13 @@ from backend.config import (
     DocumentHighlights,
     FainderMode,
     Highlights,
-    Metadata,
 )
 from backend.engine.constants import FILTERING_STOP_POINTS
 from backend.engine.conversion import (
     doc_to_col_ids,
 )
-from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 T = TypeVar("T", tuple[set[int], Highlights], set[uint32])
-
-
-class Executor(ABC):
-    """Base abstract class for query executors that defines the common interface."""
-
-    scores: dict[int, float]
-
-    @abstractmethod
-    def __init__(
-        self,
-        tantivy_index: TantivyIndex,
-        fainder_index: FainderIndex,
-        hnsw_index: HnswIndex,
-        metadata: Metadata,
-        fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
-        enable_highlighting: bool = False,
-    ) -> None:
-        """Initialize the executor with the necessary indices and metadata."""
-
-    @abstractmethod
-    def reset(
-        self,
-        fainder_mode: FainderMode,
-        enable_highlighting: bool = False,
-    ) -> None:
-        """Reset the executor's state."""
-
-    @abstractmethod
-    def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
-        """Start processing the parse tree."""
 
 
 class ResultGroupAnnotator(Visitor_Recursive[Token]):
