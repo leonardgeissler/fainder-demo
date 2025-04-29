@@ -242,8 +242,8 @@ def test_performance(
     evaluation_scenarios = {
         "simple": {"engine": simple_engine},
         "perfiltering": {"engine": perfiltering_engine},
-        "parallel": {"engine": parallel_engine},
-        "parallel_prefiltering": {"engine": parallel_prefiltering_engine},
+        "parrallel_engine": {"engine": parallel_engine},
+        "parallel_prefiltering_engine": {"engine": parallel_prefiltering_engine},
     }
 
     for mode in FAINDER_MODES:

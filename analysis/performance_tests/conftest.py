@@ -140,7 +140,7 @@ def engines() -> tuple[Engine, Engine, Engine, Engine]:
             hnsw_index=column_index,
             metadata=metadata,
             cache_size=0,
-            executor_type=ExecutorType.PARALLEL,
+            executor_type=ExecutorType.THREADED,
         ),
         Engine(
             tantivy_index=TantivyIndex(index_path=str(settings.tantivy_path), recreate=False),
@@ -148,6 +148,6 @@ def engines() -> tuple[Engine, Engine, Engine, Engine]:
             hnsw_index=column_index,
             metadata=metadata,
             cache_size=0,
-            executor_type=ExecutorType.PARALLEL_PREFILTERING,
+            executor_type=ExecutorType.THREADED_PREFILTERING,
         ),
     )

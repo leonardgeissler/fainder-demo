@@ -277,61 +277,6 @@ def multiple_percentile_combinations(
     return queries
 
 
-def nested_queries(
-    keywords: list[str],
-    terms: list[str],
-    column_names: list[str] = DEFAULT_COL_NAMES,
-    ks: list[int] = DEFAULT_KS,
-    operators: list[str] = LOGICAL_OPERATORS,
-    max_terms: int = MAX_NUM_OF_NESTED_TERMS_PER_LEVEL,
-    min_nested_level: int = MIN_NESTED_LEVEL,
-    max_nested_level: int = MAX_NESTED_LEVEL,
-) -> dict[str, dict[str, Any]]:
-    """
-    Generate nested queries with a fixed structure.
-
-    Args:
-        keywords: List of keywords to use
-        terms: List of terms to use
-        column_names: List of column names to use
-        ks: List of ks to use
-        operators: List of logical operators to use
-        max_terms: Maximum number of terms to combine
-        min_nested_level: Minimum level of nesting
-        max_nested_level: Maximum level of nesting
-    """
-    queries: dict[str, dict[str, Any]] = {}
-    for operator in operators:
-        for keyword in keywords:
-            for column_name in column_names:
-                for k in ks:
-                    for level in range(min_nested_level, max_nested_level + 1):
-                        # generate lists of terms of length level
-                        term_combinations = list(combinations(terms, level))
-                        for term_combination in term_combinations:
-                            nested_query = f"col(name('{column_name}';{k}) {operator} "
-                            i = 0
-                            for term in term_combination:
-                                nested_query += f"col({term}) {operator} "
-
-                            nested_query = nested_query[: -len(operator) - 1] + ")"
-                            query = f"kw('{keyword}') {operator} {nested_query}"
-                            queries[
-                                f"nested_combination_{operator}_{keyword}_{column_name}_{k}_{level}"
-                            ] = {
-                                "query": query,
-                                "ids": [
-                                    {"keyword_id": keyword},
-                                    {"percentile_id": term_combination},
-                                    {"column_id": (column_name, k)},
-                                ],
-                            }
-                            i += 1
-                            if i > max_terms:
-                                break
-    # If we reach here, we have not exceeded the max_terms limit
-    # but we have generated all possible queries
-    return queries
 
 
 def generate_all_test_cases() -> dict[str, Any]:
@@ -349,25 +294,14 @@ def generate_all_test_cases() -> dict[str, Any]:
     multiple_percentile_combinations_queries = multiple_percentile_combinations(
         percentile_combinations_queries
     )
-    nested = nested_queries(
-        DEFAULT_KEYWORDS,
-        percentile_terms,
-        column_names=DEFAULT_COL_NAMES,
-        ks=DEFAULT_KS,
-        operators=LOGICAL_OPERATORS,
-        max_terms=MAX_NUM_QUERY_PER_NUM_TERMS,
-        min_nested_level=MIN_NESTED_LEVEL,
-        max_nested_level=MAX_NESTED_LEVEL,
-    )
 
     test_cases = {
-        # "base_keyword_queries": {"queries": keywordsqueries},
-        # "base_percentile_queries": {"queries": percentilequeries},
-        # "percentile_combinations": {"queries": percentile_combinations_queries},
-        # "mixed_combinations_with_fixed_structure": {
-        #    "queries": mixed_term_combinations_with_fixed_structure_queries
-        # },
-        "nested_queries": {"queries": nested},
+        "base_keyword_queries": {"queries": keywordsqueries},
+        "base_percentile_queries": {"queries": percentilequeries},
+        "percentile_combinations": {"queries": percentile_combinations_queries},
+        "mixed_combinations_with_fixed_structure": {
+            "queries": mixed_term_combinations_with_fixed_structure_queries
+        },
         "multiple_percentile_combinations": {"queries": multiple_percentile_combinations_queries},
     }
 
