@@ -53,6 +53,12 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
         self.max_workers = max_workers
 
         self.reset(fainder_mode, enable_highlighting)
+        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
+
+    def __del__(self) -> None:
+        # Shutdown the thread pool if it is still running
+        if self._thread_pool:
+            self._thread_pool.shutdown(wait=True)
 
     def reset(
         self,
@@ -66,13 +72,10 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
     def execute(self, tree: ParseTree) -> tuple[set[int], Highlights]:
         """Start processing the parse tree."""
         # Create a new thread pool for this execution
-        self._thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
+        
         self._thread_results: dict[int, Any] = {}
 
         result = self.transform(tree)
-
-        # Make sure to shut down the thread pool
-        self._thread_pool.shutdown(wait=True)
 
         return result
 
@@ -274,8 +277,5 @@ class ThreadedExecutor(Transformer[Token, tuple[set[int], Highlights]], Executor
 
         # Resolve the item if it's a future
         item = self._resolve_doc_result(items[0])
-
-        # Shutdown the thread pool after the query is complete
-        self._thread_pool.shutdown(wait=True)
 
         return item
