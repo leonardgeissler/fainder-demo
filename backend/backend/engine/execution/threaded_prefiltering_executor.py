@@ -120,6 +120,16 @@ class IntermediateResultFuture:
 
         return self._build_hist_filter_future(metadata, fainder_mode)
 
+    def is_empty(self) -> bool:
+        """Check if the intermediate result is empty."""
+        return (
+            self._doc_ids is None
+            and self._col_ids is None
+            and len(self.kw_result_futures) == 0
+            and len(self.column_result_futures) == 0
+            and len(self.pp_result_futures) == 0
+        )
+
     def __str__(self) -> str:
         """String representation of the intermediate result future."""
         return (
@@ -185,8 +195,8 @@ class IntermediateResultStoreFuture:
 
         logger.trace(f"read groups {read_groups}")
         for read_group in read_groups:
-            if read_group not in self.results:
-                return None
+            if read_group not in self.results or self.results[read_group].is_empty():
+                continue
 
             logger.trace(
                 f"Processing read group {read_group} with results {self.results[read_group]}"

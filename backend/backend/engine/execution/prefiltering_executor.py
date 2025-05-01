@@ -64,6 +64,10 @@ class IntermediateResult:
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
         return None
 
+    def is_empty(self) -> bool:
+        """Check if the intermediate result is empty."""
+        return self._col_ids is None and self._doc_ids is None
+
     def __str__(self) -> str:
         """String representation of the intermediate result."""
         return f"IntermediateResult(\n\tdoc_ids={self._doc_ids},\n\tcol_ids={self._col_ids}\n)"
@@ -98,7 +102,7 @@ class IntermediateResultStore:
             raise ValueError("Cannot build a hist filter without read groups")
 
         for read_group in read_groups:
-            if read_group not in self.results:
+            if read_group not in self.results or self.results[read_group].is_empty():
                 # This means this group does not have an intermediate result yet this happens alot
                 continue
 
