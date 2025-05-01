@@ -61,9 +61,9 @@
             </template>
             <v-list-item-title>
               {{
-                highlightEnabled
-                  ? "Disable Syntax Highlight"
-                  : "Enable Syntax Highlight"
+                syntax_highlighting
+                  ? "Disable Syntax Highlighting"
+                  : "Enable Syntax Highlighting"
               }}
             </v-list-item-title>
           </v-list-item>
@@ -105,8 +105,8 @@
           <Search_Component
             :key="searchComponentKey"
             :search-query="route.query.query"
-            :inline="true"
-            :lines="3"
+            :inline="false"
+            :lines="6"
             :query-builder="false"
             :simple-builder="true"
             @search-data="
@@ -144,8 +144,9 @@ const theme = useTheme();
 const { query, fainder_mode, currentPage, selectedResultIndex } =
   useSearchState();
 const colorMode = useColorMode();
-const highlightEnabled = useCookie("fainder_highlight_enabled", {
-  default: () => false,
+
+const syntax_highlighting = useCookie("fainder_syntax_highlighting", {
+  default: () => true,
 });
 
 const internalSearchQuery = computed(() => route.query.query);
@@ -168,7 +169,7 @@ function toggleTheme() {
 }
 
 function toggleHighlight() {
-  highlightEnabled.value = !highlightEnabled.value;
+  syntax_highlighting.value = !syntax_highlighting.value;
 }
 
 const showSearchDialog = ref(false);
@@ -176,7 +177,7 @@ const showSearchDialog = ref(false);
 async function searchData({
   query: searchQuery,
   fainder_mode: newfainder_mode,
-  enable_highlighting,
+  result_highlighting,
 }) {
   query.value = searchQuery;
   fainder_mode.value = newfainder_mode;
@@ -184,7 +185,7 @@ async function searchData({
   currentPage.value = 1;
   selectedResultIndex.value = 0;
 
-  await loadResults(searchQuery, 1, newfainder_mode, enable_highlighting);
+  await loadResults(searchQuery, 1, newfainder_mode, result_highlighting);
 
   await navigateTo({
     path: "/results",
@@ -193,7 +194,7 @@ async function searchData({
       page: 1,
       index: 0,
       fainder_mode: newfainder_mode,
-      enable_highlighting,
+      result_highlighting: result_highlighting,
       theme: theme.global.name.value,
     },
   });
