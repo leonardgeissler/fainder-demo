@@ -46,4 +46,5 @@ ENABLED_TESTS: Final[list[str]] = [
     "mixed_combinations_with_fixed_structure_extented",
     "early_exit",
     "multiple_percentile_combinations",
+    "multiple_percentile_combinations_with_kw"
 ]

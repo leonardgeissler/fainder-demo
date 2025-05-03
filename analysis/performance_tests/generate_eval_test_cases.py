@@ -276,6 +276,8 @@ def multiple_percentile_combinations(
     return queries
 
 
+
+
 def expected_form_extented(
     keywords: list[str],
     terms: list[str],
@@ -342,6 +344,20 @@ def early_exit(
     return new_queries
 
 
+def multiple_percentile_combinations_with_kw(
+    keyword: str,
+    multiple_percentile_combinations: dict[str, dict[str, Any]],
+):
+    # add keyword to each query
+    queries: dict[str, dict[str, Any]] = {}
+    for query_name, query in multiple_percentile_combinations.items():
+        queries[query_name] = {
+            "query": f"kw('{keyword}') AND {query['query']}",
+            "ids": [{"keyword_id": keyword}] + query["ids"],
+        }
+    return queries
+
+
 def generate_all_test_cases() -> dict[str, Any]:
     keywordsqueries = generate_simple_keyword_queries(DEFAULT_KEYWORDS)
     percentile_terms = generate_percentile_terms()
@@ -371,6 +387,14 @@ def generate_all_test_cases() -> dict[str, Any]:
     multiple_percentile_combinations_queries = multiple_percentile_combinations(
         percentile_combinations_queries
     )
+    multiple_percentile_combinations_queries_or = multiple_percentile_combinations(
+        percentile_combinations_queries, operators=["OR"]
+    )
+    multiple_percentile_combinations_queries_with_kw = (
+        multiple_percentile_combinations_with_kw(
+            DEFAULT_KEYWORDS[0], multiple_percentile_combinations_queries_or
+        )
+    )
 
     test_cases = {
         "base_keyword_queries": {"queries": keywordsqueries},
@@ -384,6 +408,10 @@ def generate_all_test_cases() -> dict[str, Any]:
         },
         "early_exit": {"queries": early_exit_queries},
         "multiple_percentile_combinations": {"queries": multiple_percentile_combinations_queries},
+        "multiple_percentile_combinations_with_kw": {
+            "queries": multiple_percentile_combinations_queries_with_kw
+        },
+        
     }
 
     # Filter test cases based on ENABLED_TESTS
