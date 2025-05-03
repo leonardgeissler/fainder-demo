@@ -32,6 +32,7 @@ MAX_NUM_QUERY_PER_NUM_TERMS: Final[int] = 20
 FAINDER_MODES: Final[list[str]] = ["low_memory", "full_precision", "full_recall", "exact"]
 
 MAX_NUM_MIXED_TERMS_WITH_FIXED_STRUCTURE: Final[int] = 30
+MAX_NUM_MIXED_TERMS_EXTENTED_WITH_FIXED_STRUCTURE: Final[int] = 20
 
 MAX_NUM_OF_NESTED_TERMS_PER_LEVEL: Final[int] = 10
 MIN_NESTED_LEVEL: Final[int] = 2

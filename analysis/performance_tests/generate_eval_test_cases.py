@@ -11,12 +11,10 @@ from .constants import (
     DEFAULT_PERCENTILES,
     DEFAULT_THRESHOLDS,
     LOGICAL_OPERATORS,
-    MAX_NESTED_LEVEL,
     MAX_NUM_MIXED_TERMS_WITH_FIXED_STRUCTURE,
-    MAX_NUM_OF_NESTED_TERMS_PER_LEVEL,
+    MAX_NUM_MIXED_TERMS_EXTENTED_WITH_FIXED_STRUCTURE,
     MAX_NUM_QUERY_PER_NUM_TERMS,
     MAX_NUM_TERMS_QUERY,
-    MIN_NESTED_LEVEL,
     MIN_NUM_TERMS_QUERY,
 )
 
@@ -277,6 +275,70 @@ def multiple_percentile_combinations(
     return queries
 
 
+def expected_form_extented(
+    keywords: list[str],
+    terms: list[str],
+    column_names: list[str] = DEFAULT_COL_NAMES,
+    ks: list[int] = DEFAULT_KS,
+    max_terms: int = MAX_NUM_MIXED_TERMS_EXTENTED_WITH_FIXED_STRUCTURE,
+) -> dict[str, dict[str, Any]]:
+    """
+    Generate expected form for extended queries.
+
+    Args:
+        keywords: List of keywords to combine
+        terms: List of terms to combine
+        column_names: List of column names to combine
+        ks: List of ks to combine
+    """
+
+    # query structure: kw('test') AND col(name('age',1) AND (pp(0.5;le;2000 OR pp(0.5;ge;2000)))
+    queries: dict[str, dict[str, Any]] = {}
+    query_counter = 1
+    for keyword in keywords:
+        for column_name in column_names:
+            for k in ks:
+                for term1 in terms:
+                    for term2 in terms:
+                        if term1 == term2:
+                            continue
+                        
+                        query = (
+                            f"kw('{keyword}') AND "
+                            f"col(name('{column_name}';{k}) AND "
+                            f"({term1} OR {term2}))"
+                        )
+                        queries[f"expected_form_{query_counter}"] = {
+                            "query": query,
+                            "ids": [
+                                {"keyword_id": keyword},
+                                {"percentile_id": term1},
+                                {"percentile_id": term2},
+                                {"column_id": (column_name, k)},
+                            ],
+                        }
+                        query_counter += 1
+                        if query_counter > max_terms:
+                            return queries
+    return queries
+
+def early_exit(
+    queries: dict[str, dict[str, Any]],
+    form: str = "expected_form",
+) -> dict[str, dict[str, Any]]:
+    """
+    Ads an early 0 results to each query
+    """
+
+    new_queries: dict[str, dict[str, Any]] = {}
+    for query_name, query in queries.items():
+
+        new_queries["early_exit_" + form] = {
+            "query": "(kw(a) AND NOT kw(a)) AND"+ query["query"],
+            "ids": query["ids"],
+        }
+
+    return new_queries
 
 
 def generate_all_test_cases() -> dict[str, Any]:
@@ -289,6 +351,20 @@ def generate_all_test_cases() -> dict[str, Any]:
 
     mixed_term_combinations_with_fixed_structure_queries = (
         mixed_term_combinations_with_fixed_structure(DEFAULT_KEYWORDS, percentile_terms)
+    )
+
+    mixed_term_combinations_with_fixed_structure_extented_queries = (
+        expected_form_extented(
+            DEFAULT_KEYWORDS,
+            percentile_terms,
+            column_names=DEFAULT_COL_NAMES,
+            ks=DEFAULT_KS,
+        )
+    )
+
+    early_exit_queries = early_exit(
+        mixed_term_combinations_with_fixed_structure_extented_queries,
+        form="expected_form",
     )
 
     multiple_percentile_combinations_queries = multiple_percentile_combinations(
