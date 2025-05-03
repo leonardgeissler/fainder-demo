@@ -2,6 +2,7 @@ import csv
 import json
 import sys
 import time
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from backend.engine import Engine
 from backend.indices.keyword_op import TantivyIndex
 from backend.indices.name_op import HnswIndex as ColumnIndex
 from backend.indices.percentile_op import FainderIndex
+from .constants import ENABLED_TESTS
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -19,16 +21,24 @@ def _setup_and_teardown() -> None:  # pyright: ignore[reportUnusedFunction]
     """
     Generic setup and teardown fixture that runs before and after each test.
     """
+    process = subprocess.Popen(['git', 'rev-parse', 'HEAD'], shell=False, stdout=subprocess.PIPE)
+    git_head_hash = process.communicate()[0].strip()
     # Setup code
 
     # Create logs directory if it doesn't exist
     base_log_dir = Path("logs")
     base_log_dir.mkdir(exist_ok=True)
     log_dir = Path("logs/logs")
-    log_dir.mkdir(exist_ok=True)
+    log_dir.mkdir(exist_ok=True, )
 
     performance_log_dir = Path("logs/performance")
     performance_log_dir.mkdir(exist_ok=True)
+    performance_log_dir = Path("logs/performance/git_heads")
+    performance_log_dir.mkdir(exist_ok=True)
+    performance_log_dir = Path(f"logs/performance/git_heads/{git_head_hash.decode('utf-8')}")
+    performance_log_dir.mkdir(exist_ok=True)
+    performance_log_dir_all = performance_log_dir / "all"
+    performance_log_dir_all.mkdir(exist_ok=True)
 
     # Create directory for profiling logs
     profiling_log_dir = Path("logs/profiling")
@@ -39,7 +49,7 @@ def _setup_and_teardown() -> None:  # pyright: ignore[reportUnusedFunction]
     # Create CSV performance log file and write headers
     timestamp_str = time.strftime("%Y%m%d_%H%M%S")
 
-    csv_log_path = performance_log_dir / f"performance_metrics_{timestamp_str}.csv"
+    csv_log_path = performance_log_dir_all / f"performance_metrics_{timestamp_str}.csv"
     with csv_log_path.open("w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(
@@ -80,6 +90,33 @@ def _setup_and_teardown() -> None:  # pyright: ignore[reportUnusedFunction]
             ]
         )
 
+    # for each enabled test, create a CSV file in its own directory
+    individual_log_dirs = {}
+    for test_name in ENABLED_TESTS:
+        test_log_dir = performance_log_dir / test_name
+        test_log_dir.mkdir(exist_ok=True)
+        test_csv_log_path = test_log_dir / f"performance_metrics_{test_name}_{timestamp_str}.csv"
+        with test_csv_log_path.open("w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(
+                [
+                    "timestamp",
+                    "category",
+                    "test_name",
+                    "query",
+                    "scenario",
+                    "execution_time",
+                    "results_consistent",
+                    "fainder_mode",
+                    "num_results",
+                    "ids",
+                    "num_terms",
+                    "id_str",
+                ]
+            )
+        individual_log_dirs[test_name] = test_csv_log_path
+
+
     # Remove default handler
     logger.remove()
 
@@ -99,6 +136,7 @@ def _setup_and_teardown() -> None:  # pyright: ignore[reportUnusedFunction]
     # Add CSV log paths to pytest's config
     pytest.csv_log_path = csv_log_path  # type: ignore
     pytest.profile_csv_log_path = profile_csv_log_path  # type: ignore
+    pytest.individual_log_dirs = individual_log_dirs # type: ignore
 
     return
 

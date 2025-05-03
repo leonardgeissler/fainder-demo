@@ -16,6 +16,7 @@ from .constants import (
     MAX_NUM_QUERY_PER_NUM_TERMS,
     MAX_NUM_TERMS_QUERY,
     MIN_NUM_TERMS_QUERY,
+    ENABLED_TESTS,
 )
 
 
@@ -378,8 +379,20 @@ def generate_all_test_cases() -> dict[str, Any]:
         "mixed_combinations_with_fixed_structure": {
             "queries": mixed_term_combinations_with_fixed_structure_queries
         },
+        "mixed_combinations_with_fixed_structure_extented": {
+            "queries": mixed_term_combinations_with_fixed_structure_extented_queries
+        },
+        "early_exit": {"queries": early_exit_queries},
         "multiple_percentile_combinations": {"queries": multiple_percentile_combinations_queries},
     }
+
+    # Filter test cases based on ENABLED_TESTS
+    test_cases = {
+        name: data
+        for name, data in test_cases.items()
+        if name in ENABLED_TESTS
+    }
+
 
     output = Path("test_cases/performance_test_cases.json")
 

@@ -246,10 +246,15 @@ def test_performance(
         "parallel_prefiltering_engine": {"engine": parallel_prefiltering_engine},
     }
 
+    # Get paths for logs
+    csv_path = Path(pytest.csv_log_path)  # type: ignore
+    profile_csv_path = Path(pytest.profile_csv_log_path)  # type: ignore
+    individual_log_dirs: dict[str, Path] = pytest.individual_log_dirs  # type: ignore
+
+    individual_log_dir: Path = individual_log_dirs[category] 
+
+
     for mode in FAINDER_MODES:
-        # Get paths for logs
-        csv_path = Path(pytest.csv_log_path)  # type: ignore
-        profile_csv_path = Path(pytest.profile_csv_log_path)  # type: ignore
 
         # Run all scenarios
         timings, results, is_consistent = run_evaluation_scenarios(
@@ -259,6 +264,20 @@ def test_performance(
         # Log to CSV
         log_performance_csv(
             csv_path,
+            category,
+            test_name,
+            query,
+            timings,
+            results,
+            is_consistent,
+            mode,
+            ids,
+            id_str,
+        )
+
+        # Log to individual log files
+        log_performance_csv(
+            individual_log_dir,
             category,
             test_name,
             query,

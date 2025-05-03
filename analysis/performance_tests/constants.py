@@ -37,3 +37,13 @@ MAX_NUM_MIXED_TERMS_EXTENTED_WITH_FIXED_STRUCTURE: Final[int] = 20
 MAX_NUM_OF_NESTED_TERMS_PER_LEVEL: Final[int] = 10
 MIN_NESTED_LEVEL: Final[int] = 2
 MAX_NESTED_LEVEL: Final[int] = 4
+
+ENABLED_TESTS: Final[list[str]] = [
+    "base_keyword_queries",
+    "base_percentile_queries",
+    "base_percentile_queries",
+    "mixed_combinations_with_fixed_structure",
+    "mixed_combinations_with_fixed_structure_extented",
+    "early_exit",
+    "multiple_percentile_combinations",
+]
