@@ -53,3 +53,4 @@ logs/
 
 # tantivy lock
 *.lock
+/outputs

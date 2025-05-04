@@ -3,25 +3,11 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any
 
-from .constants import (
-    DEFAULT_COL_NAMES,
-    DEFAULT_KEYWORDS,
-    DEFAULT_KS,
-    DEFAULT_OPERATORS,
-    DEFAULT_PERCENTILES,
-    DEFAULT_THRESHOLDS,
-    LOGICAL_OPERATORS,
-    MAX_NUM_MIXED_TERMS_WITH_FIXED_STRUCTURE,
-    MAX_NUM_MIXED_TERMS_EXTENTED_WITH_FIXED_STRUCTURE,
-    MAX_NUM_QUERY_PER_NUM_TERMS,
-    MAX_NUM_TERMS_QUERY,
-    MIN_NUM_TERMS_QUERY,
-    ENABLED_TESTS,
-)
+from .config_models import PerformanceConfig
 
 
 def generate_simple_keyword_queries(
-    keywords: list[str] = DEFAULT_KEYWORDS,
+    keywords: list[str],
     prefix: str = "simple_keyword",
     field_name: str | None = None,
 ) -> dict[str, dict[str, Any]]:
@@ -45,9 +31,9 @@ def generate_simple_keyword_queries(
 
 
 def generate_percentile_terms(
-    percentile_values: list[float] = DEFAULT_PERCENTILES,
-    thresholds: list[int] = DEFAULT_THRESHOLDS,
-    operators: list[str] = DEFAULT_OPERATORS,
+    percentile_values: list[float],
+    thresholds: list[int],
+    operators: list[str],
 ) -> list[str]:
     """
     Generate percentile terms for testing.
@@ -69,9 +55,9 @@ def generate_percentile_terms(
 
 
 def generate_percentile_queries(
-    percentile_values: list[float] = DEFAULT_PERCENTILES,
-    thresholds: list[int] = DEFAULT_THRESHOLDS,
-    operators: list[str] = DEFAULT_OPERATORS,
+    percentile_values: list[float],
+    thresholds: list[int],
+    operators: list[str],
 ) -> dict[str, dict[str, Any]]:
     """
     Generate percentile queries for testing.
@@ -106,10 +92,10 @@ def wrap_term(term: str) -> str:
 
 def keyword_combinations(
     keywords: list[str],
-    operators: list[str] = LOGICAL_OPERATORS,
-    min_terms: int = MIN_NUM_TERMS_QUERY,
-    max_terms: int = MAX_NUM_TERMS_QUERY,
-    num_query_per_num_terms: int = MAX_NUM_QUERY_PER_NUM_TERMS,
+    operators: list[str],
+    min_terms: int,
+    max_terms: int,
+    num_query_per_num_terms: int,
     internal_combinations: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """
@@ -155,10 +141,10 @@ def keyword_combinations(
 
 def percentile_term_combinations(
     terms: list[str],
-    operators: list[str] = LOGICAL_OPERATORS,
-    min_terms: int = MIN_NUM_TERMS_QUERY,
-    max_terms: int = MAX_NUM_TERMS_QUERY,
-    num_query_per_num_terms: int = MAX_NUM_QUERY_PER_NUM_TERMS,
+    operators: list[str],
+    min_terms: int,
+    max_terms: int,
+    num_query_per_num_terms: int,
 ) -> dict[str, dict[str, Any]]:
     """
     Generate percentile term combinations for testing.
@@ -198,10 +184,10 @@ def percentile_term_combinations(
 def mixed_term_combinations_with_fixed_structure(
     keywords: list[str],
     terms: list[str],
-    column_names: list[str] = DEFAULT_COL_NAMES,
-    ks: list[int] = DEFAULT_KS,
-    operators: list[str] = LOGICAL_OPERATORS,
-    max_terms: int = MAX_NUM_MIXED_TERMS_WITH_FIXED_STRUCTURE,
+    column_names: list[str],
+    ks: list[int],
+    operators: list[str],
+    max_terms: int,
 ) -> dict[str, dict[str, Any]]:
     # query structure: kw('test') AND col(name('age',1) AND pp(0.5;le;2000))
 
@@ -234,10 +220,10 @@ def mixed_term_combinations_with_fixed_structure(
 
 def multiple_percentile_combinations(
     percentile_combinations: dict[str, dict[str, Any]],
-    operators: list[str] = LOGICAL_OPERATORS,
-    min_terms: int = MIN_NUM_TERMS_QUERY,
-    max_terms: int = MAX_NUM_TERMS_QUERY,
-    num_query_per_num_terms: int = MAX_NUM_QUERY_PER_NUM_TERMS,
+    operators: list[str],
+    min_terms: int ,
+    max_terms: int ,
+    num_query_per_num_terms: int,
 ) -> dict[str, dict[str, Any]]:
     """
     Combines multiple different percentile combinations into a single query.
@@ -276,14 +262,12 @@ def multiple_percentile_combinations(
     return queries
 
 
-
-
 def expected_form_extented(
     keywords: list[str],
     terms: list[str],
-    column_names: list[str] = DEFAULT_COL_NAMES,
-    ks: list[int] = DEFAULT_KS,
-    max_terms: int = MAX_NUM_MIXED_TERMS_EXTENTED_WITH_FIXED_STRUCTURE,
+    column_names: list[str],
+    ks: list[int],
+    max_terms: int,
 ) -> dict[str, dict[str, Any]]:
     """
     Generate expected form for extended queries.
@@ -325,6 +309,7 @@ def expected_form_extented(
                             return queries
     return queries
 
+
 def early_exit(
     queries: dict[str, dict[str, Any]],
     form: str = "expected_form",
@@ -358,24 +343,54 @@ def multiple_percentile_combinations_with_kw(
     return queries
 
 
-def generate_all_test_cases() -> dict[str, Any]:
-    keywordsqueries = generate_simple_keyword_queries(DEFAULT_KEYWORDS)
-    percentile_terms = generate_percentile_terms()
-    percentilequeries = generate_percentile_queries()
+def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
+    """
+    Generate all test cases, optionally using a configuration.
+    
+    Args:
+        config: Optional config object (pydantic model or dict)
+    """
 
-    # keyword_combinations_queries = keyword_combinations(DEFAULT_KEYWORDS)
-    percentile_combinations_queries = percentile_term_combinations(percentile_terms)
+    # Generate test cases with the config values
+    keywordsqueries = generate_simple_keyword_queries(config.keywords.default_keywords)
+    percentile_terms_list = generate_percentile_terms(
+        percentile_values=config.percentiles.default_percentiles,
+        thresholds=config.percentiles.default_thresholds,
+        operators=config.percentiles.default_operators,
+    )
+    percentilequeries = generate_percentile_queries(
+        percentile_values=config.percentiles.default_percentiles,
+        thresholds=config.percentiles.default_thresholds,
+        operators=config.percentiles.default_operators,
+    )
+
+    percentile_combinations_queries = percentile_term_combinations(
+        terms=percentile_terms_list,
+        operators=config.keywords.logical_operators,
+        min_terms=config.query_generation.min_num_terms_query,
+        max_terms=config.query_generation.max_num_terms_query,
+        num_query_per_num_terms=config.query_generation.max_num_query_per_num_terms,
+    )
 
     mixed_term_combinations_with_fixed_structure_queries = (
-        mixed_term_combinations_with_fixed_structure(DEFAULT_KEYWORDS, percentile_terms)
+        mixed_term_combinations_with_fixed_structure(
+            keywords=config.keywords.default_keywords,
+            terms=percentile_terms_list,
+            column_names=config.keywords.default_col_names,
+            ks=config.keywords.default_ks,
+            operators=config.keywords.logical_operators,
+            max_terms=config.query_generation.max_num_mixed_terms_with_fixed_structure,
+        )
     )
 
     mixed_term_combinations_with_fixed_structure_extented_queries = (
         expected_form_extented(
-            DEFAULT_KEYWORDS,
-            percentile_terms,
-            column_names=DEFAULT_COL_NAMES,
-            ks=DEFAULT_KS,
+            keywords=config.keywords.default_keywords,
+            terms=percentile_terms_list,
+            column_names=config.keywords.default_col_names,
+            ks=config.keywords.default_ks,
+            max_terms=config.query_generation.max_num_mixed_terms_extended_with_fixed_structure,
+
         )
     )
 
@@ -385,14 +400,26 @@ def generate_all_test_cases() -> dict[str, Any]:
     )
 
     multiple_percentile_combinations_queries = multiple_percentile_combinations(
-        percentile_combinations_queries
+        percentile_combinations=percentile_combinations_queries,
+        operators=config.keywords.logical_operators,
+        min_terms=config.query_generation.min_num_terms_query,
+        max_terms=config.query_generation.max_num_terms_query,
+        num_query_per_num_terms=config.query_generation.max_num_query_per_num_terms,
     )
+    
     multiple_percentile_combinations_queries_or = multiple_percentile_combinations(
-        percentile_combinations_queries, operators=["OR"]
+        percentile_combinations=percentile_combinations_queries,
+        operators=["OR"],
+        min_terms=config.query_generation.min_num_terms_query,
+        max_terms=config.query_generation.max_num_terms_query,
+        num_query_per_num_terms=config.query_generation.max_num_query_per_num_terms,
+
     )
+    
     multiple_percentile_combinations_queries_with_kw = (
         multiple_percentile_combinations_with_kw(
-            DEFAULT_KEYWORDS[0], multiple_percentile_combinations_queries_or
+            keyword=config.keywords.default_keywords[0],
+            multiple_percentile_combinations=multiple_percentile_combinations_queries_or
         )
     )
 
@@ -411,19 +438,12 @@ def generate_all_test_cases() -> dict[str, Any]:
         "multiple_percentile_combinations_with_kw": {
             "queries": multiple_percentile_combinations_queries_with_kw
         },
-        
     }
 
-    # Filter test cases based on ENABLED_TESTS
-    test_cases = {
-        name: data
-        for name, data in test_cases.items()
-        if name in ENABLED_TESTS
-    }
-
+    # Filter test cases based on enabled_tests
+    test_cases = {name: data for name, data in test_cases.items() if name in config.experiment.enabled_tests}
 
     output = Path("test_cases/performance_test_cases.json")
-
     output.parent.mkdir(exist_ok=True)
     with output.open("w") as f:
         json.dump(test_cases, f, indent=2)
@@ -431,9 +451,11 @@ def generate_all_test_cases() -> dict[str, Any]:
     return test_cases
 
 
-def save_test_cases(output_path: Path) -> None:
+def save_test_cases(output_path: Path, config: PerformanceConfig | None = None) -> None:
     """Generate test cases and save them to a JSON file."""
-    test_cases = generate_all_test_cases()
+    if config is None:
+        config = PerformanceConfig()
+    test_cases = generate_all_test_cases(config)
     with output_path.open("w") as f:
         json.dump(test_cases, f, indent=2)
 

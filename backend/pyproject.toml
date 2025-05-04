@@ -20,7 +20,6 @@ keywords = [
     "percentile predicate",
 ]
 classifiers = [
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
@@ -28,11 +27,11 @@ dependencies = [
     "fainder@git+https://github.com/lbhm/fainder@demo",
     "fastapi[standard]~=0.115.6",
     "hnswlib~=0.8.0",
+    "hydra-core>=1.3.2",
     "lark[interegular]~=1.2",
     "loguru~=0.7.3",
     "numpy~=2.0",
     "orjson~=3.10",
-    "pydantic~=2.10",
     "pydantic-settings~=2.7",
     "sentence-transformers~=4.0",
     "tantivy~=0.22.2",

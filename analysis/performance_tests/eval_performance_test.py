@@ -1,39 +1,28 @@
 import cProfile
 import csv
 import io
-import json
 import pstats
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional, Union
 
-import pytest
 from loguru import logger
 
 from backend.engine import Engine
 
-from .constants import FAINDER_MODES
-from .generate_eval_test_cases import generate_all_test_cases
-
-USE_JSON = False
-DISABLE_PROFILING = True
-
-if USE_JSON:
-    with Path("test_cases/performance_test_cases.json").open("r") as f:
-        test_cases = json.load(f)
-else:
-    test_cases = generate_all_test_cases()
+from .config_models import PerformanceConfig
 
 
 def execute_with_profiling(
-    evaluator: Engine, query: str, params: dict[str, Any], mode: str
+    evaluator: Engine, query: str, params: dict[str, Any], mode: str, disable_profiling: bool = True
 ) -> tuple[Any, float, io.StringIO]:
     """Execute a query with profiling and timing."""
-    if DISABLE_PROFILING:
+    if disable_profiling:
         start_time = time.time()
         result, _ = evaluator.execute(query, fainder_mode=mode)
         end_time = time.time()
         return result, end_time - start_time, io.StringIO()
+    
     pr = cProfile.Profile()
     pr.enable()
 
@@ -149,6 +138,7 @@ def run_evaluation_scenarios(
     profile_csv_path: Path,
     category: str,
     test_name: str,
+    disable_profiling: bool = True,
 ) -> tuple[dict[str, float], dict[str, list[str]], bool]:
     """
     Run multiple evaluation scenarios for a query and return timing results.
@@ -160,12 +150,12 @@ def run_evaluation_scenarios(
     for scenario_name, params in scenarios.items():
         evaluator = params["engine"]
         assert isinstance(evaluator, Engine)
-        result, execution_time, stats_io = execute_with_profiling(evaluator, query, params, mode)
+        result, execution_time, stats_io = execute_with_profiling(evaluator, query, params, mode, disable_profiling)
         timings[scenario_name] = execution_time
         results[scenario_name] = result
 
         # Save profiling statistics
-        if not DISABLE_PROFILING:
+        if not disable_profiling:
             save_profiling_stats(
                 stats_io, profile_csv_path, category, test_name, query, scenario_name, mode
             )
@@ -211,100 +201,3 @@ def log_performance_csv(
                     id_str,
                 ]
             )
-
-
-@pytest.mark.parametrize(
-    ("category", "test_name", "test_case"),
-    [
-        (cat, name, case)
-        for cat, data in test_cases.items()
-        for name, case in data["queries"].items()
-    ],
-)
-def test_performance(
-    category: str,
-    test_name: str,
-    test_case: dict[str, Any],
-    engines: tuple[Engine, Engine, Engine, Engine],
-) -> None:
-    simple_engine, perfiltering_engine, parallel_engine, parallel_prefiltering_engine = engines
-    query = test_case["query"]
-    ids = test_case.get("ids", [])
-    keyword_id = test_case.get("keyword_id")
-    percentile_id = test_case.get("percentile_id")
-    id_str = ""
-    if keyword_id:
-        id_str = keyword_id
-    elif percentile_id:
-        id_str = percentile_id
-
-    # Define different evaluation scenarios
-    evaluation_scenarios = {
-        "simple": {"engine": simple_engine},
-        "perfiltering": {"engine": perfiltering_engine},
-        "parrallel_engine": {"engine": parallel_engine},
-        "parallel_prefiltering_engine": {"engine": parallel_prefiltering_engine},
-    }
-
-    # Get paths for logs
-    csv_path = Path(pytest.csv_log_path)  # type: ignore
-    profile_csv_path = Path(pytest.profile_csv_log_path)  # type: ignore
-    individual_log_dirs: dict[str, Path] = pytest.individual_log_dirs  # type: ignore
-
-    individual_log_dir: Path = individual_log_dirs[category] 
-
-
-    for mode in FAINDER_MODES:
-
-        # Run all scenarios
-        timings, results, is_consistent = run_evaluation_scenarios(
-            query, evaluation_scenarios, mode, profile_csv_path, category, test_name
-        )
-
-        # Log to CSV
-        log_performance_csv(
-            csv_path,
-            category,
-            test_name,
-            query,
-            timings,
-            results,
-            is_consistent,
-            mode,
-            ids,
-            id_str,
-        )
-
-        # Log to individual log files
-        log_performance_csv(
-            individual_log_dir,
-            category,
-            test_name,
-            query,
-            timings,
-            results,
-            is_consistent,
-            mode,
-            ids,
-            id_str,
-        )
-
-        # Create detailed performance log for console/file
-        performance_log = {
-            "category": category,
-            "test_name": test_name,
-            "query": query,
-            "metrics": {
-                "timings": timings,
-            },
-            "results_consistent": is_consistent,
-        }
-
-        logger.info("PERFORMANCE_DATA: " + str(performance_log))
-
-        # Assert that all results are consistent and name
-        first_result = next(iter(results.values()))
-        for name, result in results.items():
-            assert len(result) == len(first_result), f"Results for {name} have different lengths"
-            assert set(result) == set(first_result), f"Results for {name} are inconsistent"
-            # assert result == first_result, f"Results for {name} are inconsistent in order"
