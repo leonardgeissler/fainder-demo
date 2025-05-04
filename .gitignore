@@ -54,3 +54,4 @@ logs/
 # tantivy lock
 *.lock
 /outputs
+test_cases/performance_test_cases.json

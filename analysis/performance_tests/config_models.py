@@ -63,18 +63,6 @@ class QueryGenerationConfig:
         default=20,
         metadata={"description": "Maximum number of mixed terms with extended fixed structure"}
     )
-    max_num_of_nested_terms_per_level: int = field(
-        default=10,
-        metadata={"description": "Maximum number of nested terms per level"}
-    )
-    min_nested_level: int = field(
-        default=2,
-        metadata={"description": "Minimum nesting level for queries"}
-    )
-    max_nested_level: int = field(
-        default=4,
-        metadata={"description": "Maximum nesting level for queries"}
-    )
 
 
 @dataclass
