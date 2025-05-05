@@ -102,7 +102,6 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             parent_write_group = self.write_groups[id(tree)]
             parent_read_groups = self.read_groups[id(tree)].copy()
-            parent_read_groups.remove(parent_write_group)
 
             for child in tree.children:
                 current_write_group = self._create_group_id()

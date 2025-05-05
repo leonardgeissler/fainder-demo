@@ -6,6 +6,7 @@ from operator import and_, or_
 from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy import uint32
+from numpy.typing import NDArray
 
 from backend.config import (
     ColumnHighlights,
@@ -54,11 +55,21 @@ class IntermediateResultFuture:
         """Add a future that will resolve to histogram IDs"""
         self.pp_result_futures.append(future)
 
-    def add_col_ids(self, col_ids: set[uint32]) -> None:
+    def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
+        if self._doc_ids is not None:
+            helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
+            col_ids = col_ids.intersection(helper_col_ids)
+        if self._col_ids is not None:
+            col_ids = col_ids.intersection(self._col_ids)
         self._col_ids = col_ids
         self._doc_ids = None
 
-    def add_doc_ids(self, doc_ids: set[int]) -> None:
+    def add_doc_ids(self, doc_ids: set[int], col_to_doc: NDArray[uint32]) -> None:
+        if self._col_ids is not None:
+            helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
+            doc_ids = doc_ids.intersection(helper_doc_ids)
+        if self._doc_ids is not None:
+            doc_ids = doc_ids.intersection(self._doc_ids)
         self._doc_ids = doc_ids
         self._col_ids = None
 
@@ -127,8 +138,7 @@ class IntermediateResultFuture:
             and self._col_ids is None
             and len(self.kw_result_futures) == 0
             and len(self.column_result_futures) == 0
-            and len(self.pp_result_futures) == 0
-        )
+        )  # not checking pp_result_futures becuase they are irrelevant for the histogram filter
 
     def __str__(self) -> str:
         """String representation of the intermediate result future."""
@@ -171,18 +181,22 @@ class IntermediateResultStoreFuture:
             self.results[write_group] = IntermediateResultFuture(write_group)
         self.results[write_group].add_hist_future(future)
 
-    def add_col_ids(self, write_group: int, col_ids: set[uint32]) -> None:
+    def add_col_ids(
+        self, write_group: int, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]
+    ) -> None:
         """Add column IDs to the intermediate result."""
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(write_group, col_ids=col_ids)
-        self.results[write_group].add_col_ids(col_ids)
+        self.results[write_group].add_col_ids(col_ids, doc_to_cols)
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
 
-    def add_doc_ids(self, write_group: int, doc_ids: set[int]) -> None:
+    def add_doc_ids(
+        self, write_group: int, doc_ids: set[int], col_to_doc: NDArray[uint32]
+    ) -> None:
         """Add document IDs to the intermediate result."""
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(write_group, doc_ids=doc_ids)
-        self.results[write_group].add_doc_ids(doc_ids)
+        self.results[write_group].add_doc_ids(doc_ids, col_to_doc)
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
 
     def get_hist_filter(
@@ -196,6 +210,9 @@ class IntermediateResultStoreFuture:
         logger.trace(f"read groups {read_groups}")
         for read_group in read_groups:
             if read_group not in self.results or self.results[read_group].is_empty():
+                logger.trace(
+                    f"Read group {read_group} does not have an intermediate result, skipping"
+                )
                 continue
 
             logger.trace(
@@ -433,7 +450,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
             write_group = items[0][1]
 
         doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
-        self.intermediate_results.add_doc_ids(write_group, doc_ids)
+        self.intermediate_results.add_doc_ids(write_group, doc_ids, self.metadata.col_to_doc)
         parent_write_group = self._get_parent_write_group(write_group)
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids), parent_write_group
@@ -452,9 +469,9 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
 
         if isinstance(result, tuple):
-            self.intermediate_results.add_doc_ids(write_group, result[0])
+            self.intermediate_results.add_doc_ids(write_group, result[0], self.metadata.col_to_doc)
         else:
-            self.intermediate_results.add_col_ids(write_group, result)
+            self.intermediate_results.add_col_ids(write_group, result, self.metadata.doc_to_cols)
 
         parent_write_group = self._get_parent_write_group(write_group)
         if isinstance(result, tuple):
@@ -473,9 +490,9 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
         result = junction(clean_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
 
         if isinstance(result, tuple):
-            self.intermediate_results.add_doc_ids(write_group, result[0])
+            self.intermediate_results.add_doc_ids(write_group, result[0], self.metadata.col_to_doc)
         else:
-            self.intermediate_results.add_col_ids(write_group, result)
+            self.intermediate_results.add_col_ids(write_group, result, self.metadata.doc_to_cols)
 
         parent_write_group = self._get_parent_write_group(write_group)
         if isinstance(result, tuple):
@@ -503,7 +520,7 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
             col_highlights: ColumnHighlights = set()
             parent_write_group = self._get_parent_write_group(write_group)
             result = (all_docs - to_negate, (doc_highlights, col_highlights), parent_write_group)
-            self.intermediate_results.add_doc_ids(write_group, result[0])
+            self.intermediate_results.add_doc_ids(write_group, result[0], self.metadata.col_to_doc)
             return result
         if len(item) == 2:
             to_negate_cols: set[uint32] = item[0]
@@ -511,7 +528,9 @@ class ParallelPrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights
             # For column expressions, we negate using the set of all column IDs
             all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
             result_col = all_columns - to_negate_cols
-            self.intermediate_results.add_col_ids(write_group_cols, result_col)
+            self.intermediate_results.add_col_ids(
+                write_group_cols, result_col, self.metadata.doc_to_cols
+            )
             parent_write_group_cols = self._get_parent_write_group(write_group_cols)
             return result_col, parent_write_group_cols
 

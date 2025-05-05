@@ -4,6 +4,7 @@ from operator import and_, or_
 from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy import uint32
+from numpy.typing import NDArray
 
 from backend.config import (
     ColumnHighlights,
@@ -41,11 +42,21 @@ class IntermediateResult:
         self._col_ids: set[uint32] | None = col_ids
         self._doc_ids: set[int] | None = doc_ids
 
-    def add_col_ids(self, col_ids: set[uint32]) -> None:
+    def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
+        if self._doc_ids is not None:
+            helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
+            col_ids = col_ids.intersection(helper_col_ids)
+        if self._col_ids is not None:
+            col_ids = col_ids.intersection(self._col_ids)
         self._col_ids = col_ids
         self._doc_ids = None
 
-    def add_doc_ids(self, doc_ids: set[int]) -> None:
+    def add_doc_ids(self, doc_ids: set[int], col_to_doc: NDArray[uint32]) -> None:
+        if self._col_ids is not None:
+            helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
+            doc_ids = doc_ids.intersection(helper_doc_ids)
+        if self._doc_ids is not None:
+            doc_ids = doc_ids.intersection(self._doc_ids)
         self._doc_ids = doc_ids
         self._col_ids = None
 
@@ -79,17 +90,21 @@ class IntermediateResultStore:
     def __init__(self) -> None:
         self.results: dict[int, IntermediateResult] = {}
 
-    def add_col_id_results(self, write_group: int, col_ids: set[uint32]) -> None:
+    def add_col_id_results(
+        self, write_group: int, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]
+    ) -> None:
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
         if write_group in self.results:
-            self.results[write_group].add_col_ids(col_ids=col_ids)
+            self.results[write_group].add_col_ids(col_ids=col_ids, doc_to_cols=doc_to_cols)
         else:
             self.results[write_group] = IntermediateResult(col_ids=col_ids)
 
-    def add_doc_id_results(self, write_group: int, doc_ids: set[int]) -> None:
+    def add_doc_id_results(
+        self, write_group: int, doc_ids: set[int], col_to_doc: NDArray[uint32]
+    ) -> None:
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
         if write_group in self.results:
-            self.results[write_group].add_doc_ids(doc_ids=doc_ids)
+            self.results[write_group].add_doc_ids(doc_ids=doc_ids, col_to_doc=col_to_doc)
         else:
             self.results[write_group] = IntermediateResult(doc_ids=doc_ids)
 
@@ -104,13 +119,15 @@ class IntermediateResultStore:
         for read_group in read_groups:
             if read_group not in self.results or self.results[read_group].is_empty():
                 # This means this group does not have an intermediate result yet this happens alot
+                logger.trace(
+                    f"Read group {read_group} does not have an intermediate result, skipping"
+                )
                 continue
 
             logger.trace(
                 f"Processing read group {read_group} with results {self.results[read_group]}"
             )
             intermediate = self.results[read_group].build_hist_filter(metadata, fainder_mode)
-            logger.trace(f"intermediate {intermediate}")
 
             if intermediate is None:
                 return None
@@ -122,7 +139,6 @@ class IntermediateResultStore:
             else:
                 hist_filter &= intermediate
 
-        logger.trace(f"Hist filter: {hist_filter}")
         return hist_filter
 
 
@@ -215,7 +231,9 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         self.updates_scores(result_docs, scores)
 
         write_group = self._get_write_group(items[0])
-        self.intermediate_results.add_doc_id_results(write_group, set(result_docs))
+        self.intermediate_results.add_doc_id_results(
+            write_group, set(result_docs), self.metadata.col_to_doc
+        )
 
         parent_write_group = self._get_parent_write_group(write_group)
 
@@ -229,7 +247,9 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         col_ids = items[0][0]
         write_group = items[0][1]
         doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
-        self.intermediate_results.add_doc_id_results(write_group, doc_ids)
+        self.intermediate_results.add_doc_id_results(
+            write_group, doc_ids, self.metadata.col_to_doc
+        )
         parent_write_group = self._get_parent_write_group(write_group)
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids), parent_write_group
@@ -245,7 +265,9 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         result = self.hnsw_index.search(column, k, None)
 
         write_group = self._get_write_group(items[0])
-        self.intermediate_results.add_col_id_results(write_group, result)
+        self.intermediate_results.add_col_id_results(
+            write_group, result, self.metadata.doc_to_cols
+        )
         parent_write_group = self._get_parent_write_group(write_group)
         return result, parent_write_group
 
@@ -258,15 +280,22 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         hist_filter = self.intermediate_results.build_hist_filter(
             self._get_read_groups(items[0]), self.metadata, self.fainder_mode
         )
-        logger.trace(f"Hist filter: {hist_filter}")
+
         write_group = self._get_write_group(items[0])
         if hist_filter is not None and len(hist_filter) == 0:
+            logger.trace("Empty histogram filter, returning empty result")
             return set(), write_group
+
+        logger.trace(
+            f"Length of histogram filter: {len(hist_filter) if hist_filter is not None else 0}"
+        )
         result_hists = self.fainder_index.search(
             percentile, comparison, reference, self.fainder_mode, hist_filter
         )
         result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
-        self.intermediate_results.add_col_id_results(write_group, result)
+        self.intermediate_results.add_col_id_results(
+            write_group, result, self.metadata.doc_to_cols
+        )
         parent_write_group = self._get_parent_write_group(write_group)
         return result, parent_write_group
 
@@ -285,9 +314,13 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
         write_group = items[0][2] if len(items[0]) == 3 else items[0][1]
         if isinstance(result, tuple):
-            self.intermediate_results.add_doc_id_results(write_group, result[0])
+            self.intermediate_results.add_doc_id_results(
+                write_group, result[0], self.metadata.col_to_doc
+            )
         else:
-            self.intermediate_results.add_col_id_results(write_group, result)
+            self.intermediate_results.add_col_id_results(
+                write_group, result, self.metadata.doc_to_cols
+            )
 
         parent_write_group = self._get_parent_write_group(write_group)
         if isinstance(result, tuple):
@@ -310,9 +343,13 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
         write_group = items[0][2] if len(items[0]) == 3 else items[0][1]
 
         if isinstance(result, tuple):
-            self.intermediate_results.add_doc_id_results(write_group, result[0])
+            self.intermediate_results.add_doc_id_results(
+                write_group, result[0], self.metadata.col_to_doc
+            )
         else:
-            self.intermediate_results.add_col_id_results(write_group, result)
+            self.intermediate_results.add_col_id_results(
+                write_group, result, self.metadata.doc_to_cols
+            )
 
         parent_write_group = self._get_parent_write_group(write_group)
         if isinstance(result, tuple):
@@ -334,7 +371,9 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             col_highlights: ColumnHighlights = set()
             parent_write_group = self._get_parent_write_group(write_group)
             result = (all_docs - to_negate, (doc_highlights, col_highlights), parent_write_group)
-            self.intermediate_results.add_doc_id_results(write_group, result[0])
+            self.intermediate_results.add_doc_id_results(
+                write_group, result[0], self.metadata.col_to_doc
+            )
             return result
         if len(items[0]) == 2:
             to_negate_cols: set[uint32] = items[0][0]
@@ -342,7 +381,9 @@ class PrefilteringExecutor(Transformer[Token, tuple[set[int], Highlights]], Exec
             # For column expressions, we negate using the set of all column IDs
             all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
             result_col = all_columns - to_negate_cols
-            self.intermediate_results.add_col_id_results(write_group_cols, result_col)
+            self.intermediate_results.add_col_id_results(
+                write_group_cols, result_col, self.metadata.doc_to_cols
+            )
             parent_write_group_cols = self._get_parent_write_group(write_group_cols)
             return result_col, parent_write_group_cols
 
