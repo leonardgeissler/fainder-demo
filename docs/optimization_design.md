@@ -51,7 +51,7 @@ Using a top-down approach:
 
 1. **Disjunction nodes**: Each child gets
    - A new write group
-   - Only its write group as read group
+   - Same read group as parent plus its own write group
 2. **Conjunction nodes**: Each child gets
    - Same write group as parent
    - Same read group as parent
