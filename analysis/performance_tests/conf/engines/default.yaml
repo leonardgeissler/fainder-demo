@@ -1,0 +1,16 @@
+scenarios:
+  - name: simple
+    executor_type: SIMPLE
+    cache_size: 0
+  
+  - name: perfiltering
+    executor_type: PREFILTERING
+    cache_size: 0
+  
+  - name: parrallel_engine
+    executor_type: THREADED
+    cache_size: 0
+  
+  - name: parallel_prefiltering_engine
+    executor_type: THREADED_PREFILTERING
+    cache_size: 0

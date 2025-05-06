@@ -1,0 +1,18 @@
+# Keyword related constants
+default_keywords:
+  - test
+  - born
+  - by
+
+default_col_names:
+  - age
+  - date
+
+default_ks:
+  - 0
+  - 2
+  - 5
+
+# Logical operators
+logical_operators:
+  - AND

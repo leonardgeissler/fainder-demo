@@ -1,0 +1,8 @@
+enabled_tests:
+  - expected_form_not_queries
+
+fainder_modes:
+  - low_memory
+  - full_precision
+  - full_recall
+  - exact
