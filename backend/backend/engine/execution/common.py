@@ -114,12 +114,14 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             parent_group = self.write_groups[id(tree)]
             new_group = self._create_group_id()
-            read_groups = [new_group]
+            read_group = self.read_groups[id(tree)].copy()
+            read_groups = [new_group, *read_group]
+            self.parent_write_group[new_group] = parent_group
 
             for child in tree.children:
                 self.write_groups[id(child)] = new_group
                 self.read_groups[id(child)] = read_groups
-                self.parent_write_group[new_group] = parent_group
+
         else:
             raise ValueError(f"Node {tree} does not have write or read groups")
 

@@ -33,7 +33,11 @@ class IntermediateResultFuture:
     """Stores futures and results for intermediate results during parallel execution."""
 
     def __init__(
-        self, write_group: int, doc_ids: set[int] | None = None, col_ids: set[uint32] | None = None
+        self,
+        write_group: int,
+        doc_ids: set[int] | None = None,
+        col_ids: set[uint32] | None = None,
+        fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
     ) -> None:
         # resolved results trump futures
         self.write_group = write_group
@@ -41,8 +45,16 @@ class IntermediateResultFuture:
         self.col_result_futures: list[Future[tuple[ColResult, int]]] = []
 
         # Store resolved results only one of these should be set
-        self._col_ids: set[uint32] | None = col_ids
-        self._doc_ids: set[int] | None = doc_ids
+        self._doc_ids: set[int] | None = None
+        self._col_ids: set[uint32] | None = None
+        if doc_ids is not None and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
+            return
+
+        if col_ids is not None and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
+            return
+
+        self._col_ids = col_ids
+        self._doc_ids = doc_ids
 
     def add_doc_future(self, future: Future[tuple[DocResult, int]]) -> None:
         """Add a future that will resolve to document IDs"""
@@ -52,7 +64,11 @@ class IntermediateResultFuture:
         """Add a future that will resolve to column IDs"""
         self.col_result_futures.append(future)
 
-    def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
+    def add_col_ids(
+        self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]], fainder_mode: FainderMode
+    ) -> None:
+        if exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
+            return
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
             col_ids = col_ids.intersection(helper_col_ids)
@@ -61,7 +77,11 @@ class IntermediateResultFuture:
         self._col_ids = col_ids
         self._doc_ids = None
 
-    def add_doc_ids(self, doc_ids: set[int], col_to_doc: NDArray[uint32]) -> None:
+    def add_doc_ids(
+        self, doc_ids: set[int], col_to_doc: NDArray[uint32], fainder_mode: FainderMode
+    ) -> None:
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
+            return
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
             doc_ids = doc_ids.intersection(helper_doc_ids)
@@ -157,7 +177,9 @@ class IntermediateResultStoreFuture:
     ) -> None:
         """Add a future that will resolve to document IDs"""
         if write_group not in self.results:
-            self.results[write_group] = IntermediateResultFuture(write_group)
+            self.results[write_group] = IntermediateResultFuture(
+                write_group, fainder_mode=self.fainder_mode
+            )
         self.results[write_group].add_doc_future(future)
 
     def add_future_col_result(
@@ -165,7 +187,9 @@ class IntermediateResultStoreFuture:
     ) -> None:
         """Add a future that will resolve to column IDs"""
         if write_group not in self.results:
-            self.results[write_group] = IntermediateResultFuture(write_group)
+            self.results[write_group] = IntermediateResultFuture(
+                write_group, fainder_mode=self.fainder_mode
+            )
         self.results[write_group].add_col_future(future)
 
     def add_col_ids(
@@ -173,8 +197,10 @@ class IntermediateResultStoreFuture:
     ) -> None:
         """Add column IDs to the intermediate result."""
         if write_group not in self.results:
-            self.results[write_group] = IntermediateResultFuture(write_group, col_ids=col_ids)
-        self.results[write_group].add_col_ids(col_ids, doc_to_cols)
+            self.results[write_group] = IntermediateResultFuture(
+                write_group, col_ids=col_ids, fainder_mode=self.fainder_mode
+            )
+        self.results[write_group].add_col_ids(col_ids, doc_to_cols, self.fainder_mode)
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
 
     def add_doc_ids(
@@ -182,8 +208,10 @@ class IntermediateResultStoreFuture:
     ) -> None:
         """Add document IDs to the intermediate result."""
         if write_group not in self.results:
-            self.results[write_group] = IntermediateResultFuture(write_group, doc_ids=doc_ids)
-        self.results[write_group].add_doc_ids(doc_ids, col_to_doc)
+            self.results[write_group] = IntermediateResultFuture(
+                write_group, doc_ids=doc_ids, fainder_mode=self.fainder_mode
+            )
+        self.results[write_group].add_doc_ids(doc_ids, col_to_doc, self.fainder_mode)
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
 
     def get_hist_filter(

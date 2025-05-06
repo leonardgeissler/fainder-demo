@@ -34,17 +34,32 @@ class IntermediateResult:
     """
 
     def __init__(
-        self, doc_ids: set[int] | None = None, col_ids: set[uint32] | None = None
+        self,
+        doc_ids: set[int] | None = None,
+        col_ids: set[uint32] | None = None,
+        fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
     ) -> None:
         if doc_ids is None and col_ids is None:
             raise ValueError("doc_ids and col_ids cannot both be None")
         if doc_ids is not None and col_ids is not None:
             raise ValueError("doc_ids and col_ids cannot both be set")
 
-        self._col_ids: set[uint32] | None = col_ids
-        self._doc_ids: set[int] | None = doc_ids
+        self._doc_ids: set[int] | None = None
+        self._col_ids: set[uint32] | None = None
+        if doc_ids is not None and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
+            return
 
-    def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
+        if col_ids is not None and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
+            return
+
+        self._col_ids = col_ids
+        self._doc_ids = doc_ids
+
+    def add_col_ids(
+        self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]], fainder_mode: FainderMode
+    ) -> None:
+        if exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
+            return
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
             col_ids = col_ids.intersection(helper_col_ids)
@@ -53,7 +68,11 @@ class IntermediateResult:
         self._col_ids = col_ids
         self._doc_ids = None
 
-    def add_doc_ids(self, doc_ids: set[int], col_to_doc: NDArray[uint32]) -> None:
+    def add_doc_ids(
+        self, doc_ids: set[int], col_to_doc: NDArray[uint32], fainder_mode: FainderMode
+    ) -> None:
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
+            return
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
             doc_ids = doc_ids.intersection(helper_doc_ids)
@@ -93,22 +112,38 @@ class IntermediateResultStore:
         self.results: dict[int, IntermediateResult] = {}
 
     def add_col_id_results(
-        self, write_group: int, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]
+        self,
+        write_group: int,
+        col_ids: set[uint32],
+        doc_to_cols: dict[int, set[int]],
+        fainder_mode: FainderMode,
     ) -> None:
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
         if write_group in self.results:
-            self.results[write_group].add_col_ids(col_ids=col_ids, doc_to_cols=doc_to_cols)
+            self.results[write_group].add_col_ids(
+                col_ids=col_ids, doc_to_cols=doc_to_cols, fainder_mode=fainder_mode
+            )
         else:
-            self.results[write_group] = IntermediateResult(col_ids=col_ids)
+            self.results[write_group] = IntermediateResult(
+                col_ids=col_ids, fainder_mode=fainder_mode
+            )
 
     def add_doc_id_results(
-        self, write_group: int, doc_ids: set[int], col_to_doc: NDArray[uint32]
+        self,
+        write_group: int,
+        doc_ids: set[int],
+        col_to_doc: NDArray[uint32],
+        fainder_mode: FainderMode,
     ) -> None:
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
         if write_group in self.results:
-            self.results[write_group].add_doc_ids(doc_ids=doc_ids, col_to_doc=col_to_doc)
+            self.results[write_group].add_doc_ids(
+                doc_ids=doc_ids, col_to_doc=col_to_doc, fainder_mode=fainder_mode
+            )
         else:
-            self.results[write_group] = IntermediateResult(doc_ids=doc_ids)
+            self.results[write_group] = IntermediateResult(
+                doc_ids=doc_ids, fainder_mode=fainder_mode
+            )
 
     def build_hist_filter(
         self, read_groups: list[int], metadata: Metadata, fainder_mode: FainderMode
@@ -241,7 +276,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         write_group = self._get_write_group(items[0])
         self.intermediate_results.add_doc_id_results(
-            write_group, set(result_docs), self.metadata.col_to_doc
+            write_group, set(result_docs), self.metadata.col_to_doc, self.fainder_mode
         )
 
         parent_write_group = self._get_parent_write_group(write_group)
@@ -257,7 +292,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         write_group = items[0][1]
         doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
         self.intermediate_results.add_doc_id_results(
-            write_group, doc_ids, self.metadata.col_to_doc
+            write_group, doc_ids, self.metadata.col_to_doc, self.fainder_mode
         )
         parent_write_group = self._get_parent_write_group(write_group)
         if self.enable_highlighting:
@@ -275,7 +310,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         write_group = self._get_write_group(items[0])
         self.intermediate_results.add_col_id_results(
-            write_group, result, self.metadata.doc_to_cols
+            write_group, result, self.metadata.doc_to_cols, self.fainder_mode
         )
         parent_write_group = self._get_parent_write_group(write_group)
         return result, parent_write_group
@@ -303,7 +338,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         )
         result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
         self.intermediate_results.add_col_id_results(
-            write_group, result, self.metadata.doc_to_cols
+            write_group, result, self.metadata.doc_to_cols, self.fainder_mode
         )
         parent_write_group = self._get_parent_write_group(write_group)
         return result, parent_write_group
@@ -315,11 +350,11 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
         if isinstance(result, tuple):
             self.intermediate_results.add_doc_id_results(
-                write_group, result[0], self.metadata.col_to_doc
+                write_group, result[0], self.metadata.col_to_doc, self.fainder_mode
             )
         else:
             self.intermediate_results.add_col_id_results(
-                write_group, result, self.metadata.doc_to_cols
+                write_group, result, self.metadata.doc_to_cols, self.fainder_mode
             )
 
         return result, self._get_parent_write_group(write_group)
@@ -332,11 +367,11 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         if isinstance(result, tuple):
             self.intermediate_results.add_doc_id_results(
-                write_group, result[0], self.metadata.col_to_doc
+                write_group, result[0], self.metadata.col_to_doc, self.fainder_mode
             )
         else:
             self.intermediate_results.add_col_id_results(
-                write_group, result, self.metadata.doc_to_cols
+                write_group, result, self.metadata.doc_to_cols, self.fainder_mode
             )
 
         return result, self._get_parent_write_group(write_group)
@@ -356,7 +391,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
             col_highlights: ColumnHighlights = set()
             doc_result = all_docs.difference(to_negate)
             self.intermediate_results.add_doc_id_results(
-                write_group, doc_result, self.metadata.col_to_doc
+                write_group, doc_result, self.metadata.col_to_doc, self.fainder_mode
             )
 
             result = (doc_result, (doc_highlights, col_highlights))
@@ -367,7 +402,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
         result_col = all_columns - to_negate_cols
         self.intermediate_results.add_col_id_results(
-            write_group, result_col, self.metadata.doc_to_cols
+            write_group, result_col, self.metadata.doc_to_cols, self.fainder_mode
         )
 
         return result_col, self._get_parent_write_group(write_group)
