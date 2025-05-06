@@ -105,7 +105,7 @@ class IntermediateResultFuture:
         for kw_future in self.kw_result_futures:
             doc_ids, _ = kw_future.result()
             if exceeds_filtering_limit(doc_ids[0], "num_doc_ids", self.fainder_mode):
-                return None
+                continue
             col_ids = doc_to_col_ids(doc_ids[0], metadata.doc_to_cols)
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
             if first:
@@ -117,7 +117,7 @@ class IntermediateResultFuture:
         for col_future in self.col_result_futures:
             col_ids, _ = col_future.result()
             if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
-                return None
+                continue
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
             if first:
                 hist_ids = new_hist_ids
