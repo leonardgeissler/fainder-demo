@@ -1,6 +1,6 @@
 # Performance Testing Framework
 
-This directory contains a framework for running performance tests using Hydra for configuration and Pydantic for data validation.
+This directory contains a framework for running performance tests using Hydra for configuration.
 
 ## Directory Structure
 
@@ -11,7 +11,6 @@ This directory contains a framework for running performance tests using Hydra fo
   - `keywords/`: Keyword configurations
   - `percentiles/`: Percentile configurations
   - `query_generation/`: Query generation configurations
-- `schema/`: JSON schema for the Pydantic models (generated)
 - `test_cases/`: Generated test cases (JSON files)
 
 ## Running Tests
@@ -37,7 +36,7 @@ Alternatively, you can use the provided bash script:
 
 ## Configuration
 
-The configuration is managed using Hydra and Pydantic models. The main configuration is defined in `config_models.py` as a set of Pydantic models.
+The configuration is managed using Hydra and dataclasses. The main configuration is defined in `config_models.py` as a set of dataclasses.
 
 To generate the JSON schema for the configuration models:
 

@@ -321,8 +321,8 @@ def early_exit(
     new_queries: dict[str, dict[str, Any]] = {}
     for query_name, query in queries.items():
 
-        new_queries["early_exit_" + form] = {
-            "query": "(kw(a) AND NOT kw(a)) AND"+ query["query"],
+        new_queries["early_exit_" + form + "_" + query_name] = {
+            "query": "kw('agjkehkejhgkjehgsjkhg') AND "+ query["query"],
             "ids": query["ids"],
         }
 
@@ -337,7 +337,7 @@ def multiple_percentile_combinations_with_kw(
     queries: dict[str, dict[str, Any]] = {}
     for query_name, query in multiple_percentile_combinations.items():
         queries[query_name] = {
-            "query": f"kw('{keyword}') AND {query['query']}",
+            "query": f"kw('{keyword}') AND ({query['query']})",
             "ids": [{"keyword_id": keyword}] + query["ids"],
         }
     return queries
