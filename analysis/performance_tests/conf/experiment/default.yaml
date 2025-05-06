@@ -7,6 +7,7 @@ enabled_tests:
   - early_exit
   - multiple_percentile_combinations
   - multiple_percentile_combinations_with_kw
+  - expected_form_not_queries
 
 fainder_modes:
   - low_memory

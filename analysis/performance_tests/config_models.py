@@ -100,6 +100,7 @@ class ExperimentConfig:
             "early_exit",
             "multiple_percentile_combinations",
             "multiple_percentile_combinations_with_kw"
+            "expected_form_not_queries"
         ],
         metadata={"description": "Test categories to enable"}
     )

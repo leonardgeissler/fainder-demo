@@ -3,6 +3,8 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from .config_models import PerformanceConfig
 
 
@@ -181,7 +183,7 @@ def percentile_term_combinations(
     return queries
 
 
-def mixed_term_combinations_with_fixed_structure(
+def expected_form(
     keywords: list[str],
     terms: list[str],
     column_names: list[str],
@@ -342,6 +344,79 @@ def multiple_percentile_combinations_with_kw(
         }
     return queries
 
+def expected_form_not(
+    keywords: list[str],
+    terms: list[str],
+    column_names: list[str],
+    ks: list[int],
+    operators: list[str],
+    max_terms: int,
+) -> dict[str, dict[str, Any]]:
+
+    # expected form: kw('test') AND col(name('age',1) AND pp(0.5;le;2000))
+    # with NOT operator added to all possible combinations
+    queries: dict[str, dict[str, Any]] = {}
+    query_counter = 1
+    helper = [0, 1, 2, 3]
+    combination_1 = list(combinations(helper, 1))
+    combination_2 = list(combinations(helper, 2))
+    combination_3 = list(combinations(helper, 3))
+    combination_4 = list(combinations(helper, 4))
+    combination = combination_1.copy()
+    combination.extend(combination_2)
+    combination.extend(combination_3)
+    combination.extend(combination_4)
+    logger.info(f"combinations: {combination}")
+    # if 0 then not kw('test') usw
+    for operator in operators:
+        for keyword in keywords:
+            for percentile in terms:
+                for column_name in column_names:
+                    for k in ks:
+                        for comb in combination:
+                            if len(comb) == 0:
+                                continue
+                            query = ""
+
+                            
+                            if 0 in comb:
+                                query += f"NOT kw('{keyword}') {operator} "
+                            else:
+                                query += f"kw('{keyword}') {operator} "
+
+                            if 1 in comb:
+                                query += f"NOT col("
+                            else:
+                                query += f"col("
+                            
+                            if 2 in comb:
+                                query += f"NOT name('{column_name}';{k}) {operator} "
+                            else:
+                                query += f"name('{column_name}';{k}) {operator} "
+                            
+                            if 3 in comb:
+                                query += f"NOT {percentile})"
+                            else:
+                                query += f"{percentile})"
+
+                            not_ids: list[str] = [str(term) for term in comb]
+                            not_ids_str = "-".join(not_ids)
+
+                            queries[f"mixed_combination_{operator}_{query_counter}_{not_ids_str}"] = {
+                                "query": query,
+                                "ids": [
+                                    {"keyword_id": keyword},
+                                    {"percentile_id": percentile},
+                                    {"column_id": (column_name, k)},
+                                ],
+                            }
+                        query_counter += 1
+                        if query_counter > max_terms:
+                            return queries
+    return queries
+                        
+
+
 
 def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     """
@@ -373,7 +448,7 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     )
 
     mixed_term_combinations_with_fixed_structure_queries = (
-        mixed_term_combinations_with_fixed_structure(
+        expected_form(
             keywords=config.keywords.default_keywords,
             terms=percentile_terms_list,
             column_names=config.keywords.default_col_names,
@@ -423,6 +498,16 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         )
     )
 
+    expected_form_not_queries = expected_form_not(
+        keywords=config.keywords.default_keywords,
+        terms=percentile_terms_list,
+        column_names=config.keywords.default_col_names,
+        ks=config.keywords.default_ks,
+        operators=config.keywords.logical_operators,
+        max_terms=config.query_generation.max_num_mixed_terms_extended_with_fixed_structure,
+    )
+
+
     test_cases = {
         "base_keyword_queries": {"queries": keywordsqueries},
         "base_percentile_queries": {"queries": percentilequeries},
@@ -437,6 +522,9 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         "multiple_percentile_combinations": {"queries": multiple_percentile_combinations_queries},
         "multiple_percentile_combinations_with_kw": {
             "queries": multiple_percentile_combinations_queries_with_kw
+        },
+        "expected_form_not_queries": {
+            "queries": expected_form_not_queries
         },
     }
 
