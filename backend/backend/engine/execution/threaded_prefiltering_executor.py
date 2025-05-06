@@ -39,7 +39,6 @@ class IntermediateResultFuture:
         self.write_group = write_group
         self.kw_result_futures: list[Future[tuple[DocResult, int]]] = []
         self.col_result_futures: list[Future[tuple[ColResult, int]]] = []
-        self.pp_result_futures: list[Future[tuple[ColResult, int]]] = []
 
         # Store resolved results only one of these should be set
         self._col_ids: set[uint32] | None = col_ids
@@ -52,10 +51,6 @@ class IntermediateResultFuture:
     def add_col_future(self, future: Future[tuple[ColResult, int]]) -> None:
         """Add a future that will resolve to column IDs"""
         self.col_result_futures.append(future)
-
-    def add_hist_future(self, future: Future[tuple[ColResult, int]]) -> None:
-        """Add a future that will resolve to histogram IDs"""
-        self.pp_result_futures.append(future)
 
     def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
         if self._doc_ids is not None:
@@ -146,7 +141,7 @@ class IntermediateResultFuture:
             f"IntermediateResultFuture(\n\twrite_group={self.write_group},"
             f"\n\tdoc_ids={self._doc_ids},\n\tcol_ids={self._col_ids},\n\t,"
             f"\n\tkw_futures={len(self.kw_result_futures)},\n\t"
-            f"col_futures={len(self.col_result_futures)},\n\tpp_futures={len(self.pp_result_futures)}\n)"
+            f"col_futures={len(self.col_result_futures)},\n"
         )
 
 
@@ -172,14 +167,6 @@ class IntermediateResultStoreFuture:
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(write_group)
         self.results[write_group].add_col_future(future)
-
-    def add_future_hist_result(
-        self, write_group: int, future: Future[tuple[ColResult, int]]
-    ) -> None:
-        """Add a future that will resolve to histogram IDs"""
-        if write_group not in self.results:
-            self.results[write_group] = IntermediateResultFuture(write_group)
-        self.results[write_group].add_hist_future(future)
 
     def add_col_ids(
         self, write_group: int, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]
@@ -416,10 +403,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         logger.trace(f"Evaluating percentile term: {items}")
 
         # Submit task to thread pool and store the future with a unique ID
-        future = self._thread_pool.submit(_percentile_task, items)
-        write_group = self._get_write_group(items[0])
-        self.intermediate_results.add_future_hist_result(write_group, future)
-        return future
+        return self._thread_pool.submit(_percentile_task, items)
 
     def col_op(
         self, items: list[tuple[ColResult, int] | Future[tuple[ColResult, int]]]
