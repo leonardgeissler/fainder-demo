@@ -35,9 +35,9 @@ class IntermediateResultFuture:
     def __init__(
         self,
         write_group: int,
+        fainder_mode: FainderMode,
         doc_ids: set[int] | None = None,
         col_ids: set[uint32] | None = None,
-        fainder_mode: FainderMode = FainderMode.LOW_MEMORY,
     ) -> None:
         # resolved results trump futures
         self.write_group = write_group
@@ -47,6 +47,7 @@ class IntermediateResultFuture:
         # Store resolved results only one of these should be set
         self._doc_ids: set[int] | None = None
         self._col_ids: set[uint32] | None = None
+        self.fainder_mode = fainder_mode
         if doc_ids is not None and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
             return
 
@@ -64,10 +65,8 @@ class IntermediateResultFuture:
         """Add a future that will resolve to column IDs"""
         self.col_result_futures.append(future)
 
-    def add_col_ids(
-        self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]], fainder_mode: FainderMode
-    ) -> None:
-        if exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
+    def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
+        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
             return
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
@@ -77,10 +76,8 @@ class IntermediateResultFuture:
         self._col_ids = col_ids
         self._doc_ids = None
 
-    def add_doc_ids(
-        self, doc_ids: set[int], col_to_doc: NDArray[uint32], fainder_mode: FainderMode
-    ) -> None:
-        if exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
+    def add_doc_ids(self, doc_ids: set[int], col_to_doc: NDArray[uint32]) -> None:
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
             return
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
@@ -90,28 +87,24 @@ class IntermediateResultFuture:
         self._doc_ids = doc_ids
         self._col_ids = None
 
-    def _build_hist_filter_resolved(
-        self, metadata: Metadata, fainder_mode: FainderMode
-    ) -> ColResult | None:
+    def _build_hist_filter_resolved(self, metadata: Metadata) -> ColResult | None:
         if self._doc_ids is not None:
-            if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", fainder_mode):
+            if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", self.fainder_mode):
                 return None
             col_ids = doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
         if self._col_ids is not None:
-            if exceeds_filtering_limit(self._col_ids, "num_col_ids", fainder_mode):
+            if exceeds_filtering_limit(self._col_ids, "num_col_ids", self.fainder_mode):
                 return None
             return col_to_hist_ids(self._col_ids, metadata.col_to_hist)
         return None
 
-    def _build_hist_filter_future(
-        self, metadata: Metadata, fainder_mode: FainderMode
-    ) -> ColResult | None:
+    def _build_hist_filter_future(self, metadata: Metadata) -> ColResult | None:
         hist_ids: ColResult = set()
         first = True
         for kw_future in self.kw_result_futures:
             doc_ids, _ = kw_future.result()
-            if exceeds_filtering_limit(doc_ids[0], "num_doc_ids", fainder_mode):
+            if exceeds_filtering_limit(doc_ids[0], "num_doc_ids", self.fainder_mode):
                 return None
             col_ids = doc_to_col_ids(doc_ids[0], metadata.doc_to_cols)
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
@@ -123,7 +116,7 @@ class IntermediateResultFuture:
 
         for col_future in self.col_result_futures:
             col_ids, _ = col_future.result()
-            if exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
+            if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
                 return None
             new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
             if first:
@@ -138,13 +131,13 @@ class IntermediateResultFuture:
             return None
         return hist_ids
 
-    def build_hist_filter(self, metadata: Metadata, fainder_mode: FainderMode) -> ColResult | None:
+    def build_hist_filter(self, metadata: Metadata) -> ColResult | None:
         """Build a histogram filter from the intermediate results."""
-        hist_ids_resolved = self._build_hist_filter_resolved(metadata, fainder_mode)
+        hist_ids_resolved = self._build_hist_filter_resolved(metadata)
         if hist_ids_resolved is not None:
             return hist_ids_resolved
 
-        return self._build_hist_filter_future(metadata, fainder_mode)
+        return self._build_hist_filter_future(metadata)
 
     def is_empty(self) -> bool:
         """Check if the intermediate result is empty."""
@@ -200,7 +193,7 @@ class IntermediateResultStoreFuture:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, col_ids=col_ids, fainder_mode=self.fainder_mode
             )
-        self.results[write_group].add_col_ids(col_ids, doc_to_cols, self.fainder_mode)
+        self.results[write_group].add_col_ids(col_ids, doc_to_cols)
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
 
     def add_doc_ids(
@@ -211,12 +204,10 @@ class IntermediateResultStoreFuture:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, doc_ids=doc_ids, fainder_mode=self.fainder_mode
             )
-        self.results[write_group].add_doc_ids(doc_ids, col_to_doc, self.fainder_mode)
+        self.results[write_group].add_doc_ids(doc_ids, col_to_doc)
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
 
-    def get_hist_filter(
-        self, read_groups: list[int], metadata: Metadata, fainder_mode: FainderMode
-    ) -> ColResult | None:
+    def get_hist_filter(self, read_groups: list[int], metadata: Metadata) -> ColResult | None:
         """Build a histogram filter from the intermediate results."""
         hist_filter: ColResult | None = None
         if len(read_groups) == 0:
@@ -233,7 +224,7 @@ class IntermediateResultStoreFuture:
             logger.trace(
                 f"Processing read group {read_group} with results {self.results[read_group]}"
             )
-            intermediate = self.results[read_group].build_hist_filter(metadata, fainder_mode)
+            intermediate = self.results[read_group].build_hist_filter(metadata)
 
             if intermediate is None:
                 return None
@@ -309,7 +300,9 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         logger.trace(f"Parent write groups: {self.parent_write_group}")
         # create intermediate results for all write groups
         for write_group in self.write_groups.values():
-            self.intermediate_results.results[write_group] = IntermediateResultFuture(write_group)
+            self.intermediate_results.results[write_group] = IntermediateResultFuture(
+                write_group, self.fainder_mode
+            )
 
         result = self.transform(tree)
 
@@ -415,7 +408,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
                 f"Thread executing percentile search with {percentile} {comparison} {reference}"
             )
             hist_filter = self.intermediate_results.get_hist_filter(
-                self._get_read_groups(items[0]), self.metadata, self.fainder_mode
+                self._get_read_groups(items[0]), self.metadata
             )
             logger.trace(f"Hist filter: {hist_filter}")
             write_group = self._get_write_group(items[0])
