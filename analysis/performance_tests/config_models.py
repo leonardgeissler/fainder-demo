@@ -63,7 +63,10 @@ class QueryGenerationConfig:
         default=20,
         metadata={"description": "Maximum number of mixed terms with extended fixed structure"}
     )
-
+    max_num_mixed_terms_with_fixed_structure_not: int = field(
+        default=10,
+        metadata={"description": "Maximum number of mixed terms with fixed structure not"}
+    )
 
 @dataclass
 class EngineConfig:

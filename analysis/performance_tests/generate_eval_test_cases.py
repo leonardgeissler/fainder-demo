@@ -504,7 +504,7 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         column_names=config.keywords.default_col_names,
         ks=config.keywords.default_ks,
         operators=config.keywords.logical_operators,
-        max_terms=config.query_generation.max_num_mixed_terms_extended_with_fixed_structure,
+        max_terms=config.query_generation.max_num_mixed_terms_with_fixed_structure_not,
     )
 
 
