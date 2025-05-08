@@ -55,9 +55,9 @@ Using a top-down approach:
 2. **Conjunction nodes**: Each child gets
    - Same write group as parent
    - Same read group as parent
-3. **Negation nodes**:
-   - Create new write group
-   - Pass as both write and read group to children
+3. **Negation nodes**: Each child gets
+   - A new write group
+   - Same read group as parent plus its own write group
 
 #### Performance Impact
 

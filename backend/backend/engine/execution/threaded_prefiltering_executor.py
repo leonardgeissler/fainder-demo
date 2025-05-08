@@ -410,7 +410,9 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             hist_filter = self.intermediate_results.get_hist_filter(
                 self._get_read_groups(items[0]), self.metadata
             )
-            logger.trace(f"Hist filter: {hist_filter}")
+            logger.trace(
+                f"Length hist filter: {len(hist_filter) if hist_filter is not None else 'None'}"
+            )
             write_group = self._get_write_group(items[0])
             if hist_filter is not None and len(hist_filter) == 0:
                 return set(), write_group
@@ -424,7 +426,10 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         logger.trace(f"Evaluating percentile term: {items}")
 
         # Submit task to thread pool and store the future with a unique ID
-        return self._thread_pool.submit(_percentile_task, items)
+        future = self._thread_pool.submit(_percentile_task, items)
+        write_group = self._get_write_group(items[0])
+        self.intermediate_results.add_future_col_result(write_group, future)
+        return future
 
     def col_op(
         self, items: list[tuple[ColResult, int] | Future[tuple[ColResult, int]]]

@@ -319,7 +319,8 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
             return set(), write_group
 
         logger.trace(
-            f"Length of histogram filter: {len(hist_filter) if hist_filter is not None else 0}"
+            f"Length of histogram filter: "
+            f"{len(hist_filter) if hist_filter is not None else 'None'}"
         )
         result_hists = self.fainder_index.search(
             percentile, comparison, reference, self.fainder_mode, hist_filter
