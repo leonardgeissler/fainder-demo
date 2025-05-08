@@ -421,15 +421,13 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             )
             result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
             parent_write_group = self._get_parent_write_group(write_group)
+            self.intermediate_results.add_col_ids(write_group, result, self.metadata.doc_to_cols)
             return result, parent_write_group
 
         logger.trace(f"Evaluating percentile term: {items}")
 
         # Submit task to thread pool and store the future with a unique ID
-        future = self._thread_pool.submit(_percentile_task, items)
-        write_group = self._get_write_group(items[0])
-        self.intermediate_results.add_future_col_result(write_group, future)
-        return future
+        return self._thread_pool.submit(_percentile_task, items)
 
     def col_op(
         self, items: list[tuple[ColResult, int] | Future[tuple[ColResult, int]]]
