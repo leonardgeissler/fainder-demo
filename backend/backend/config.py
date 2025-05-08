@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from collections.abc import Sequence
 from enum import Enum
@@ -85,6 +86,7 @@ class Settings(BaseSettings):
     min_usability_score: float = 0.0
     rank_by_usability: bool = True
     executor_type: ExecutorType = ExecutorType.SIMPLE
+    max_workers: int = os.cpu_count() or 1
 
     # Fainder settings
     fainder_n_clusters: int = 50
