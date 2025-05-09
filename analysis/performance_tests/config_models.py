@@ -111,6 +111,10 @@ class ExperimentConfig:
         default_factory=lambda: ["low_memory", "full_precision", "full_recall", "exact"],
         metadata={"description": "Fainder modes to test"}
     )
+    num_runs: int = field(
+        default=1,
+        metadata={"description": "Number of times to run each query for more reliable timing"}
+    )
 
 
 @dataclass

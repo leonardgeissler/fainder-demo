@@ -11,7 +11,7 @@ defaults:
 # Paths for logs
 log_dir: logs
 performance_log_dir: ${log_dir}/performance
-profiling_log_dir: ${log_dir}/profiling
+profiling_log_dir: profiling
 
 # Execution settings
 disable_profiling: true

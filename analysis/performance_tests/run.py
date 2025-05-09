@@ -108,7 +108,7 @@ def setup_directories(config: PerformanceConfig) -> Dict[str, Path]:
     paths["all_results_dir"] = all_results_dir
     
     # Profiling logs
-    profiling_dir = Path(config.profiling_log_dir)
+    profiling_dir = git_hash_dir / Path(config.profiling_log_dir)
     profiling_dir.mkdir(exist_ok=True)
     profiling_raw_dir = profiling_dir / "raw"
     profiling_raw_dir.mkdir(exist_ok=True)
@@ -177,7 +177,8 @@ def run_test_case(
     test_case: Dict[str, Any],
     csv_paths: Dict[str, Path],
     disable_profiling: bool,
-    fainder_modes: List[str]
+    fainder_modes: List[str],
+    num_runs: int = 1
 ) -> None:
     """Run a single test case across all engines and modes"""
     query = test_case["query"]
@@ -192,46 +193,32 @@ def run_test_case(
         id_str = percentile_id
         
     for mode in fainder_modes:
-        # Run query with each engine scenario
-        timings = {}
-        results = {}
-        
-        for scenario, engine in engines.items():
-            result, execution_time, stats_io = execute_with_profiling(
-                engine, query, {}, mode, disable_profiling=disable_profiling
-            )
-            timings[scenario] = execution_time
-            results[scenario] = result
+        for _ in range(num_runs):
+            # Run query with each engine scenario
+            timings = {}
+            results = {}
             
-            # Save profiling data if enabled
-            if not disable_profiling:
-                save_profiling_stats(
-                    stats_io, csv_paths["profile_csv"], category, test_name, 
-                    query, scenario, mode
+            for scenario, engine in engines.items():
+                result, execution_time, stats_io = execute_with_profiling(
+                    engine, query, {}, mode, disable_profiling=disable_profiling
                 )
-        
-        # Check result consistency
-        first_result = next(iter(results.values()))
-        is_consistent = all(set(result) == set(first_result) for result in results.values())
-        
-        # Log to main CSV
-        log_performance_csv(
-            csv_paths["main_perf_csv"],
-            category,
-            test_name,
-            query,
-            timings,
-            results,
-            is_consistent,
-            mode,
-            ids,
-            id_str,
-        )
-        
-        # Log to individual test CSV
-        if category in csv_paths["individual_csvs"]:
+                timings[scenario] = execution_time
+                results[scenario] = result
+                
+                # Save profiling data if enabled
+                if not disable_profiling:
+                    save_profiling_stats(
+                        stats_io, csv_paths["profile_csv"], category, test_name, 
+                        query, scenario, mode
+                    )
+
+            # Check result consistency
+            first_result = next(iter(results.values()))
+            is_consistent = all(set(result) == set(first_result) for result in results.values())
+            
+            # Log to main CSV
             log_performance_csv(
-                csv_paths["individual_csvs"][category],
+                csv_paths["main_perf_csv"],
                 category,
                 test_name,
                 query,
@@ -242,21 +229,36 @@ def run_test_case(
                 ids,
                 id_str,
             )
-        
-        # Log to console
-        performance_log = {
-            "category": category,
-            "test_name": test_name,
-            "query": query,
-            "metrics": {
-                "timings": timings,
-            },
-            "results_consistent": is_consistent,
-        }
-        logger.info(f"PERFORMANCE_DATA: {performance_log}")
-        
-        # Assert result consistency
-        assert is_consistent, f"Results for query '{query}' are inconsistent across engines"
+            
+            # Log to individual test CSV
+            if category in csv_paths["individual_csvs"]:
+                log_performance_csv(
+                    csv_paths["individual_csvs"][category],
+                    category,
+                    test_name,
+                    query,
+                    timings,
+                    results,
+                    is_consistent,
+                    mode,
+                    ids,
+                    id_str,
+                )
+            
+            # Log to console
+            performance_log = {
+                "category": category,
+                "test_name": test_name,
+                "query": query,
+                "metrics": {
+                    "timings": timings,
+                },
+                "results_consistent": is_consistent,
+            }
+            logger.info(f"PERFORMANCE_DATA: {performance_log}")
+            
+            # Assert result consistency
+            assert is_consistent, f"Results for query '{query}' are inconsistent across engines"
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
@@ -300,7 +302,8 @@ def main(hydra_config: DictConfig) -> None:
                 test_case=test_case,
                 csv_paths=csv_paths,
                 disable_profiling=config.disable_profiling,
-                fainder_modes=config.experiment.fainder_modes
+                fainder_modes=config.experiment.fainder_modes,
+                num_runs=config.experiment.num_runs  # Pass the number of runs
             )
             
     # Summarize results

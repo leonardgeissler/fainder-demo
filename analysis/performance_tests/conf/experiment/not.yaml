@@ -6,3 +6,6 @@ fainder_modes:
   - full_precision
   - full_recall
   - exact
+
+# Number of times to run each query for more reliable timing measurements
+num_runs: 3
