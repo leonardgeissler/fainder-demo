@@ -4,13 +4,14 @@ import io
 import pstats
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from loguru import logger
 
 from backend.engine import Engine
 
-from .config_models import PerformanceConfig
+
+from pstats import SortKey
 
 
 def execute_with_profiling(
@@ -35,7 +36,7 @@ def execute_with_profiling(
     # Capture profiling output to a StringIO object
     s = io.StringIO()
     ps = pstats.Stats(pr, stream=s)
-    ps.sort_stats("cumulative")
+    ps.sort_stats(SortKey.TIME)
     ps.print_stats(20)  # Print top 20 functions
 
     return result, end_time - start_time, s
