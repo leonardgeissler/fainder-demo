@@ -122,11 +122,27 @@ def generate_metadata(
     # Second pass: process the documents with the updated column IDs
     logger.info("Processing croissant files - second pass to update documents")
     vector_id = 0
+    col_id = 0
     for doc_id, path in enumerate(sorted(croissant_path.iterdir())):
         json_doc = load_json(path)
         json_doc["id"] = doc_id
         if return_documents:
             json_docs[doc_id] = json_doc
+        i = 0
+        try:
+            for record_set in json_doc["recordSet"]:
+                for col in record_set["field"]:
+                    col_id = list(doc_to_cols[doc_id])[i]
+                    if "histogram" in col:
+                        col["histogram"]["id"] = col_id
+                        col["id"] = col_id
+                        assert col_id in doc_to_cols[doc_id]
+                    else:
+                        col["id"] = col_id + len(columns_with_histograms)
+                        assert col_id in doc_to_cols[doc_id]
+                    i += 1
+        except KeyError:
+            pass
 
         # Process columns for name_to_vector mapping
         for col in doc_column_mapping[doc_id]:
