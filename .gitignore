@@ -57,3 +57,4 @@ logs/
 *.lock
 /outputs
 /test_cases
+/analysis/performance_tests/figures

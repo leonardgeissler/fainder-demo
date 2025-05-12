@@ -3,7 +3,7 @@ from pathlib import Path
 import time
 from typing import Any
 from backend.engine.engine import Engine
-from backend.engine.executor import doc_to_col_ids, col_to_hist_ids
+from backend.engine.conversion import col_to_hist_ids, doc_to_col_ids
 from backend.config import Metadata
 import pytest
 
@@ -14,10 +14,9 @@ from numpy.typing import ArrayLike
 REFERENCES = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000]
 COMPARISONS = ["le"]
 PERCENTILES = [0.1, 0.5, 0.9]
-FAINDER_MODES = ["low_memory", "full_precision", "full_recall", "exact"]
+FAINDER_MODES = ["full_recall", "exact"]
 
-KEYWORDS = ["age", "date", "name", "address", "city", "state", "zip", "phone", "email", "web", "germany", "the", "a", "test", "born", "by", "blood", "heart", "lung", "italy", "usa", "bank", "health", "money", "school", "work", "music", "family", "food", "water", "time", "company", "business", "house", "car", "country", "person", "book", "computer", "university", "student", "teacher", "doctor", "hospital", "patient", "science", "technology", "internet", "language", "culture",
-           "data", "database", "dataset", "record", "field", "value", "column", "row", "table", "query", "statistic", "metric", "measure", "variable", "attribute", "parameter", "analysis", "analytics", "visualization", "dashboard", "report", "chart", "graph", "api", "json", "xml", "csv", "excel", "sql", "nosql", "index", "key", "schema", "metadata", "timestamp", "integer", "string", "boolean", "float", "array", "object", "null", "dataframe", "dataset", "processing", "pipeline", "etl"]
+KEYWORDS = ["age", "date", "name", "address", "city", "state", "zip", "phone", "email", "web", "germany", "the", "a", "test", "born", "by", "blood", "heart", "lung", "italy", "usa", "bank", "health", "money", "school", "work", "music", "family", "food", "water", "time", "company", "business", "house", "car", "country", "person", "book", "computer", "university", "student", "teacher", "doctor", "hospital", "patient", "science", "technology", "internet", "language", "culture", "data", "database", "dataset", "record", "field", "value", "column", "row", "table", "query", "statistic", "metric", "measure", "variable", "attribute", "parameter", "analysis", "analytics", "visualization", "dashboard", "report", "chart", "graph", "api", "json", "xml", "csv", "excel", "sql", "nosql", "index", "key", "schema", "metadata", "timestamp", "integer", "string", "boolean", "float", "array", "object", "null", "dataframe", "dataset", "processing", "pipeline", "etl"]
 
 
 ALL = (
@@ -61,6 +60,9 @@ def log_performance_csv(
     execution_time_first: float,
     num_results_first: int,
     num_results: int,
+    filter_size_wrong_doc: int = 0,
+    filter_size_right_doc: int = 0,
+    filter_size_doc: int = 0,
 ):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     with csv_path.open("a", newline="") as csvfile:
@@ -72,6 +74,9 @@ def log_performance_csv(
                 filter_size_wrong,
                 filter_size_right,
                 filter_size,
+                filter_size_wrong_doc,
+                filter_size_right_doc,
+                filter_size_doc,
                 execution_time,
                 execution_time_first,
                 num_results_first,
@@ -104,6 +109,9 @@ def test_breaking_point_fainder(
         0,
         0,
         len(result_without_filtering),
+        0,
+        0,
+        0,
     )
 
     keywords = []
@@ -116,13 +124,13 @@ def test_breaking_point_fainder(
         start_time = time.perf_counter()
         result_keyword, _ = simple_engine.execute(keyword_query)
         time_keyword = time.perf_counter() - start_time
-        result_keyword_hists = col_to_hist_ids(doc_to_col_ids(set(result_keyword), metadata.doc_to_cols), metadata.col_to_hist)
+        result_keyword_hists = col_to_hist_ids(doc_to_col_ids(set(result_keyword), metadata.doc_to_cols), metadata.cutoff_hists)
         
         query_string = f"{keyword_query} AND {query['query']}"
         start_time = time.perf_counter()
         result_keyword_filter, _ = prefiltering_engine.execute(query_string, fainder_mode=query["fainder_mode"])
         time_with_keyword_filter = time.perf_counter() - start_time
-        result_keyword_filter_hists = col_to_hist_ids(doc_to_col_ids(set(result_keyword_filter), metadata.doc_to_cols), metadata.col_to_hist)
+        result_keyword_filter_hists = col_to_hist_ids(doc_to_col_ids(set(result_keyword_filter), metadata.doc_to_cols), metadata.cutoff_hists)
 
         if time_without_filtering < time_with_keyword_filter:
             break
@@ -131,6 +139,11 @@ def test_breaking_point_fainder(
         filter_size_right = len(result_keyword_filter_hists)
         filter_size_wrong = len(result_keyword_hists) - filter_size_right
         filter_size = len(result_keyword_hists)
+
+        # calculate the filter size on document level
+        filter_size_right_doc = len(result_keyword_filter)
+        filter_size_wrong_doc = len(result_keyword) - filter_size_right_doc
+        filter_size_doc = len(result_keyword)
 
 
         log_performance_csv(
@@ -144,6 +157,9 @@ def test_breaking_point_fainder(
             time_keyword,
             len(result_keyword),
             len(result_keyword_filter),
+            filter_size_wrong_doc,
+            filter_size_right_doc,
+            filter_size_doc,
         )
 
 
