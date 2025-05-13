@@ -34,17 +34,33 @@ class IntermediateResult:
     """
 
     def __init__(
-        self, doc_ids: set[int] | None = None, col_ids: set[uint32] | None = None
+        self,
+        fainder_mode: FainderMode,
+        doc_ids: set[int] | None = None,
+        col_ids: set[uint32] | None = None,
     ) -> None:
+        self.fainder_mode = fainder_mode
         if doc_ids is None and col_ids is None:
             raise ValueError("doc_ids and col_ids cannot both be None")
         if doc_ids is not None and col_ids is not None:
             raise ValueError("doc_ids and col_ids cannot both be set")
 
-        self._col_ids: set[uint32] | None = col_ids
-        self._doc_ids: set[int] | None = doc_ids
+        self._doc_ids: set[int] | None = (
+            None
+            if doc_ids is not None
+            and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode)
+            else doc_ids
+        )
+        self._col_ids: set[uint32] | None = (
+            None
+            if col_ids is not None
+            and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode)
+            else col_ids
+        )
 
     def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
+        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
+            return
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
             col_ids = col_ids.intersection(helper_col_ids)
@@ -54,6 +70,8 @@ class IntermediateResult:
         self._doc_ids = None
 
     def add_doc_ids(self, doc_ids: set[int], col_to_doc: NDArray[uint32]) -> None:
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
+            return
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
             doc_ids = doc_ids.intersection(helper_doc_ids)
@@ -62,16 +80,14 @@ class IntermediateResult:
         self._doc_ids = doc_ids
         self._col_ids = None
 
-    def build_hist_filter(
-        self, metadata: Metadata, fainder_mode: FainderMode
-    ) -> set[uint32] | None:
+    def build_hist_filter(self, metadata: Metadata) -> set[uint32] | None:
         """Build a histogram filter from the intermediate results."""
         if self._col_ids is not None:
-            if exceeds_filtering_limit(self._col_ids, "num_col_ids", fainder_mode):
+            if exceeds_filtering_limit(self._col_ids, "num_col_ids", self.fainder_mode):
                 return None
             return col_to_hist_ids(self._col_ids, metadata.col_to_hist)
         if self._doc_ids is not None:
-            if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", fainder_mode):
+            if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", self.fainder_mode):
                 return None
             col_ids = doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
             return col_to_hist_ids(col_ids, metadata.col_to_hist)
@@ -89,30 +105,39 @@ class IntermediateResult:
 class IntermediateResultStore:
     """Store intermediate results for prefiltering per group."""
 
-    def __init__(self) -> None:
+    def __init__(self, fainder_mode: FainderMode) -> None:
         self.results: dict[int, IntermediateResult] = {}
+        self.fainder_mode = fainder_mode
 
     def add_col_id_results(
-        self, write_group: int, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]
+        self,
+        write_group: int,
+        col_ids: set[uint32],
+        doc_to_cols: dict[int, set[int]],
     ) -> None:
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
         if write_group in self.results:
             self.results[write_group].add_col_ids(col_ids=col_ids, doc_to_cols=doc_to_cols)
         else:
-            self.results[write_group] = IntermediateResult(col_ids=col_ids)
+            self.results[write_group] = IntermediateResult(
+                col_ids=col_ids, fainder_mode=self.fainder_mode
+            )
 
     def add_doc_id_results(
-        self, write_group: int, doc_ids: set[int], col_to_doc: NDArray[uint32]
+        self,
+        write_group: int,
+        doc_ids: set[int],
+        col_to_doc: NDArray[uint32],
     ) -> None:
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
         if write_group in self.results:
             self.results[write_group].add_doc_ids(doc_ids=doc_ids, col_to_doc=col_to_doc)
         else:
-            self.results[write_group] = IntermediateResult(doc_ids=doc_ids)
+            self.results[write_group] = IntermediateResult(
+                doc_ids=doc_ids, fainder_mode=self.fainder_mode
+            )
 
-    def build_hist_filter(
-        self, read_groups: list[int], metadata: Metadata, fainder_mode: FainderMode
-    ) -> set[uint32] | None:
+    def build_hist_filter(self, read_groups: list[int], metadata: Metadata) -> set[uint32] | None:
         """Build a histogram filter from the intermediate results."""
         hist_filter: set[uint32] | None = None
         if len(read_groups) == 0:
@@ -129,7 +154,7 @@ class IntermediateResultStore:
             logger.trace(
                 f"Processing read group {read_group} with results {self.results[read_group]}"
             )
-            intermediate = self.results[read_group].build_hist_filter(metadata, fainder_mode)
+            intermediate = self.results[read_group].build_hist_filter(metadata)
 
             if intermediate is None:
                 return None
@@ -172,7 +197,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.scores: dict[int, float] = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
-        self.intermediate_results = IntermediateResultStore()
+        self.intermediate_results = IntermediateResultStore(fainder_mode)
         self.write_groups: dict[int, int] = {}
         self.read_groups: dict[int, list[int]] = {}
         self.parent_write_group: dict[int, int] = {}
@@ -287,7 +312,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         comparison: str = items[1]
         reference = float(items[2])
         hist_filter = self.intermediate_results.build_hist_filter(
-            self._get_read_groups(items[0]), self.metadata, self.fainder_mode
+            self._get_read_groups(items[0]), self.metadata
         )
 
         write_group = self._get_write_group(items[0])
@@ -296,7 +321,8 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
             return set(), write_group
 
         logger.trace(
-            f"Length of histogram filter: {len(hist_filter) if hist_filter is not None else 0}"
+            f"Length of histogram filter: "
+            f"{len(hist_filter) if hist_filter is not None else 'None'}"
         )
         result_hists = self.fainder_index.search(
             percentile, comparison, reference, self.fainder_mode, hist_filter

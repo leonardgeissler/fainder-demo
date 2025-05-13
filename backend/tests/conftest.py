@@ -21,7 +21,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
 
     # Create logs directory if it doesn't exist
     log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
+    log_dir.mkdir(exist_ok=True, parents=True)
 
     # Remove default handler
     logger.remove()
