@@ -57,8 +57,6 @@ class IntermediateResult:
         )
 
     def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
-        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
-            return
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
             col_ids = col_ids.intersection(helper_col_ids)
@@ -68,8 +66,6 @@ class IntermediateResult:
         self._doc_ids = None
 
     def add_doc_ids(self, doc_ids: set[int], col_to_doc: NDArray[uint32]) -> None:
-        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
-            return
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
             doc_ids = doc_ids.intersection(helper_doc_ids)
@@ -102,7 +98,7 @@ class IntermediateResult:
 class IntermediateResultStore:
     """Store intermediate results for prefiltering per group."""
 
-    def __init__(self, fainder_mode: FainderMode, write_groups_used: dict[int, bool]) -> None:
+    def __init__(self, fainder_mode: FainderMode, write_groups_used: dict[int, int]) -> None:
         self.results: dict[int, IntermediateResult] = {}
         self.fainder_mode = fainder_mode
         self.write_groups_used = write_groups_used
@@ -114,9 +110,16 @@ class IntermediateResultStore:
         doc_to_cols: dict[int, set[int]],
     ) -> None:
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
-        if write_group in self.write_groups_used and not self.write_groups_used[write_group]:
+        if write_group not in self.write_groups_used:
+            raise ValueError(f"Write group {write_group} is not used")
+
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] == 0:
             logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
             return
+
+        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
+            return
+
         if write_group in self.results:
             self.results[write_group].add_col_ids(col_ids=col_ids, doc_to_cols=doc_to_cols)
         else:
@@ -131,9 +134,16 @@ class IntermediateResultStore:
         col_to_doc: NDArray[uint32],
     ) -> None:
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
-        if write_group in self.write_groups_used and not self.write_groups_used[write_group]:
+        if write_group not in self.write_groups_used:
+            raise ValueError(f"Write group {write_group} is not used")
+
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] == 0:
             logger.trace(f"Write group {write_group} is not used, skipping adding document IDs")
             return
+
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
+            return
+
         if write_group in self.results:
             self.results[write_group].add_doc_ids(doc_ids=doc_ids, col_to_doc=col_to_doc)
         else:
