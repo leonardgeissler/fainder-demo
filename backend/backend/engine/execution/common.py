@@ -102,7 +102,6 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             parent_write_group = self.write_groups[id(tree)]
             parent_read_groups = self.read_groups[id(tree)].copy()
-            self.write_groups_used[parent_write_group] = True
 
             for child in tree.children:
                 current_write_group = self._create_group_id()
@@ -139,7 +138,6 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 # For parallel processing, treat col_op as a disjunction
                 parent_write_group = self.write_groups[id(tree)]
                 parent_read_groups = self.read_groups[id(tree)].copy()
-                self.write_groups_used[parent_write_group] = True
 
                 for child in tree.children:
                     current_write_group = self._create_group_id()
@@ -151,7 +149,6 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 # For sequential processing, all children read and write to the same groups
                 write_group = self.write_groups[id(tree)]
                 read_groups = self.read_groups[id(tree)]
-                self.write_groups_used[write_group] = True
 
                 for child in tree.children:
                     # Store in our dictionaries rather than on the objects directly
@@ -160,6 +157,28 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                     logger.trace(
                         f"Child {child} has write group {write_group} and read group {read_groups}"
                     )
+        else:
+            raise ValueError(f"Node {tree} does not have write or read groups")
+
+    def ppercentile_op(self, tree: ParseTree) -> None:
+        # Set attributes for all children using the parent's values
+        logger.trace(f"Processing ppercentile node: {tree}")
+        if id(tree) in self.write_groups and id(tree) in self.read_groups:
+            write_group = self.write_groups[id(tree)]
+            read_groups = self.read_groups[id(tree)]
+
+            for read_group in read_groups:
+                if read_group not in self.write_groups_used:
+                    raise ValueError(f"Read group {read_group} not found in write groups")
+                self.write_groups_used[read_group] = True
+
+            for child in tree.children:
+                # Store in our dictionaries rather than on the objects directly
+                self.write_groups[id(child)] = write_group
+                self.read_groups[id(child)] = read_groups
+                logger.trace(
+                    f"Child {child} has write group {write_group} and read group {read_groups}"
+                )
         else:
             raise ValueError(f"Node {tree} does not have write or read groups")
 
