@@ -87,7 +87,6 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             write_group = self.write_groups[id(tree)]
             read_group = self.read_groups[id(tree)]
-            self.write_groups_used[write_group] = True
 
             for child in tree.children:
                 self.write_groups[id(child)] = write_group
@@ -102,6 +101,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             parent_write_group = self.write_groups[id(tree)]
             parent_read_groups = self.read_groups[id(tree)].copy()
+            self.write_groups_used[parent_write_group] = True
 
             for child in tree.children:
                 current_write_group = self._create_group_id()
@@ -117,11 +117,11 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         # For negation, increment the write group and add to read groups
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             parent_group = self.write_groups[id(tree)]
-            self.write_groups_used[parent_group] = True
             new_group = self._create_group_id()
             read_group = self.read_groups[id(tree)].copy()
             read_groups = [new_group, *read_group]
             self.parent_write_group[new_group] = parent_group
+            self.write_groups_used[new_group] = False
 
             for child in tree.children:
                 self.write_groups[id(child)] = new_group
@@ -160,7 +160,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         else:
             raise ValueError(f"Node {tree} does not have write or read groups")
 
-    def ppercentile_op(self, tree: ParseTree) -> None:
+    def percentile_op(self, tree: ParseTree) -> None:
         # Set attributes for all children using the parent's values
         logger.trace(f"Processing ppercentile node: {tree}")
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
