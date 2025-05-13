@@ -45,17 +45,20 @@ class IntermediateResultFuture:
         self.col_result_futures: list[Future[tuple[ColResult, int]]] = []
 
         # Store resolved results only one of these should be set
-        self._doc_ids: set[int] | None = None
-        self._col_ids: set[uint32] | None = None
+        self._doc_ids: set[int] | None = (
+            None
+            if doc_ids is not None
+            and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode)
+            else doc_ids
+        )
+        self._col_ids: set[uint32] | None = (
+            None
+            if col_ids is not None
+            and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode)
+            else col_ids
+        )
+
         self.fainder_mode = fainder_mode
-        if doc_ids is not None and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
-            return
-
-        if col_ids is not None and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
-            return
-
-        self._col_ids = col_ids
-        self._doc_ids = doc_ids
 
     def add_doc_future(self, future: Future[tuple[DocResult, int]]) -> None:
         """Add a future that will resolve to document IDs"""

@@ -45,16 +45,18 @@ class IntermediateResult:
         if doc_ids is not None and col_ids is not None:
             raise ValueError("doc_ids and col_ids cannot both be set")
 
-        self._doc_ids: set[int] | None = None
-        self._col_ids: set[uint32] | None = None
-        if doc_ids is not None and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode):
-            return
-
-        if col_ids is not None and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode):
-            return
-
-        self._col_ids = col_ids
-        self._doc_ids = doc_ids
+        self._doc_ids: set[int] | None = (
+            None
+            if doc_ids is not None
+            and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode)
+            else doc_ids
+        )
+        self._col_ids: set[uint32] | None = (
+            None
+            if col_ids is not None
+            and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode)
+            else col_ids
+        )
 
     def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
         if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
