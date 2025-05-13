@@ -102,9 +102,10 @@ class IntermediateResult:
 class IntermediateResultStore:
     """Store intermediate results for prefiltering per group."""
 
-    def __init__(self, fainder_mode: FainderMode) -> None:
+    def __init__(self, fainder_mode: FainderMode, write_groups_used: dict[int, bool]) -> None:
         self.results: dict[int, IntermediateResult] = {}
         self.fainder_mode = fainder_mode
+        self.write_groups_used = write_groups_used
 
     def add_col_id_results(
         self,
@@ -113,6 +114,9 @@ class IntermediateResultStore:
         doc_to_cols: dict[int, set[int]],
     ) -> None:
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
+        if write_group in self.write_groups_used and not self.write_groups_used[write_group]:
+            logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
+            return
         if write_group in self.results:
             self.results[write_group].add_col_ids(col_ids=col_ids, doc_to_cols=doc_to_cols)
         else:
@@ -127,6 +131,9 @@ class IntermediateResultStore:
         col_to_doc: NDArray[uint32],
     ) -> None:
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
+        if write_group in self.write_groups_used and not self.write_groups_used[write_group]:
+            logger.trace(f"Write group {write_group} is not used, skipping adding document IDs")
+            return
         if write_group in self.results:
             self.results[write_group].add_doc_ids(doc_ids=doc_ids, col_to_doc=col_to_doc)
         else:
@@ -194,7 +201,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.scores: dict[int, float] = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
-        self.intermediate_results = IntermediateResultStore(fainder_mode)
+        self.intermediate_results = IntermediateResultStore(fainder_mode, {})
         self.write_groups: dict[int, int] = {}
         self.read_groups: dict[int, list[int]] = {}
         self.parent_write_group: dict[int, int] = {}
@@ -246,9 +253,11 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.write_groups = groups.write_groups
         self.read_groups = groups.read_groups
         self.parent_write_group = groups.parent_write_group
+        self.intermediate_results.write_groups_used = groups.write_groups_used
         logger.trace(f"Write groups: {self.write_groups}")
         logger.trace(f"Read groups: {self.read_groups}")
         logger.trace(f"Parent write groups: {self.parent_write_group}")
+        logger.trace(f"Write groups used: {self.intermediate_results.write_groups_used}")
         return self.transform(tree)
 
     ### Operator implementations ###

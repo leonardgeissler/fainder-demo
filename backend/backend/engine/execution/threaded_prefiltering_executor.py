@@ -68,8 +68,6 @@ class IntermediateResultFuture:
         self.col_result_futures.append(future)
 
     def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
-        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
-            return
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
             col_ids = col_ids.intersection(helper_col_ids)
@@ -79,8 +77,6 @@ class IntermediateResultFuture:
         self._doc_ids = None
 
     def add_doc_ids(self, doc_ids: set[int], col_to_doc: NDArray[uint32]) -> None:
-        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
-            return
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
             doc_ids = doc_ids.intersection(helper_doc_ids)
@@ -162,14 +158,18 @@ class IntermediateResultFuture:
 class IntermediateResultStoreFuture:
     """Stores futures and results for intermediate results during parallel execution."""
 
-    def __init__(self, fainder_mode: FainderMode) -> None:
+    def __init__(self, fainder_mode: FainderMode, write_groups_used: dict[int, bool]) -> None:
         self.results: dict[int, IntermediateResultFuture] = {}
         self.fainder_mode = fainder_mode
+        self.write_groups_used = write_groups_used
 
     def add_future_kw_result(
         self, write_group: int, future: Future[tuple[DocResult, int]]
     ) -> None:
         """Add a future that will resolve to document IDs"""
+        if write_group in self.write_groups_used and not self.write_groups_used[write_group]:
+            logger.trace(f"Write group {write_group} is not used, skipping keyword search")
+            return
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, fainder_mode=self.fainder_mode
@@ -180,6 +180,9 @@ class IntermediateResultStoreFuture:
         self, write_group: int, future: Future[tuple[ColResult, int]]
     ) -> None:
         """Add a future that will resolve to column IDs"""
+        if write_group in self.write_groups_used and not self.write_groups_used[write_group]:
+            logger.trace(f"Write group {write_group} is not used, skipping column search")
+            return
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, fainder_mode=self.fainder_mode
@@ -190,22 +193,38 @@ class IntermediateResultStoreFuture:
         self, write_group: int, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]
     ) -> None:
         """Add column IDs to the intermediate result."""
+        if write_group in self.write_groups_used and not self.write_groups_used[write_group]:
+            logger.trace(f"Write group {write_group} is not used, skipping column search")
+            return
+
+        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
+            return
+
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, col_ids=col_ids, fainder_mode=self.fainder_mode
             )
-        self.results[write_group].add_col_ids(col_ids, doc_to_cols)
+        else:
+            self.results[write_group].add_col_ids(col_ids, doc_to_cols)
         logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
 
     def add_doc_ids(
         self, write_group: int, doc_ids: set[int], col_to_doc: NDArray[uint32]
     ) -> None:
         """Add document IDs to the intermediate result."""
+        if write_group in self.write_groups_used and not self.write_groups_used[write_group]:
+            logger.trace(f"Write group {write_group} is not used, skipping keyword search")
+            return
+
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
+            return
+
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, doc_ids=doc_ids, fainder_mode=self.fainder_mode
             )
-        self.results[write_group].add_doc_ids(doc_ids, col_to_doc)
+        else:
+            self.results[write_group].add_doc_ids(doc_ids, col_to_doc)
         logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
 
     def get_hist_filter(self, read_groups: list[int], metadata: Metadata) -> ColResult | None:
@@ -262,7 +281,6 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.fainder_index = fainder_index
         self.hnsw_index = hnsw_index
         self.metadata = metadata
-        self.intermediate_results = IntermediateResultStoreFuture(fainder_mode=fainder_mode)
         self.write_groups: dict[int, int] = {}
         self.read_groups: dict[int, list[int]] = {}
         self.parent_write_group: dict[int, int] = {}
@@ -283,7 +301,9 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.scores = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
-        self.intermediate_results = IntermediateResultStoreFuture(fainder_mode=fainder_mode)
+        self.intermediate_results = IntermediateResultStoreFuture(
+            fainder_mode=fainder_mode, write_groups_used={}
+        )
 
     def execute(self, tree: ParseTree) -> DocResult:
         """Start processing the parse tree."""
@@ -296,6 +316,8 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.write_groups = groups.write_groups
         self.read_groups = groups.read_groups
         self.parent_write_group = groups.parent_write_group
+        self.intermediate_results.write_groups_used = groups.write_groups_used
+        logger.trace(f"Write groups used: {groups.write_groups_used}")
         logger.trace(f"Write groups: {self.write_groups}")
         logger.trace(f"Read groups: {self.read_groups}")
         logger.trace(f"Parent write groups: {self.parent_write_group}")

@@ -30,6 +30,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         self.write_groups: dict[int, int] = {}
         self.read_groups: dict[int, list[int]] = {}
         self.parent_write_group: dict[int, int] = {}  # node write group to parent write group
+        self.write_groups_used: dict[int, bool] = {}
         self.current_write_group = 0
 
     def apply(self, tree: ParseTree, parallel: bool = False) -> None:
@@ -73,6 +74,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         self.write_groups[id(tree)] = 0
         self.read_groups[id(tree)] = [0]
         self.parent_write_group[0] = 0
+        self.write_groups_used[0] = False
 
         # Set same attributes for all children
         for child in tree.children:
@@ -85,6 +87,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             write_group = self.write_groups[id(tree)]
             read_group = self.read_groups[id(tree)]
+            self.write_groups_used[write_group] = True
 
             for child in tree.children:
                 self.write_groups[id(child)] = write_group
@@ -99,9 +102,11 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             parent_write_group = self.write_groups[id(tree)]
             parent_read_groups = self.read_groups[id(tree)].copy()
+            self.write_groups_used[parent_write_group] = True
 
             for child in tree.children:
                 current_write_group = self._create_group_id()
+                self.write_groups_used[current_write_group] = False
                 self.write_groups[id(child)] = current_write_group
                 self.read_groups[id(child)] = [current_write_group, *parent_read_groups]
                 self.parent_write_group[current_write_group] = parent_write_group
@@ -113,6 +118,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
         # For negation, increment the write group and add to read groups
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             parent_group = self.write_groups[id(tree)]
+            self.write_groups_used[parent_group] = True
             new_group = self._create_group_id()
             read_group = self.read_groups[id(tree)].copy()
             read_groups = [new_group, *read_group]
@@ -133,9 +139,11 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 # For parallel processing, treat col_op as a disjunction
                 parent_write_group = self.write_groups[id(tree)]
                 parent_read_groups = self.read_groups[id(tree)].copy()
+                self.write_groups_used[parent_write_group] = True
 
                 for child in tree.children:
                     current_write_group = self._create_group_id()
+                    self.write_groups_used[current_write_group] = False
                     self.write_groups[id(child)] = current_write_group
                     self.read_groups[id(child)] = [current_write_group, *parent_read_groups]
                     self.parent_write_group[current_write_group] = parent_write_group
@@ -143,6 +151,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 # For sequential processing, all children read and write to the same groups
                 write_group = self.write_groups[id(tree)]
                 read_groups = self.read_groups[id(tree)]
+                self.write_groups_used[write_group] = True
 
                 for child in tree.children:
                     # Store in our dictionaries rather than on the objects directly
