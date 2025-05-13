@@ -421,7 +421,9 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
                 percentile, comparison, reference, self.fainder_mode, hist_filter
             )
             parent_write_group = self._get_parent_write_group(write_group)
-            self.intermediate_results.add_col_ids(write_group, result_hists, self.metadata.doc_to_cols)
+            self.intermediate_results.add_col_ids(
+                write_group, result_hists, self.metadata.doc_to_cols
+            )
             return result_hists, parent_write_group
 
         logger.trace(f"Evaluating percentile term: {items}")
