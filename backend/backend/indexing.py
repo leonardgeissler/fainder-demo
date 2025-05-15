@@ -87,8 +87,8 @@ def generate_metadata(
     logger.info("Processing documents")
     hists: list[tuple[np.uint32, Histogram]] = []
     vector_id = 0
-    current_col = 0
-    current_hist = 0
+    col_id_hist = 0
+    col_id_no_hist = num_hists
 
     for doc_id, path in enumerate(sorted(croissant_path.iterdir())):
         # Read the file and add a document ID to it
@@ -102,19 +102,19 @@ def generate_metadata(
             for record_set in json_doc["recordSet"]:
                 for col in record_set["field"]:
                     if "histogram" in col:
-                        col_id = current_hist
+                        col_id = col_id_hist
+                        col_id_hist += 1
+
                         densities = np.array(col["histogram"]["densities"], dtype=np.float32)
                         bins = np.array(col["histogram"]["bins"], dtype=np.float64)
-                        hists.append((np.uint32(col_id), (densities, bins)))
-                        col["histogram"]["id"] = col_id
-                        current_hist += 1
+                        hists.append((np.uint32(col_id_hist), (densities, bins)))
+                        col["histogram"]["id"] = col_id_hist
                     else:
-                        col_id = current_col + num_hists
-                        current_col += 1
+                        col_id = col_id_no_hist
+                        col_id_no_hist += 1
 
                     col["id"] = col_id
                     doc_to_cols[doc_id].add(col_id)
-
                     col_to_doc[col_id] = doc_id
 
                     col_name = col["name"]
