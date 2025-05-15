@@ -59,10 +59,9 @@ class Metadata(BaseModel):
     doc_to_cols: dict[int, set[int]]
     doc_to_path: list[str]
     col_to_doc: IntegerArray
-    col_to_hist: dict[int, int]  # Must be a dict, not every column has a histogram
-    hist_to_col: IntegerArray
     name_to_vector: dict[str, int]
     vector_to_cols: dict[int, set[int]]
+    num_hists: int
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

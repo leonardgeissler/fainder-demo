@@ -10,9 +10,7 @@ from numpy.typing import NDArray
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
 from backend.engine.conversion import (
     col_to_doc_ids,
-    col_to_hist_ids,
     doc_to_col_ids,
-    hist_to_col_ids,
 )
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
@@ -85,12 +83,11 @@ class IntermediateResult:
         if self._col_ids is not None:
             if exceeds_filtering_limit(self._col_ids, "num_col_ids", self.fainder_mode):
                 return None
-            return col_to_hist_ids(self._col_ids, metadata.col_to_hist)
+            return self._col_ids
         if self._doc_ids is not None:
             if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", self.fainder_mode):
                 return None
-            col_ids = doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
-            return col_to_hist_ids(col_ids, metadata.col_to_hist)
+            return doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
         return None
 
     def is_empty(self) -> bool:
@@ -324,10 +321,9 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
             f"Length of histogram filter: "
             f"{len(hist_filter) if hist_filter is not None else 'None'}"
         )
-        result_hists = self.fainder_index.search(
+        result = self.fainder_index.search(
             percentile, comparison, reference, self.fainder_mode, hist_filter
         )
-        result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
         self.intermediate_results.add_col_id_results(
             write_group, result, self.metadata.doc_to_cols
         )

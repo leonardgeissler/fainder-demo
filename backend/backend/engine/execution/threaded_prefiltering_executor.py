@@ -14,7 +14,6 @@ from backend.engine.conversion import (
     col_to_doc_ids,
     col_to_hist_ids,
     doc_to_col_ids,
-    hist_to_col_ids,
 )
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
@@ -94,12 +93,11 @@ class IntermediateResultFuture:
         if self._doc_ids is not None:
             if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", self.fainder_mode):
                 return None
-            col_ids = doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
-            return col_to_hist_ids(col_ids, metadata.col_to_hist)
+            return doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
         if self._col_ids is not None:
             if exceeds_filtering_limit(self._col_ids, "num_col_ids", self.fainder_mode):
                 return None
-            return col_to_hist_ids(self._col_ids, metadata.col_to_hist)
+            return self._col_ids
         return None
 
     def _build_hist_filter_future(self, metadata: Metadata) -> ColResult | None:
@@ -110,7 +108,7 @@ class IntermediateResultFuture:
             if exceeds_filtering_limit(doc_ids[0], "num_doc_ids", self.fainder_mode):
                 continue
             col_ids = doc_to_col_ids(doc_ids[0], metadata.doc_to_cols)
-            new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
+            new_hist_ids = col_to_hist_ids(col_ids, metadata.num_hists)
             if first:
                 hist_ids = new_hist_ids
                 first = False
@@ -121,7 +119,7 @@ class IntermediateResultFuture:
             col_ids, _ = col_future.result()
             if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
                 continue
-            new_hist_ids = col_to_hist_ids(col_ids, metadata.col_to_hist)
+            new_hist_ids = col_to_hist_ids(col_ids, metadata.num_hists)
             if first:
                 hist_ids = new_hist_ids
                 first = False
@@ -422,10 +420,11 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             result_hists = self.fainder_index.search(
                 percentile, comparison, reference, self.fainder_mode, hist_filter
             )
-            result = hist_to_col_ids(result_hists, self.metadata.hist_to_col)
             parent_write_group = self._get_parent_write_group(write_group)
-            self.intermediate_results.add_col_ids(write_group, result, self.metadata.doc_to_cols)
-            return result, parent_write_group
+            self.intermediate_results.add_col_ids(
+                write_group, result_hists, self.metadata.doc_to_cols
+            )
+            return result_hists, parent_write_group
 
         logger.trace(f"Evaluating percentile term: {items}")
 
