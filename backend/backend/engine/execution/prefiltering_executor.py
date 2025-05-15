@@ -113,8 +113,8 @@ class IntermediateResultStore:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] == 0:
-            logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
+            logger.debug(f"Write group {write_group} is not used, skipping adding column IDs")
             return
 
         if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
@@ -137,8 +137,9 @@ class IntermediateResultStore:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] == 0:
-            logger.trace(f"Write group {write_group} is not used, skipping adding document IDs")
+        logger.debug(f"Write group used: {self.write_groups_used[write_group]}")
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
+            logger.debug(f"Write group {write_group} is not used, skipping adding document IDs")
             return
 
         if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):

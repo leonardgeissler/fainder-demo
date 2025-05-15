@@ -148,6 +148,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 # For sequential processing, all children read and write to the same groups
                 write_group = self.write_groups[id(tree)]
                 read_groups = self.read_groups[id(tree)]
+                self.write_groups_used[write_group] = 0
 
                 for child in tree.children:
                     # Store in our dictionaries rather than on the objects directly

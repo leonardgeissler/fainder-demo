@@ -170,7 +170,7 @@ class IntermediateResultStoreFuture:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] == 0:
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
             logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
             return
 
@@ -187,7 +187,7 @@ class IntermediateResultStoreFuture:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] == 0:
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
             logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
             return
 
@@ -204,7 +204,7 @@ class IntermediateResultStoreFuture:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] == 0:
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
             logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
             return
 
@@ -226,7 +226,7 @@ class IntermediateResultStoreFuture:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] == 0:
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
             logger.trace(f"Write group {write_group} is not used, skipping adding document IDs")
             return
 
