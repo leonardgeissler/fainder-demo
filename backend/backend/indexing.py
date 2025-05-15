@@ -103,12 +103,11 @@ def generate_metadata(
                 for col in record_set["field"]:
                     if "histogram" in col:
                         col_id = col_id_hist
-                        col_id_hist += 1
-
                         densities = np.array(col["histogram"]["densities"], dtype=np.float32)
                         bins = np.array(col["histogram"]["bins"], dtype=np.float64)
                         hists.append((np.uint32(col_id_hist), (densities, bins)))
                         col["histogram"]["id"] = col_id_hist
+                        col_id_hist += 1
                     else:
                         col_id = col_id_no_hist
                         col_id_no_hist += 1
