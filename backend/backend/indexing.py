@@ -60,7 +60,6 @@ def generate_metadata(
     # Initialize mappings
     doc_to_cols: dict[int, set[int]] = defaultdict(set)
     doc_to_path: list[str] = []
-    col_to_doc: list[int] = []
     name_to_vector: dict[str, int] = {}
     vector_to_cols: dict[int, set[int]] = defaultdict(set)
 
@@ -68,90 +67,68 @@ def generate_metadata(
     tantivy_docs: list[tantivy.Document] = []
     tantivy_schema = get_tantivy_schema()
 
-    # First pass: collect all columns and separate those with histograms
-    logger.info("Processing croissant files - first pass to collect columns")
-    columns_with_histograms: list[dict[str, Any]] = []
-    columns_without_histograms: list[dict[str, Any]] = []
-    doc_column_mapping: dict[int, list[Any]] = {}  # Temporary mapping from doc_id to columns
-
-    for doc_id, path in enumerate(sorted(croissant_path.iterdir())):
+    # First pass: count the number of histograms
+    logger.info("Counting histograms")
+    num_hists = 0
+    num_cols = 0
+    for _, path in enumerate(sorted(croissant_path.iterdir())):
         json_doc = load_json(path)
-        doc_columns: list[Any] = []
-        doc_column_mapping[doc_id] = doc_columns
-
         try:
             for record_set in json_doc["recordSet"]:
                 for col in record_set["field"]:
-                    col["doc_id"] = doc_id
                     if "histogram" in col:
-                        columns_with_histograms.append(col)
-                    else:
-                        columns_without_histograms.append(col)
-                    doc_columns.append(col)
+                        num_hists += 1
+                    num_cols += 1
+
         except KeyError as e:
             logger.error(f"KeyError {e} reading file {path}")
 
-    # Assign IDs: columns with histograms first
-    col_id = 0
-    hists: list[tuple[np.uint32, Histogram]] = []
-
-    # Process columns with histograms first
-    for col in columns_with_histograms:
-        col["id"] = col_id
-        doc_id = col["doc_id"]
-        doc_to_cols[doc_id].add(col_id)
-        col_to_doc.append(doc_id)
-
-        densities = np.array(col["histogram"]["densities"], dtype=np.float32)
-        bins = np.array(col["histogram"]["bins"], dtype=np.float64)
-
-        # Here histogram ID equals column ID
-        hists.append((np.uint32(col_id), (densities, bins)))
-        col["histogram"]["id"] = col_id
-
-        col_id += 1
-
-    # Then process columns without histograms
-    for col in columns_without_histograms:
-        col["id"] = col_id
-        doc_id = col["doc_id"]
-        doc_to_cols[doc_id].add(col_id)
-        col_to_doc.append(doc_id)
-        col_id += 1
+    col_to_doc: list[int] = [-1] * (num_cols)
 
     # Second pass: process the documents with the updated column IDs
-    logger.info("Processing croissant files - second pass to update documents")
+    logger.info("Processing documents")
+    hists: list[tuple[np.uint32, Histogram]] = []
+    col_counter = 0
+    hist_id = 0
     vector_id = 0
     col_id = 0
+
     for doc_id, path in enumerate(sorted(croissant_path.iterdir())):
+        # Read the file and add a document ID to it
         json_doc = load_json(path)
         json_doc["id"] = doc_id
         if return_documents:
             json_docs[doc_id] = json_doc
-        i = 0
+
+        # Ingest histograms and assign unique ids to columns
         try:
             for record_set in json_doc["recordSet"]:
                 for col in record_set["field"]:
-                    col_id = list(doc_to_cols[doc_id])[i]
                     if "histogram" in col:
+                        densities = np.array(col["histogram"]["densities"], dtype=np.float32)
+                        bins = np.array(col["histogram"]["bins"], dtype=np.float64)
+                        hists.append((np.uint32(hist_id), (densities, bins)))
+                        col_id = hist_id
                         col["histogram"]["id"] = col_id
                         col["id"] = col_id
-                        assert col_id in doc_to_cols[doc_id]
+                        doc_to_cols[doc_id].add(col_id)
+                        col_to_doc[col_id] = doc_id
+                        hist_id += 1
                     else:
-                        col["id"] = col_id + len(columns_with_histograms)
-                        assert col_id in doc_to_cols[doc_id]
-                    i += 1
-        except KeyError:
-            pass
+                        col_id = col_counter + num_hists
+                        doc_to_cols[doc_id].add(col_counter + num_hists)
+                        col["id"] = col_id
+                        col_to_doc[col_id] = doc_id
+                        col_counter += 1
 
-        # Process columns for name_to_vector mapping
-        for col in doc_column_mapping[doc_id]:
-            col_name = col["name"]
-            col_id = col["id"]
-            if col_name not in name_to_vector:
-                name_to_vector[col_name] = vector_id
-                vector_id += 1
-            vector_to_cols[name_to_vector[col_name]].add(col_id)
+                    col_name = col["name"]
+                    if col_name not in name_to_vector:
+                        name_to_vector[col_name] = vector_id
+                        vector_id += 1
+                    vector_to_cols[name_to_vector[col_name]].add(col_id)
+
+        except KeyError as e:
+            logger.error(f"KeyError {e} reading file {path}")
 
         # Store the document path for file-based Croissant stores
         doc_to_path.append(path.name)
@@ -165,7 +142,7 @@ def generate_metadata(
 
     logger.info(
         f"Found {len(doc_to_cols)} documents with {len(col_to_doc)} columns and "
-        f"{len(columns_with_histograms)} histograms."
+        f"{num_hists} histograms."
     )
 
     # Index the documents in Tantivy (we index all documents at once to increase performance)
@@ -180,7 +157,7 @@ def generate_metadata(
             "doc_to_cols": {str(k): list(v) for k, v in doc_to_cols.items()},
             "doc_to_path": doc_to_path,
             "col_to_doc": col_to_doc,
-            "cutoff_hists": len(columns_with_histograms),
+            "cutoff_hists": num_hists,
             "name_to_vector": name_to_vector,
             "vector_to_cols": {str(k): list(v) for k, v in vector_to_cols.items()},
         },
