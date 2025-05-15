@@ -36,12 +36,12 @@ def initialize_logging(log_dir: Path) -> None:
     logger.add(
         sys.stdout,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | {message}",
-        filter=lambda record: record["level"].name == "INFO",
+        level="INFO",
     )
     logger.add(
         log_dir / "logs/query_performance__{time:YYYY-MM-DD HH:mm:ss}.log",
         format="{time:YYYY-MM-DD HH:mm:ss} | {message}",
-        filter=lambda record: record["level"].name == "INFO",
+        level="INFO",
         rotation="1 day",
     )
 
