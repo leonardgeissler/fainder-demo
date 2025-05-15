@@ -261,7 +261,7 @@ class IntermediateResultStoreFuture:
             intermediate = self.results[read_group].build_hist_filter(metadata)
 
             if intermediate is None:
-                return None
+                continue
 
             logger.trace(f"intermediate {intermediate}")
             if hist_filter is None:

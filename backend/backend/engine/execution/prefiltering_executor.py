@@ -171,7 +171,8 @@ class IntermediateResultStore:
             intermediate = self.results[read_group].build_hist_filter(metadata)
 
             if intermediate is None:
-                return None
+                continue
+
             if len(intermediate) == 0:
                 return set()
 
