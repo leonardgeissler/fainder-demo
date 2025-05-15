@@ -110,7 +110,7 @@
         2,
         2
     ],
-    "cutoff_hists": 23,
+    "num_hists": 23,
     "name_to_vector": {
         "City": 0,
         "Latitude": 1,
