@@ -45,7 +45,7 @@ def _prepare_document_for_tantivy(json_doc: dict[str, Any]) -> None:
         json_doc["publisher"] = json_doc["publisher"]["name"]
 
 
-# flake8: noqa: C901
+# ruff: noqa: C901
 def generate_metadata(
     croissant_path: Path, metadata_path: Path, tantivy_path: Path, return_documents: bool = True
 ) -> tuple[
@@ -58,6 +58,7 @@ def generate_metadata(
     downstream processing.
     """
     # Initialize mappings
+    # NOTE: We need the vector_id intermediate step because hnswlib requires int IDs for vectors
     doc_to_cols: dict[int, set[int]] = defaultdict(set)
     doc_to_path: list[str] = []
     name_to_vector: dict[str, int] = {}
@@ -157,7 +158,7 @@ def generate_metadata(
             "doc_to_cols": {str(k): list(v) for k, v in doc_to_cols.items()},
             "doc_to_path": doc_to_path,
             "col_to_doc": col_to_doc,
-            "cutoff_hists": num_hists,
+            "num_hists": num_hists,
             "name_to_vector": name_to_vector,
             "vector_to_cols": {str(k): list(v) for k, v in vector_to_cols.items()},
         },

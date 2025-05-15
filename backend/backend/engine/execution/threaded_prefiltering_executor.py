@@ -108,7 +108,7 @@ class IntermediateResultFuture:
             if exceeds_filtering_limit(doc_ids[0], "num_doc_ids", self.fainder_mode):
                 continue
             col_ids = doc_to_col_ids(doc_ids[0], metadata.doc_to_cols)
-            new_hist_ids = col_to_hist_ids(col_ids, metadata.cutoff_hists)
+            new_hist_ids = col_to_hist_ids(col_ids, metadata.num_hists)
             if first:
                 hist_ids = new_hist_ids
                 first = False
@@ -119,7 +119,7 @@ class IntermediateResultFuture:
             col_ids, _ = col_future.result()
             if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
                 continue
-            new_hist_ids = col_to_hist_ids(col_ids, metadata.cutoff_hists)
+            new_hist_ids = col_to_hist_ids(col_ids, metadata.num_hists)
             if first:
                 hist_ids = new_hist_ids
                 first = False

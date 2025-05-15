@@ -10,9 +10,7 @@ from loguru import logger
 from numpy import uint32
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
-from backend.engine.conversion import (
-    col_to_doc_ids,
-)
+from backend.engine.conversion import col_to_doc_ids
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 from .common import ColResult, DocResult, TResult, junction

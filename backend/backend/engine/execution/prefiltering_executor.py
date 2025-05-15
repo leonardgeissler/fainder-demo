@@ -321,10 +321,9 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
             f"Length of histogram filter: "
             f"{len(hist_filter) if hist_filter is not None else 'None'}"
         )
-        result_hists = self.fainder_index.search(
+        result = self.fainder_index.search(
             percentile, comparison, reference, self.fainder_mode, hist_filter
         )
-        result = result_hists
         self.intermediate_results.add_col_id_results(
             write_group, result, self.metadata.doc_to_cols
         )

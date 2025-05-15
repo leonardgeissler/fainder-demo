@@ -61,7 +61,7 @@ class Metadata(BaseModel):
     col_to_doc: IntegerArray
     name_to_vector: dict[str, int]
     vector_to_cols: dict[int, set[int]]
-    cutoff_hists: int
+    num_hists: int
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
