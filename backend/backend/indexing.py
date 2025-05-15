@@ -45,7 +45,6 @@ def _prepare_document_for_tantivy(json_doc: dict[str, Any]) -> None:
         json_doc["publisher"] = json_doc["publisher"]["name"]
 
 
-# ruff: noqa: C901
 def generate_metadata(
     croissant_path: Path, metadata_path: Path, tantivy_path: Path, return_documents: bool = True
 ) -> tuple[
@@ -72,27 +71,21 @@ def generate_metadata(
     logger.info("Counting histograms")
     num_hists = 0
     num_cols = 0
-    for _, path in enumerate(sorted(croissant_path.iterdir())):
+    for path in croissant_path.iterdir():
         json_doc = load_json(path)
-        try:
-            for record_set in json_doc["recordSet"]:
-                for col in record_set["field"]:
-                    if "histogram" in col:
-                        num_hists += 1
-                    num_cols += 1
+        for record_set in json_doc.get("recordSet", []):
+            fields = record_set.get("field", [])
+            num_hists += sum(1 for col in fields if "histogram" in col)
+            num_cols += len(fields)
 
-        except KeyError as e:
-            logger.error(f"KeyError {e} reading file {path}")
-
-    col_to_doc: list[int] = [-1] * (num_cols)
+    # We need to pre-allocate the column ID mapping since we insert at different indices
+    col_to_doc: list[int] = [-1] * num_cols
 
     # Second pass: process the documents with the updated column IDs
     logger.info("Processing documents")
     hists: list[tuple[np.uint32, Histogram]] = []
-    col_counter = 0
-    hist_id = 0
     vector_id = 0
-    col_id = 0
+    current_col = 0
 
     for doc_id, path in enumerate(sorted(croissant_path.iterdir())):
         # Read the file and add a document ID to it
@@ -106,28 +99,24 @@ def generate_metadata(
             for record_set in json_doc["recordSet"]:
                 for col in record_set["field"]:
                     if "histogram" in col:
+                        col_id = current_col
                         densities = np.array(col["histogram"]["densities"], dtype=np.float32)
                         bins = np.array(col["histogram"]["bins"], dtype=np.float64)
-                        hists.append((np.uint32(hist_id), (densities, bins)))
-                        col_id = hist_id
+                        hists.append((np.uint32(col_id), (densities, bins)))
                         col["histogram"]["id"] = col_id
-                        col["id"] = col_id
-                        doc_to_cols[doc_id].add(col_id)
-                        col_to_doc[col_id] = doc_id
-                        hist_id += 1
                     else:
-                        col_id = col_counter + num_hists
-                        doc_to_cols[doc_id].add(col_counter + num_hists)
-                        col["id"] = col_id
-                        col_to_doc[col_id] = doc_id
-                        col_counter += 1
+                        col_id = current_col + num_hists
+
+                    col["id"] = col_id
+                    doc_to_cols[doc_id].add(col_id)
+                    col_to_doc[col_id] = doc_id
+                    current_col += 1
 
                     col_name = col["name"]
                     if col_name not in name_to_vector:
                         name_to_vector[col_name] = vector_id
                         vector_id += 1
                     vector_to_cols[name_to_vector[col_name]].add(col_id)
-
         except KeyError as e:
             logger.error(f"KeyError {e} reading file {path}")
 
