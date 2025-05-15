@@ -78,6 +78,8 @@ def generate_metadata(
             num_hists += sum(1 for col in fields if "histogram" in col)
             num_cols += len(fields)
 
+    logger.info(f"Found {num_hists} histograms and {num_cols} columns")
+
     # We need to pre-allocate the column ID mapping since we insert at different indices
     col_to_doc: list[int] = [-1] * num_cols
 
@@ -86,6 +88,7 @@ def generate_metadata(
     hists: list[tuple[np.uint32, Histogram]] = []
     vector_id = 0
     current_col = 0
+    current_hist = 0
 
     for doc_id, path in enumerate(sorted(croissant_path.iterdir())):
         # Read the file and add a document ID to it
@@ -99,18 +102,20 @@ def generate_metadata(
             for record_set in json_doc["recordSet"]:
                 for col in record_set["field"]:
                     if "histogram" in col:
-                        col_id = current_col
+                        col_id = current_hist
                         densities = np.array(col["histogram"]["densities"], dtype=np.float32)
                         bins = np.array(col["histogram"]["bins"], dtype=np.float64)
                         hists.append((np.uint32(col_id), (densities, bins)))
                         col["histogram"]["id"] = col_id
+                        current_hist += 1
                     else:
                         col_id = current_col + num_hists
+                        current_col += 1
 
                     col["id"] = col_id
                     doc_to_cols[doc_id].add(col_id)
+
                     col_to_doc[col_id] = doc_id
-                    current_col += 1
 
                     col_name = col["name"]
                     if col_name not in name_to_vector:
