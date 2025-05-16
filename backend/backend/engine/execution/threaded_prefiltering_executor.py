@@ -162,6 +162,7 @@ class IntermediateResultStoreFuture:
         self.results: dict[int, IntermediateResultFuture] = {}
         self.fainder_mode = fainder_mode
         self.write_groups_used = write_groups_used
+        self.write_groups_actually_used: dict[int, int] = {}
 
     def add_future_kw_result(
         self, write_group: int, future: Future[tuple[DocResult, int]]
@@ -260,6 +261,10 @@ class IntermediateResultStoreFuture:
             )
             intermediate = self.results[read_group].build_hist_filter(metadata)
 
+            self.write_groups_actually_used[read_group] = (
+                self.write_groups_actually_used.get(read_group, 0) + 1
+            )
+
             if intermediate is None:
                 continue
 
@@ -343,7 +348,14 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
                 write_group, self.fainder_mode
             )
 
-        return self.transform(tree)
+        result = self.transform(tree)
+
+        self.write_groups_actually_used = self.intermediate_results.write_groups_actually_used
+        self.write_groups_used = self.intermediate_results.write_groups_used
+        logger.trace(f"Write groups actually used: {self.write_groups_actually_used}")
+        logger.trace(f"Write groups used: {self.write_groups_used}")
+
+        return result
 
     def _get_write_group(self, node: ParseTree | Token) -> int:
         """Get the write group for a node."""

@@ -102,6 +102,7 @@ class IntermediateResultStore:
         self.results: dict[int, IntermediateResult] = {}
         self.fainder_mode = fainder_mode
         self.write_groups_used = write_groups_used
+        self.write_groups_actually_used: dict[int, int] = {}
 
     def add_col_id_results(
         self,
@@ -177,6 +178,9 @@ class IntermediateResultStore:
 
             logger.trace(
                 f"Intermediate result size: {len(intermediate) if intermediate else 'None'}"
+            )
+            self.write_groups_actually_used[read_group] = (
+                self.write_groups_actually_used.get(read_group, 0) + 1
             )
 
             if intermediate is None:
@@ -278,7 +282,15 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         logger.trace(f"Read groups: {self.read_groups}")
         logger.trace(f"Parent write groups: {self.parent_write_group}")
         logger.trace(f"Write groups used: {self.intermediate_results.write_groups_used}")
-        return self.transform(tree)
+
+        result = self.transform(tree)
+
+        self.write_groups_actually_used = self.intermediate_results.write_groups_actually_used
+        self.write_groups_used = self.intermediate_results.write_groups_used
+        logger.trace(f"Write groups actually used: {self.write_groups_actually_used}")
+        logger.trace(f"Write groups used: {self.write_groups_used}")
+
+        return result
 
     ### Operator implementations ###
 
