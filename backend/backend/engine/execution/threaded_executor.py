@@ -139,7 +139,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
         return future
 
     def col_op(self, items: Sequence[ColResult | Future[ColResult]]) -> DocResult:
-        logger.trace(f"Evaluating column term: {items}")
+        logger.trace("Evaluating column term")
 
         if len(items) != 1:
             raise ValueError("Column term must have exactly one item")
@@ -154,7 +154,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
         return doc_ids, ({}, set())
 
     def conjunction(self, items: Sequence[TResult | Future[TResult]]) -> TResult:
-        logger.trace(f"Evaluating conjunction with items: {items}")
+        logger.trace(f"Evaluating conjunction with items of length: {len(items)}")
 
         # Resolve all futures in items
         resolved_items = self._resolve_items(items)
@@ -162,7 +162,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
         return junction(resolved_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
 
     def disjunction(self, items: Sequence[TResult | Future[TResult]]) -> TResult:
-        logger.trace(f"Evaluating disjunction with items: {items}")
+        logger.trace(f"Evaluating disjunction with items of length: {len(items)}")
 
         # Resolve all futures in items
         resolved_items = self._resolve_items(items)

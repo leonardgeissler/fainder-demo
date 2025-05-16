@@ -217,7 +217,7 @@ class IntermediateResultStoreFuture:
             )
         else:
             self.results[write_group].add_col_ids(col_ids, doc_to_cols)
-        logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
+        logger.trace(f"Adding column IDs to write group {write_group}: length {len(col_ids)}")
 
     def add_doc_ids(
         self, write_group: int, doc_ids: set[int], col_to_doc: NDArray[uint32]
@@ -239,7 +239,7 @@ class IntermediateResultStoreFuture:
             )
         else:
             self.results[write_group].add_doc_ids(doc_ids, col_to_doc)
-        logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
+        logger.trace(f"Adding document IDs to write group {write_group}: length {len(doc_ids)}")
 
     def get_hist_filter(self, read_groups: list[int], metadata: Metadata) -> ColResult | None:
         """Build a histogram filter from the intermediate results."""
@@ -263,13 +263,15 @@ class IntermediateResultStoreFuture:
             if intermediate is None:
                 continue
 
-            logger.trace(f"intermediate {intermediate}")
+            logger.trace(f"intermediate length {len(intermediate)}")
             if hist_filter is None:
                 hist_filter = intermediate
             else:
                 hist_filter &= intermediate
 
-        logger.trace(f"Hist filter: {hist_filter}")
+        logger.trace(
+            f"Hist filter length: {len(hist_filter) if hist_filter is not None else 'None'}"
+        )
         return hist_filter
 
 
@@ -341,11 +343,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
                 write_group, self.fainder_mode
             )
 
-        result = self.transform(tree)
-
-        logger.trace(f"Final result: {result}")
-
-        return result
+        return self.transform(tree)
 
     def _get_write_group(self, node: ParseTree | Token) -> int:
         """Get the write group for a node."""
@@ -424,7 +422,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             parent_write_group = self._get_parent_write_group(write_group)
             return self.hnsw_index.search(column, k, None), parent_write_group
 
-        logger.trace(f"Evaluating column term: {items}")
+        logger.trace(f"Evaluating column name term: {items}")
 
         column = items[0]
         k = int(items[1])
@@ -470,7 +468,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def col_op(
         self, items: list[tuple[ColResult, int] | Future[tuple[ColResult, int]]]
     ) -> tuple[DocResult, int]:
-        logger.trace(f"Evaluating column term: {items}")
+        logger.trace("Evaluating column term")
 
         if len(items) != 1:
             raise ValueError("Column term must have exactly one item")
@@ -491,7 +489,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def conjunction(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
     ) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating conjunction with items: {items}")
+        logger.trace(f"Evaluating conjunction with number of items: {len(items)}")
 
         clean_items, write_group = self._resolve_items(items)
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
@@ -508,7 +506,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def disjunction(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
     ) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating disjunction with items: {items}")
+        logger.trace(f"Evaluating disjunction with number of items: {len(items)}")
 
         clean_items, write_group = self._resolve_items(items)
         result = junction(clean_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)

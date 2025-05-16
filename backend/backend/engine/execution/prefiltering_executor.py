@@ -109,7 +109,9 @@ class IntermediateResultStore:
         col_ids: set[uint32],
         doc_to_cols: dict[int, set[int]],
     ) -> None:
-        logger.trace(f"Adding column IDs to write group {write_group}: {col_ids}")
+        logger.trace(
+            f"Adding column IDs to write group {write_group} length of col_ids: {len(col_ids)}"
+        )
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
@@ -133,7 +135,9 @@ class IntermediateResultStore:
         doc_ids: set[int],
         col_to_doc: NDArray[uint32],
     ) -> None:
-        logger.trace(f"Adding document IDs to write group {write_group}: {doc_ids}")
+        logger.trace(
+            f"Adding document IDs to write group {write_group} length of doc_ids: {len(doc_ids)}"
+        )
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
@@ -170,6 +174,10 @@ class IntermediateResultStore:
                 f"Processing read group {read_group} with results {self.results[read_group]}"
             )
             intermediate = self.results[read_group].build_hist_filter(metadata)
+
+            logger.trace(
+                f"Intermediate result size: {len(intermediate) if intermediate else 'None'}"
+            )
 
             if intermediate is None:
                 continue
@@ -261,7 +269,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.read_groups = {}
         logger.trace(tree.pretty())
         groups = ResultGroupAnnotator()
-        groups.apply(tree)
+        groups.apply(tree, parallel=True)
         self.write_groups = groups.write_groups
         self.read_groups = groups.read_groups
         self.parent_write_group = groups.parent_write_group
@@ -292,7 +300,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return (set(result_docs), (highlights, set())), parent_write_group
 
     def col_op(self, items: list[tuple[ColResult, int]]) -> tuple[DocResult, int]:
-        logger.trace(f"Evaluating column term: {items}")
+        logger.trace("Evaluating column term")
 
         if len(items) != 1:
             raise ValueError("Column term must have exactly one item")
@@ -352,7 +360,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return result, parent_write_group
 
     def conjunction(self, items: Sequence[tuple[TResult, int]]) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating conjunction with items: {items}")
+        logger.trace(f"Evaluating conjunction with items: {len(items)}")
 
         clean_items, write_group = self._clean_items(items)
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
@@ -368,7 +376,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return result, self._get_parent_write_group(write_group)
 
     def disjunction(self, items: Sequence[tuple[TResult, int]]) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating disjunction with items: {items}")
+        logger.trace(f"Evaluating disjunction with items: {len(items)}")
 
         clean_items, write_group = self._clean_items(items)
         result = junction(clean_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
