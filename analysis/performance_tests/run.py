@@ -106,7 +106,7 @@ def setup_directories(config: PerformanceConfig) -> Dict[str, Path]:
     paths["perf_dir"] = perf_dir
     paths["git_hash_dir"] = git_hash_dir
     paths["all_results_dir"] = all_results_dir
-    
+
     # Profiling logs
     profiling_dir = git_hash_dir / Path(config.profiling_log_dir)
     profiling_dir.mkdir(exist_ok=True)
@@ -138,7 +138,7 @@ def create_csv_files(paths: Dict[str, Path]) -> Dict[str, Path]:
         writer.writerow([
             "timestamp", "category", "test_name", "query", "scenario",
             "execution_time", "results_consistent", "fainder_mode",
-            "num_results", "ids", "num_terms", "id_str"
+            "num_results", "ids", "num_terms", "id_str", "write_groups_used", "write_groups_actually_used"
         ])
     csv_paths["main_perf_csv"] = perf_csv_path
     
@@ -162,7 +162,7 @@ def create_csv_files(paths: Dict[str, Path]) -> Dict[str, Path]:
             writer.writerow([
                 "timestamp", "category", "test_name", "query", "scenario",
                 "execution_time", "results_consistent", "fainder_mode",
-                "num_results", "ids", "num_terms", "id_str"
+                "num_results", "ids", "num_terms", "id_str", "write_groups_used", "write_groups_actually_used"
             ])
         individual_csv_paths[test_name] = test_csv_path
     
@@ -197,7 +197,9 @@ def run_test_case(
             # Run query with each engine scenario
             timings = {}
             results = {}
-            
+            write_groups_actually_used: dict[int, int] = {}
+            write_groups_used: dict[int, int] = {}
+
             for scenario, engine in engines.items():
                 result, execution_time, stats_io = execute_with_profiling(
                     engine, query, {}, mode, disable_profiling=disable_profiling
@@ -211,6 +213,11 @@ def run_test_case(
                         stats_io, csv_paths["profile_csv"], category, test_name, 
                         query, scenario, mode
                     )
+
+                # Get write groups data 
+                if hasattr(engine.executor, "write_groups_actually_used") and hasattr(engine.executor, "write_groups_used"):
+                    write_groups_actually_used: dict[int, int] = getattr(engine.executor, "write_groups_actually_used", {})
+                    write_groups_used: dict[int, int] = getattr(engine.executor, "write_groups_used", {})
 
             # Check result consistency
             first_result = next(iter(results.values()))
@@ -228,6 +235,8 @@ def run_test_case(
                 mode,
                 ids,
                 id_str,
+                write_groups_used,
+                write_groups_actually_used,
             )
             
             # Log to individual test CSV
@@ -243,6 +252,8 @@ def run_test_case(
                     mode,
                     ids,
                     id_str,
+                    write_groups_used,
+                    write_groups_actually_used,
                 )
             
             # Log to console

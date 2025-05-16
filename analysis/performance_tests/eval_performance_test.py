@@ -179,6 +179,8 @@ def log_performance_csv(
     fainder_mode: str,
     ids: list[dict[str, str]],
     id_str: str,
+    write_groups_used: dict[int, int],
+    write_groups_actually_used: dict[int, int],
 ) -> None:
     """Log performance data to CSV file with one row per scenario."""
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -200,5 +202,7 @@ def log_performance_csv(
                     ids,
                     len(ids),
                     id_str,
+                    write_groups_used,
+                    write_groups_actually_used,
                 ]
             )
