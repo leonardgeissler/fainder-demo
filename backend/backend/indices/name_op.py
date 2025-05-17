@@ -7,11 +7,13 @@ from numpy import uint32
 from sentence_transformers import SentenceTransformer
 
 from backend.config import ColumnSearchError, Metadata
+import numpy as np
+from backend.config import ColumnArray
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import numpy as np
+
     from numpy.typing import NDArray
 
 
@@ -72,8 +74,7 @@ class HnswIndex:
         self.index = hnswlib.Index(space="cosine", dim=self.dimension)
         self.index.load_index(str(path))
         self.index.set_ef(self.ef)
-
-    def search(self, column_name: str, k: int, column_filter: set[uint32] | None) -> set[uint32]:
+    def search(self, column_name: str, k: int, column_filter: set[uint32] | None) -> ColumnArray:
         if k < 0:
             raise ColumnSearchError(f"k must be a non-negative integer: {k}")
 
@@ -111,4 +112,4 @@ class HnswIndex:
                 f"distances {distances[0]}"
             )
 
-        return result
+        return np.array(list(result), dtype=np.uint32)

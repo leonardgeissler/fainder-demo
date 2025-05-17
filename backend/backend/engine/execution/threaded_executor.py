@@ -8,12 +8,13 @@ from typing import Any
 from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy import uint32
+import numpy as np
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
 from backend.engine.conversion import col_to_doc_ids
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .common import ColResult, DocResult, TResult, junction
+from .common import ColResult, DocResult, TResult, junction, negation
 from .executor import Executor
 
 
@@ -85,7 +86,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
                 token, self.enable_highlighting, self.min_usability_score, self.rank_by_usability
             )
             self.updates_scores(result_docs, scores)
-            return set(result_docs), (highlights, set())
+            return result_docs, (highlights, np.array([], dtype=uint32))
 
         logger.opt(lazy=True).trace(f"Evaluating keyword term: {items}")
 
@@ -151,7 +152,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids)
 
-        return doc_ids, ({}, set())
+        return doc_ids, ({}, np.array([], dtype=uint32))
 
     def conjunction(self, items: Sequence[TResult | Future[TResult]]) -> TResult:
         logger.opt(lazy=True).trace(f"Evaluating conjunction with items of length: {len(items)}")
@@ -159,7 +160,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
         # Resolve all futures in items
         resolved_items = self._resolve_items(items)
 
-        return junction(resolved_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
+        return junction(resolved_items, "and", self.enable_highlighting, self.metadata.doc_to_cols)
 
     def disjunction(self, items: Sequence[TResult | Future[TResult]]) -> TResult:
         logger.opt(lazy=True).trace(f"Evaluating disjunction with items of length: {len(items)}")
@@ -167,7 +168,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
         # Resolve all futures in items
         resolved_items = self._resolve_items(items)
 
-        return junction(resolved_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
+        return junction(resolved_items, "or", self.enable_highlighting, self.metadata.doc_to_cols)
 
     def negation(self, items: Sequence[TResult | Future[TResult]]) -> TResult:
         logger.opt(lazy=True).trace(f"Evaluating negation with items of length: {len(items)}")
@@ -179,16 +180,17 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
 
         if isinstance(item, tuple):
             to_negate, _ = item
-            all_docs = set(self.metadata.doc_to_cols.keys())
+            doc_result = negation(to_negate, len(self.metadata.doc_to_cols), "doc")
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
-            col_highlights: ColumnHighlights = set()
-            return all_docs - to_negate, (doc_highlights, col_highlights)
+            col_highlights: ColumnHighlights = np.array([], dtype=uint32)
+            return doc_result , (doc_highlights, col_highlights)
 
         to_negate_cols = item
         # For column expressions, we negate using the set of all column IDs
-        all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
-        return all_columns - to_negate_cols
+        negated_cols = negation(to_negate_cols, len(self.metadata.col_to_doc), "col")
+
+        return negated_cols
 
     def query(self, items: Sequence[DocResult | Future[DocResult]]) -> DocResult:
         logger.opt(lazy=True).trace(f"Evaluating query with {len(items)} items")

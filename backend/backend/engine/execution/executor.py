@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from lark import ParseTree
 from loguru import logger
 
-from backend.config import FainderMode, Metadata
+from backend.config import DocumentArray, FainderMode, Metadata
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 from .common import DocResult
@@ -39,4 +39,4 @@ class Executor(ABC):
         logger.opt(lazy=True).trace(f"Updating scores for {len(doc_ids)} documents")
 
         for doc_id, score in zip(doc_ids, scores, strict=True):
-            self.scores[doc_id] += score
+            self.scores[int(doc_id)] += score
