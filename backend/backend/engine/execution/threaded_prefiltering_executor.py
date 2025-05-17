@@ -8,8 +8,9 @@ from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy import uint32
 from numpy.typing import NDArray
+import numpy as np
 
-from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
+from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata, DocumentArray, ColumnArray
 from backend.engine.conversion import (
     col_to_doc_ids,
     col_to_hist_ids,
@@ -24,6 +25,8 @@ from .common import (
     TResult,
     exceeds_filtering_limit,
     junction,
+    negation,
+    reducing
 )
 from .executor import Executor
 
@@ -35,8 +38,8 @@ class IntermediateResultFuture:
         self,
         write_group: int,
         fainder_mode: FainderMode,
-        doc_ids: set[int] | None = None,
-        col_ids: set[uint32] | None = None,
+        doc_ids: DocumentArray | None = None,
+        col_ids: ColumnArray | None = None,
     ) -> None:
         # resolved results trump futures
         self.write_group = write_group
@@ -44,13 +47,13 @@ class IntermediateResultFuture:
         self.col_result_futures: list[Future[tuple[ColResult, int]]] = []
 
         # Store resolved results only one of these should be set
-        self._doc_ids: set[int] | None = (
+        self._doc_ids: DocumentArray | None = (
             None
             if doc_ids is not None
             and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode)
             else doc_ids
         )
-        self._col_ids: set[uint32] | None = (
+        self._col_ids: ColumnArray | None = (
             None
             if col_ids is not None
             and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode)
@@ -67,21 +70,21 @@ class IntermediateResultFuture:
         """Add a future that will resolve to column IDs"""
         self.col_result_futures.append(future)
 
-    def add_col_ids(self, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]) -> None:
+    def add_col_ids(self, col_ids: ColumnArray, doc_to_cols: list[list[int]]) -> None:
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
-            col_ids = col_ids.intersection(helper_col_ids)
+            col_ids = reducing([helper_col_ids, col_ids], "and", "col")
         if self._col_ids is not None:
-            col_ids = col_ids.intersection(self._col_ids)
+            col_ids = reducing([col_ids, self._col_ids], "and", "col")
         self._col_ids = col_ids
         self._doc_ids = None
 
-    def add_doc_ids(self, doc_ids: set[int], col_to_doc: NDArray[uint32]) -> None:
+    def add_doc_ids(self, doc_ids: DocumentArray, col_to_doc: NDArray[uint32]) -> None:
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
-            doc_ids = doc_ids.intersection(helper_doc_ids)
+            doc_ids = reducing([doc_ids, helper_doc_ids], "and", "doc")
         if self._doc_ids is not None:
-            doc_ids = doc_ids.intersection(self._doc_ids)
+            doc_ids = reducing([doc_ids, self._doc_ids], "and", "doc")
         self._doc_ids = doc_ids
         self._col_ids = None
 
@@ -97,7 +100,7 @@ class IntermediateResultFuture:
         return None
 
     def _build_hist_filter_future(self, metadata: Metadata) -> ColResult | None:
-        hist_ids: ColResult = set()
+        hist_ids: list[ColumnArray] = []
         first = True
         for kw_future in self.kw_result_futures:
             doc_ids, _ = kw_future.result()
@@ -106,10 +109,10 @@ class IntermediateResultFuture:
             col_ids = doc_to_col_ids(doc_ids[0], metadata.doc_to_cols)
             new_hist_ids = col_to_hist_ids(col_ids, metadata.num_hists)
             if first:
-                hist_ids = new_hist_ids
+                hist_ids = [new_hist_ids]
                 first = False
             else:
-                hist_ids.intersection_update(new_hist_ids)
+                hist_ids.append(new_hist_ids)
 
         for col_future in self.col_result_futures:
             col_ids, _ = col_future.result()
@@ -117,16 +120,19 @@ class IntermediateResultFuture:
                 continue
             new_hist_ids = col_to_hist_ids(col_ids, metadata.num_hists)
             if first:
-                hist_ids = new_hist_ids
+                hist_ids = [new_hist_ids]
                 first = False
             else:
-                hist_ids.intersection_update(new_hist_ids)
+                hist_ids.append(new_hist_ids)
 
         # not resolve the pp_result_futures
 
         if first:
             return None
-        return hist_ids
+        filter_result = reducing(hist_ids, "and", "col")
+        if exceeds_filtering_limit(filter_result, "num_col_ids", self.fainder_mode):
+            return None
+        return filter_result
 
     def build_hist_filter(self, metadata: Metadata) -> ColResult | None:
         """Build a histogram filter from the intermediate results."""
@@ -199,7 +205,7 @@ class IntermediateResultStoreFuture:
         self.results[write_group].add_col_future(future)
 
     def add_col_ids(
-        self, write_group: int, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]
+        self, write_group: int, col_ids: ColumnArray, doc_to_cols: list[list[int]]
     ) -> None:
         """Add column IDs to the intermediate result."""
         if write_group not in self.write_groups_used:
@@ -223,7 +229,7 @@ class IntermediateResultStoreFuture:
         logger.trace(f"Adding column IDs to write group {write_group}: length {len(col_ids)}")
 
     def add_doc_ids(
-        self, write_group: int, doc_ids: set[int], col_to_doc: NDArray[uint32]
+        self, write_group: int, doc_ids: DocumentArray, col_to_doc: NDArray[uint32]
     ) -> None:
         """Add document IDs to the intermediate result."""
         if write_group not in self.write_groups_used:
@@ -419,7 +425,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             )
             self.updates_scores(result_docs, scores)
             parent_write_group = self._get_parent_write_group(write_group)
-            return (set(result_docs), (highlights, set())), parent_write_group
+            return (result_docs, (highlights, np.array([], dtype=uint32))), parent_write_group
 
         logger.trace(f"Evaluating keyword term: {items}")
 
@@ -466,7 +472,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             )
             write_group = self._get_write_group(items[0])
             if hist_filter is not None and len(hist_filter) == 0:
-                return set(), write_group
+                return np.array([], dtype=uint32), write_group
             result_hists = self.fainder_index.search(
                 percentile, comparison, reference, self.fainder_mode, hist_filter
             )
@@ -500,7 +506,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         if self.enable_highlighting:
             return (doc_ids, ({}, col_ids)), parent_write_group
 
-        return (doc_ids, ({}, set())), parent_write_group
+        return ((doc_ids, ({}, np.array([], dtype=uint32))), parent_write_group)
 
     def conjunction(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
@@ -508,7 +514,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         logger.trace(f"Evaluating conjunction with number of items: {len(items)}")
 
         clean_items, write_group = self._resolve_items(items)
-        result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
+        result = junction(clean_items, "and", self.enable_highlighting, self.metadata.doc_to_cols)
 
         if isinstance(result, tuple):
             self.intermediate_results.add_doc_ids(write_group, result[0], self.metadata.col_to_doc)
@@ -525,7 +531,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         logger.trace(f"Evaluating disjunction with number of items: {len(items)}")
 
         clean_items, write_group = self._resolve_items(items)
-        result = junction(clean_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
+        result = junction(clean_items, "or", self.enable_highlighting, self.metadata.doc_to_cols)
 
         if isinstance(result, tuple):
             self.intermediate_results.add_doc_ids(write_group, result[0], self.metadata.col_to_doc)
@@ -547,11 +553,10 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         if isinstance(item, tuple):
             to_negate, _ = item
-            all_docs = set(self.metadata.doc_to_cols.keys())
-            # Result highlights are reset for negated results
+        
             doc_highlights: DocumentHighlights = {}
-            col_highlights: ColumnHighlights = set()
-            doc_result = all_docs.difference(to_negate)
+            col_highlights: ColumnHighlights = np.array([], dtype=uint32)
+            doc_result = negation(to_negate, len(self.metadata.doc_to_cols), "doc")
             result = (doc_result, (doc_highlights, col_highlights))
             self.intermediate_results.add_doc_ids(
                 write_group, doc_result, self.metadata.col_to_doc
@@ -559,12 +564,11 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             return result, self._get_parent_write_group(write_group)
 
         to_negate_cols: ColResult = item
-        # For column expressions, we negate using the set of all column IDs
-        all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
-        result_col = all_columns - to_negate_cols
-        self.intermediate_results.add_col_ids(write_group, result_col, self.metadata.doc_to_cols)
+       
+        negated_cols = negation(to_negate_cols, len(self.metadata.col_to_doc), "col")
+        self.intermediate_results.add_col_ids(write_group, negated_cols, self.metadata.doc_to_cols)
 
-        return result_col, self._get_parent_write_group(write_group)
+        return negated_cols, self._get_parent_write_group(write_group)
 
     def query(
         self, items: list[tuple[DocResult, int] | Future[tuple[DocResult, int]]]

@@ -6,7 +6,7 @@ from fainder.execution.new_runner import run_approx, run_exact
 from fainder.utils import load_input
 from loguru import logger
 
-from backend.config import FainderError, FainderMode
+from backend.config import FainderError, FainderMode, ColumnArray
 
 if TYPE_CHECKING:
     from fainder.typing import Histogram
@@ -52,15 +52,15 @@ class FainderIndex:
         comparison: str,
         reference: float,
         fainder_mode: FainderMode,
-        hist_filter: set[np.uint32] | None = None,
-    ) -> set[np.uint32]:
+        hist_filter: ColumnArray | None = None,
+    ) -> ColumnArray:
         # Data validation
         if not (0 < percentile <= 1) or comparison not in ["ge", "gt", "le", "lt"]:
             raise FainderError(
                 f"Invalid percentile predicate: {percentile};{comparison};{reference}"
             )
 
-        id_filter = np.array(list(hist_filter), dtype=np.uint32) if hist_filter else None
+        id_filter = hist_filter
 
         # Predicate evaluation
         query: PctlQuery = (percentile, comparison, reference)  # type: ignore
@@ -109,4 +109,4 @@ class FainderIndex:
             f"{runtime:.2f} seconds."
         )
 
-        return result
+        return np.array(list(result), dtype=np.uint32)

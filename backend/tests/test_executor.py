@@ -79,10 +79,10 @@ def test_execute(
     logger.info(performance_log)
 
     # Verify all results are consistent and match the expected result
-    assert set(default_result) == set(expected_result)
-    assert set(no_merging_result) == set(expected_result)
-    assert set(no_opt_result) == set(expected_result)
-    assert set(prefiltering_result) == set(expected_result)
-    assert set(parallel_result) == set(expected_result)
-    assert set(parallel_prefiltering_result) == set(expected_result)
-    assert set(small_fainder_exact_result) == set(expected_result)
+    assert set(default_result) == set(expected_result), f"Default result: {default_result}, Expected: {expected_result}"
+    assert set(no_merging_result) == set(expected_result), f"No merging result: {no_merging_result}, Expected: {expected_result}"
+    assert set(no_opt_result) == set(expected_result), f"No opt result: {no_opt_result}, Expected: {expected_result}"
+    assert set(prefiltering_result) == set(expected_result), f"Prefiltering result: {prefiltering_result}, Expected: {expected_result}"
+    assert set(parallel_result) == set(expected_result), f"Parallel result: {parallel_result}, Expected: {expected_result}"
+    assert set(parallel_prefiltering_result) == set(expected_result), f"Parallel prefiltering result: {parallel_prefiltering_result}, Expected: {expected_result}"
+    assert set(small_fainder_exact_result) == set(expected_result), f"Small Fainder exact result: {small_fainder_exact_result}, Expected: {expected_result}"

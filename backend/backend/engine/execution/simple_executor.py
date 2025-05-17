@@ -5,12 +5,13 @@ from operator import and_, or_
 from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy import uint32
+import numpy as np
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
 from backend.engine.conversion import col_to_doc_ids
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .common import ColResult, DocResult, TResult, junction
+from .common import ColResult, DocResult, TResult, junction, negation
 from .executor import Executor
 
 
@@ -60,7 +61,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         )
         self.updates_scores(result_docs, scores)
 
-        return set(result_docs), (highlights, set())  # Return empty set for column highlights
+        return result_docs, (highlights, np.array([], dtype=uint32))  # Return empty array for column highlights
 
     def col_op(self, items: list[ColResult]) -> DocResult:
         logger.trace(f"Evaluating column term: with {len(items[0])} items")
@@ -72,7 +73,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids)
 
-        return doc_ids, ({}, set())
+        return doc_ids, ({}, np.array([], dtype=uint32))
 
     def name_op(self, items: list[Token]) -> ColResult:
         logger.trace(f"Evaluating column term: {items}")
@@ -94,12 +95,12 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
     def conjunction(self, items: Sequence[TResult]) -> TResult:
         logger.trace(f"Evaluating conjunction with items of length: {len(items)}")
 
-        return junction(items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
+        return junction(items, "and", self.enable_highlighting, self.metadata.doc_to_cols)
 
     def disjunction(self, items: Sequence[TResult]) -> TResult:
         logger.trace(f"Evaluating disjunction with items of length: {len(items)}")
 
-        return junction(items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
+        return junction(items, "or", self.enable_highlighting, self.metadata.doc_to_cols)
 
     def negation(self, items: Sequence[TResult]) -> TResult:
         logger.trace(f"Evaluating negation with {len(items[0])} items")
@@ -108,17 +109,15 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
             raise ValueError("Negation term must have exactly one item")
         if isinstance(items[0], tuple):
             to_negate, _ = items[0]
-            all_docs = set(self.metadata.doc_to_cols.keys())
+            doc_result = negation(to_negate, len(self.metadata.doc_to_cols), "doc")
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
-            col_highlights: ColumnHighlights = set()
-            return all_docs - to_negate, (doc_highlights, col_highlights)
+            col_highlights: ColumnHighlights = np.array([], dtype=uint32)
+            return doc_result, (doc_highlights, col_highlights)
 
         to_negate_cols = items[0]
-        # For column expressions, we negate using the set of all column IDs
-        all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
-        return all_columns - to_negate_cols
-
+        return negation(to_negate_cols, len(self.metadata.col_to_doc), "col")
+    
     def query(self, items: Sequence[DocResult]) -> DocResult:
         logger.trace(f"Evaluating query with {len(items[0])} items")
 

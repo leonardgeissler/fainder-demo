@@ -3,10 +3,12 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
+import numpy as np
 import tantivy
 from loguru import logger
 
-from backend.config import DocumentHighlights
+from backend.config import DocumentHighlights, DocumentArray
+
 
 MAX_DOCS = 1000000
 DOC_FIELDS: list[str] = [
@@ -67,7 +69,7 @@ class TantivyIndex:
         enable_highlighting: bool = False,
         min_usability_score: float = 0.0,
         rank_by_usability: bool = True,
-    ) -> tuple[list[int], list[float], DocumentHighlights]:
+    ) -> tuple[DocumentArray, list[float], DocumentHighlights]:
         logger.debug(f"Searching Tantivy index with query: {query}")
         parsed_query = self.index.parse_query(query, default_field_names=DOC_FIELDS)
         searcher = self.index.searcher()
@@ -131,4 +133,4 @@ class TantivyIndex:
                     highlights[doc_id][field_name] = html_snippet
 
         logger.info(f"Processing results took {time.perf_counter() - process_start:.5f}s")
-        return results, scores, highlights
+        return np.array(results, dtype=int), scores, highlights

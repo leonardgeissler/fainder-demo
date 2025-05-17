@@ -20,18 +20,21 @@ from pydantic import (
     field_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from numpy.typing import NDArray
 
 if TYPE_CHECKING:
     from types import FrameType
 
 DocumentHighlights = dict[int, dict[str, str]]
-ColumnHighlights = set[np.uint32]
+ColumnHighlights = NDArray[np.uint32]
 Highlights = tuple[DocumentHighlights, ColumnHighlights]
 IntegerArray = Annotated[
     NDArray[np.uint32],
     BeforeValidator(lambda data: np.array(data, dtype=np.uint32)),
     PlainSerializer(lambda data: data.tolist()),
 ]
+DocumentArray = NDArray[np.uint]
+ColumnArray = NDArray[np.uint32]
 
 
 class ExecutorType(str, Enum):
@@ -56,7 +59,7 @@ class FainderMode(str, Enum):
 
 
 class Metadata(BaseModel):
-    doc_to_cols: dict[int, set[int]]
+    doc_to_cols: list[list[int]]
     doc_to_path: list[str]
     col_to_doc: IntegerArray
     name_to_vector: dict[str, int]
