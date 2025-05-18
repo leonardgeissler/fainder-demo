@@ -2,15 +2,21 @@ import os
 from collections import defaultdict
 from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
-from operator import and_, or_
 
+import numpy as np
 from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy import uint32
 from numpy.typing import NDArray
-import numpy as np
 
-from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata, DocumentArray, ColumnArray
+from backend.config import (
+    ColumnArray,
+    ColumnHighlights,
+    DocumentArray,
+    DocumentHighlights,
+    FainderMode,
+    Metadata,
+)
 from backend.engine.conversion import (
     col_to_doc_ids,
     col_to_hist_ids,
@@ -26,7 +32,7 @@ from .common import (
     exceeds_filtering_limit,
     junction,
     negation,
-    reducing
+    reducing,
 )
 from .executor import Executor
 
@@ -294,7 +300,7 @@ class IntermediateResultStoreFuture:
             if hist_filter is None:
                 hist_filter = intermediate
             else:
-                hist_filter &= intermediate
+                hist_filter = reducing([hist_filter, intermediate], "and", "col")
 
         logger.opt(lazy=True).trace(
             f"Hist filter length: {len(hist_filter) if hist_filter is not None else 'None'}"
@@ -567,7 +573,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         if isinstance(item, tuple):
             to_negate, _ = item
-        
+
             doc_highlights: DocumentHighlights = {}
             col_highlights: ColumnHighlights = np.array([], dtype=uint32)
             doc_result = negation(to_negate, len(self.metadata.doc_to_cols), "doc")
@@ -578,7 +584,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             return result, self._get_parent_write_group(write_group)
 
         to_negate_cols: ColResult = item
-       
+
         negated_cols = negation(to_negate_cols, len(self.metadata.col_to_doc), "col")
         self.intermediate_results.add_col_ids(write_group, negated_cols, self.metadata.doc_to_cols)
 
