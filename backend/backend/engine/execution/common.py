@@ -1,19 +1,15 @@
-
 import re
 from collections.abc import Sequence
-from collections.abc import Set as AbstractSet
 from typing import Any, Literal, TypeGuard, TypeVar
 
+import numpy as np
 from lark import ParseTree, Token
 from lark.visitors import Visitor_Recursive
 from loguru import logger
-from numpy import uint32
-import numpy as np
 
-from backend.config import DocumentHighlights, FainderMode, Highlights, DocumentArray, ColumnArray
+from backend.config import ColumnArray, DocumentArray, DocumentHighlights, FainderMode, Highlights
 from backend.engine.constants import FILTERING_STOP_POINTS
 from backend.engine.conversion import doc_to_col_ids
-
 
 DocResult = tuple[DocumentArray, Highlights]
 ColResult = ColumnArray
@@ -247,9 +243,7 @@ def merge_highlights(
             doc_highlights[doc_id] = merged_highlights
 
     # Merge column highlights
-    col_highlights = union_column_array(
-        left[1], right[1]
-    )
+    col_highlights = union_column_array(left[1], right[1])
     col_highlights = intersection_column_array(
         col_highlights, doc_to_col_ids(doc_ids, doc_to_cols)
     )
@@ -257,32 +251,27 @@ def merge_highlights(
     return doc_highlights, col_highlights
 
 
-def intersection_document_array(
-    a: DocumentArray, b: DocumentArray
-) -> DocumentArray:
-    mask = np.isin(a, b)
-    return a[mask]
-
-def intersection_column_array(
-    a: ColumnArray, b: ColumnArray
-) -> ColumnArray:
+def intersection_document_array(a: DocumentArray, b: DocumentArray) -> DocumentArray:
     mask = np.isin(a, b)
     return a[mask]
 
 
-def union_column_array(
-    a: ColumnArray, b: ColumnArray
-) -> ColumnArray:
+def intersection_column_array(a: ColumnArray, b: ColumnArray) -> ColumnArray:
+    mask = np.isin(a, b)
+    return a[mask]
+
+
+def union_column_array(a: ColumnArray, b: ColumnArray) -> ColumnArray:
     """Get the union of two column arrays."""
     return np.union1d(a, b)
 
-def union_document_array(
-    a: DocumentArray, b: DocumentArray
-) -> DocumentArray:
+
+def union_document_array(a: DocumentArray, b: DocumentArray) -> DocumentArray:
     """Get the union of two document arrays."""
     return np.union1d(a, b)
 
-#@jit
+
+# @jit
 def reducing(
     arrays: Sequence[TArray],
     operator: Literal["and", "or"],
@@ -293,15 +282,15 @@ def reducing(
         for arr in arrays[1:]:
             intersection = np.intersect1d(intersection, arr, assume_unique=True)
         return intersection
-    elif operator == "or":
+    if operator == "or":
         union = arrays[0]
         logger.trace(f"Union of {union} and {arrays[1:]}")
         for arr in arrays[1:]:
             union = np.union1d(union, arr)
         return union
-    else:
-        raise ValueError(f"Invalid operator: {operator}")
-    
+    raise ValueError(f"Invalid operator: {operator}")
+
+
 def negation(
     item: TArray,
     number_of_ids: int,
@@ -311,12 +300,12 @@ def negation(
     mask = np.isin(np.arange(number_of_ids), item, invert=True)
     if dtype == "col":
         return np.arange(number_of_ids, dtype=np.uint)[mask]
-    elif dtype == "doc":
+    if dtype == "doc":
         return np.arange(number_of_ids, dtype=np.uint32)[mask]
-    else:
-        raise ValueError(f"Invalid dtype: {dtype}")
-    
-#@jit
+    raise ValueError(f"Invalid dtype: {dtype}")
+
+
+# @jit
 def junction(
     items: Sequence[TResult],
     operator: Literal["and", "or"],
@@ -329,7 +318,6 @@ def junction(
 
     # Items contains document results (i.e., DocResult)
     if is_doc_result(items):
-        logger.trace(f"Evaluating junction with items: {items}")
         if enable_highlighting and doc_to_cols is not None:
             # Initialize result with first item
             doc_ids: DocumentArray = items[0][0]
@@ -343,11 +331,11 @@ def junction(
                     doc_ids = union_document_array(doc_ids, item[0])
                 highlights = merge_highlights(highlights, item[1], doc_ids, doc_to_cols)
 
-            return doc_ids, highlights # type: ignore
+            return doc_ids, highlights  # type: ignore
         doc_ids_list: list[DocumentArray] = []
         for item in items:
             doc_ids_list.append(item[0])
-        return reducing(doc_ids_list, operator, "doc"), ({}, np.array([], dtype=np.uint32)) # type: ignore
+        return reducing(doc_ids_list, operator, "doc"), ({}, np.array([], dtype=np.uint32))  # type: ignore
 
     # Items contains column results (i.e., ColResult)
-    return reducing(items, operator, "col") # type: ignore
+    return reducing(items, operator, "col")  # type: ignore

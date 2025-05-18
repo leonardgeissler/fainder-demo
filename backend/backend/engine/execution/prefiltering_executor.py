@@ -1,12 +1,11 @@
 from collections import defaultdict
 from collections.abc import Sequence
-from operator import and_, or_
 
+import numpy as np
 from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy import uint32
 from numpy.typing import NDArray
-import numpy as np
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
 from backend.engine.conversion import (
@@ -17,15 +16,15 @@ from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 from .common import (
     ColResult,
+    ColumnArray,
     DocResult,
+    DocumentArray,
     ResultGroupAnnotator,
     TResult,
     exceeds_filtering_limit,
     junction,
     negation,
-    ColumnArray,
-    DocumentArray,
-    reducing
+    reducing,
 )
 from .executor import Executor
 
@@ -201,10 +200,10 @@ class IntermediateResultStore:
                 hist_filters = [intermediate]
             else:
                 hist_filters.append(intermediate)
-        
+
         if hist_filters is None or len(hist_filters) == 0:
             return None
-        return reducing(hist_filters, "and", "col") 
+        return reducing(hist_filters, "and", "col")
 
 
 class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
@@ -329,6 +328,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         col_ids = items[0][0]
         write_group = items[0][1]
         doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
+        logger.trace(f"Evaluating junction with items: {items}")
         self.intermediate_results.add_doc_id_results(
             write_group, doc_ids, self.metadata.col_to_doc
         )
@@ -435,8 +435,6 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
             return result, self._get_parent_write_group(write_group)
 
         to_negate_cols: ColResult = clean_items[0]
-        # For column expressions, we negate using the set of all column IDs
-        all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
         negated_cols = negation(to_negate_cols, len(self.metadata.col_to_doc), "col")
         self.intermediate_results.add_col_id_results(
             write_group, negated_cols, self.metadata.doc_to_cols
