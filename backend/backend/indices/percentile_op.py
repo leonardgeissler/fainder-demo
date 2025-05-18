@@ -97,22 +97,12 @@ class FainderIndex:
                     raise FainderError(
                         "Conversion index and histograms must be loaded for exact mode."
                     )
-                if id_filter is not None:
-                    result_set, runtime = run_exact(
-                        fainder_index=self.conversion_index,
-                        hists=self.hists,
-                        query=query,
-                        id_filter=id_filter,
-                    )
-                    result = np.array([hist for hist in result_set], dtype=np.uint32)
-                else:
-                    result, runtime = run_exact_np(
-                        fainder_index=self.conversion_index,
-                        hists=self.hists,
-                        query=query,
-                        id_filter=id_filter,
-                    )
-                # = np.array([hist for hist in result_set], dtype=np.uint32)
+                result, runtime = run_exact_np(
+                    fainder_index=self.conversion_index,
+                    hists=self.hists,
+                    query=query,
+                    id_filter=id_filter,
+                )
 
         logger.info(
             f"Query '{query}' ({fainder_mode} mode) returned {len(result)} histograms in "
