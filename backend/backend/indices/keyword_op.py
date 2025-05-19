@@ -7,8 +7,7 @@ import numpy as np
 import tantivy
 from loguru import logger
 
-from backend.config import DocumentHighlights, DocumentArray
-
+from backend.config import DocumentArray, DocumentHighlights
 
 MAX_DOCS = 1000000
 DOC_FIELDS: list[str] = [

@@ -79,18 +79,18 @@ class IntermediateResultFuture:
     def add_col_ids(self, col_ids: ColumnArray, doc_to_cols: list[list[int]]) -> None:
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
-            col_ids = reducing([helper_col_ids, col_ids], "and", "col")
+            col_ids = reducing([helper_col_ids, col_ids], "and")
         if self._col_ids is not None:
-            col_ids = reducing([col_ids, self._col_ids], "and", "col")
+            col_ids = reducing([col_ids, self._col_ids], "and")
         self._col_ids = col_ids
         self._doc_ids = None
 
     def add_doc_ids(self, doc_ids: DocumentArray, col_to_doc: NDArray[uint32]) -> None:
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
-            doc_ids = reducing([doc_ids, helper_doc_ids], "and", "doc")
+            doc_ids = reducing([doc_ids, helper_doc_ids], "and")
         if self._doc_ids is not None:
-            doc_ids = reducing([doc_ids, self._doc_ids], "and", "doc")
+            doc_ids = reducing([doc_ids, self._doc_ids], "and")
         self._doc_ids = doc_ids
         self._col_ids = None
 
@@ -135,7 +135,7 @@ class IntermediateResultFuture:
 
         if first:
             return None
-        filter_result = reducing(hist_ids, "and", "col")
+        filter_result = reducing(hist_ids, "and")
         if exceeds_filtering_limit(filter_result, "num_col_ids", self.fainder_mode):
             return None
         return filter_result
@@ -288,7 +288,7 @@ class IntermediateResultStoreFuture:
             if hist_filter is None:
                 hist_filter = intermediate
             else:
-                hist_filter = reducing([hist_filter, intermediate], "and", "col")
+                hist_filter = reducing([hist_filter, intermediate], "and")
 
         logger.trace(
             f"Hist filter length: {len(hist_filter) if hist_filter is not None else 'None'}"
@@ -562,7 +562,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
             doc_highlights: DocumentHighlights = {}
             col_highlights: ColumnHighlights = np.array([], dtype=uint32)
-            doc_result = negation(to_negate, len(self.metadata.doc_to_cols), "doc")
+            doc_result = negation(to_negate, len(self.metadata.doc_to_cols))
             result = (doc_result, (doc_highlights, col_highlights))
             self.intermediate_results.add_doc_ids(
                 write_group, doc_result, self.metadata.col_to_doc
@@ -571,7 +571,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         to_negate_cols: ColResult = item
 
-        negated_cols = negation(to_negate_cols, len(self.metadata.col_to_doc), "col")
+        negated_cols = negation(to_negate_cols, len(self.metadata.col_to_doc))
         self.intermediate_results.add_col_ids(write_group, negated_cols, self.metadata.doc_to_cols)
 
         return negated_cols, self._get_parent_write_group(write_group)

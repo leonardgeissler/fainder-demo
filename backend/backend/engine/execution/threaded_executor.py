@@ -2,13 +2,12 @@ import os
 from collections import defaultdict
 from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
-from operator import and_, or_
 from typing import Any
 
+import numpy as np
 from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy import uint32
-import numpy as np
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
 from backend.engine.conversion import col_to_doc_ids
@@ -181,17 +180,14 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
 
         if isinstance(item, tuple):
             to_negate, _ = item
-            doc_result = negation(to_negate, len(self.metadata.doc_to_cols), "doc")
+            doc_result = negation(to_negate, len(self.metadata.doc_to_cols))
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
             col_highlights: ColumnHighlights = np.array([], dtype=uint32)
-            return doc_result , (doc_highlights, col_highlights)
+            return doc_result, (doc_highlights, col_highlights)
 
         to_negate_cols = item
-        # For column expressions, we negate using the set of all column IDs
-        negated_cols = negation(to_negate_cols, len(self.metadata.col_to_doc), "col")
-
-        return negated_cols
+        return negation(to_negate_cols, len(self.metadata.col_to_doc))
 
     def query(self, items: Sequence[DocResult | Future[DocResult]]) -> DocResult:
         logger.trace(f"Evaluating query with {len(items)} items")

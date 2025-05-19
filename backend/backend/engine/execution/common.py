@@ -275,34 +275,30 @@ def union_document_array(a: DocumentArray, b: DocumentArray) -> DocumentArray:
 def reducing(
     arrays: Sequence[TArray],
     operator: Literal["and", "or"],
-    dtype: Literal["col", "doc"],
 ) -> TArray:
     if operator == "and":
         intersection = arrays[0]
         for arr in arrays[1:]:
             intersection = np.intersect1d(intersection, arr, assume_unique=True)
-        return intersection
+        return intersection.view(type(arrays[0]))
     if operator == "or":
         union = arrays[0]
         logger.trace(f"Union of {union} and {arrays[1:]}")
         for arr in arrays[1:]:
             union = np.union1d(union, arr)
-        return union
+        return union.view(type(arrays[0]))
     raise ValueError(f"Invalid operator: {operator}")
 
 
 def negation(
     item: TArray,
     number_of_ids: int,
-    dtype: Literal["col", "doc"],
 ) -> TArray:
     # Create a mask for the negation
+    dtype = item.dtype
     mask = np.isin(np.arange(number_of_ids), item, invert=True)
-    if dtype == "col":
-        return np.arange(number_of_ids, dtype=np.uint)[mask]
-    if dtype == "doc":
-        return np.arange(number_of_ids, dtype=np.uint32)[mask]
-    raise ValueError(f"Invalid dtype: {dtype}")
+    result = np.arange(number_of_ids, dtype=dtype)[mask]
+    return result.view(type(item))
 
 
 # @jit
@@ -332,10 +328,8 @@ def junction(
                 highlights = merge_highlights(highlights, item[1], doc_ids, doc_to_cols)
 
             return doc_ids, highlights  # type: ignore
-        doc_ids_list: list[DocumentArray] = []
-        for item in items:
-            doc_ids_list.append(item[0])
-        return reducing(doc_ids_list, operator, "doc"), ({}, np.array([], dtype=np.uint32))  # type: ignore
+        doc_ids_list = [item[0] for item in items]
+        return reducing(doc_ids_list, operator), ({}, np.array([], dtype=np.uint32))  # type: ignore
 
     # Items contains column results (i.e., ColResult)
-    return reducing(items, operator, "col")  # type: ignore
+    return reducing(items, operator)  # type: ignore
