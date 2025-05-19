@@ -188,7 +188,7 @@ class IntermediateResultStoreFuture:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
             logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
             return
 
@@ -205,13 +205,15 @@ class IntermediateResultStoreFuture:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
             logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
             return
 
         if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
+            logger.trace(f"Column IDs exceed filtering limit: {len(col_ids)}")
             return
 
+        logger.trace(f"Write group {write_group} is used, adding column IDs")
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, col_ids=col_ids, fainder_mode=self.fainder_mode
@@ -232,8 +234,10 @@ class IntermediateResultStoreFuture:
             return
 
         if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
+            logger.trace(f"Document IDs exceed filtering limit: {len(doc_ids)}")
             return
 
+        logger.trace(f"Write group {write_group} is used, adding document IDs")
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, doc_ids=doc_ids, fainder_mode=self.fainder_mode

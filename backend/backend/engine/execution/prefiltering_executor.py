@@ -116,13 +116,15 @@ class IntermediateResultStore:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
-            logger.debug(f"Write group {write_group} is not used, skipping adding column IDs")
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
+            logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
             return
 
         if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
+            logger.trace("Column IDs exceed filtering limit, skipping adding column IDs")
             return
 
+        logger.trace(f"Write group {write_group} is used, adding column IDs")
         if write_group in self.results:
             self.results[write_group].add_col_ids(col_ids=col_ids, doc_to_cols=doc_to_cols)
         else:
@@ -142,14 +144,15 @@ class IntermediateResultStore:
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
-        logger.debug(f"Write group used: {self.write_groups_used[write_group]}")
-        if write_group in self.write_groups_used and self.write_groups_used[write_group] <= 1:
-            logger.debug(f"Write group {write_group} is not used, skipping adding document IDs")
+        if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
+            logger.trace(f"Write group {write_group} is not used, skipping adding document IDs")
             return
 
         if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
+            logger.trace("Document IDs exceed filtering limit, skipping adding document IDs")
             return
 
+        logger.trace(f"Write group {write_group} is used, adding document IDs")
         if write_group in self.results:
             self.results[write_group].add_doc_ids(doc_ids=doc_ids, col_to_doc=col_to_doc)
         else:
