@@ -1,11 +1,10 @@
 from collections import defaultdict
 from collections.abc import Sequence
-from operator import and_, or_
 
+import numpy as np
 from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy import uint32
-import numpy as np
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
 from backend.engine.conversion import col_to_doc_ids
@@ -61,7 +60,10 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         )
         self.updates_scores(result_docs, scores)
 
-        return result_docs, (highlights, np.array([], dtype=uint32))  # Return empty array for column highlights
+        return result_docs, (
+            highlights,
+            np.array([], dtype=uint32),
+        )  # Return empty array for column highlights
 
     def col_op(self, items: list[ColResult]) -> DocResult:
         logger.opt(lazy=True).trace(f"Evaluating column term with items of length: {len(items)}")
@@ -109,15 +111,15 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
             raise ValueError("Negation term must have exactly one item")
         if isinstance(items[0], tuple):
             to_negate, _ = items[0]
-            doc_result = negation(to_negate, len(self.metadata.doc_to_cols), "doc")
+            doc_result = negation(to_negate, len(self.metadata.doc_to_cols))
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
             col_highlights: ColumnHighlights = np.array([], dtype=uint32)
             return doc_result, (doc_highlights, col_highlights)
 
         to_negate_cols = items[0]
-        return negation(to_negate_cols, len(self.metadata.col_to_doc), "col")
-    
+        return negation(to_negate_cols, len(self.metadata.col_to_doc))
+
     def query(self, items: Sequence[DocResult]) -> DocResult:
         logger.opt(lazy=True).trace(f"Evaluating query with {len(items)} items")
 

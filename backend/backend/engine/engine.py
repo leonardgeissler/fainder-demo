@@ -1,11 +1,15 @@
-
 import os
 from functools import lru_cache
-from pydoc import Doc
 
-from backend.config import CacheInfo, DocumentArray, ExecutorType, FainderMode, Highlights, Metadata
+from backend.config import (
+    CacheInfo,
+    DocumentArray,
+    ExecutorType,
+    FainderMode,
+    Highlights,
+    Metadata,
+)
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
-from loguru import logger
 
 from .execution.factory import create_executor
 from .optimizer import create_optimizer
@@ -72,13 +76,9 @@ class Engine:
         hits, misses, max_size, curr_size = self.execute.cache_info()
         return CacheInfo(hits=hits, misses=misses, max_size=max_size, curr_size=curr_size)
 
-    #@jit
     def convert_numpy_to_list(self, result: DocumentArray) -> list[int]:
         arr = result.tolist()
-        return_list = []
-        for i in range(len(arr)):
-            return_list.append(int(arr[i]))
-        return return_list
+        return [int(x) for x in arr]
 
     def _execute(
         self,

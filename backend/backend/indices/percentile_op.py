@@ -1,14 +1,14 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import numpy as np
-from fainder.execution.new_runner import run_approx_np, run_exact_old, run_exact_np
+from fainder.execution.new_runner import run_approx_np, run_exact_np, run_exact_old
 from fainder.utils import load_input
 from loguru import logger
 
 from backend.config import ColumnArray, FainderError, FainderMode
 
 if TYPE_CHECKING:
+    import numpy as np
     from fainder.typing import Histogram
     from fainder.typing import PercentileIndex as PctlIndex
     from fainder.typing import PercentileQuery as PctlQuery
@@ -61,6 +61,7 @@ class FainderIndex:
             )
 
         id_filter = hist_filter
+        result: ColumnArray
 
         # Predicate evaluation
         query: PctlQuery = (percentile, comparison, reference)  # type: ignore
@@ -114,7 +115,8 @@ class FainderIndex:
 
         logger.info(
             f"Query '{query}' ({fainder_mode} mode) returned {len(result)} histograms in "
-            f"{runtime:.2f} seconds. With filter size {id_filter.size if id_filter is not None else 0}."
+            f"{runtime:.2f} seconds. With filter size "
+            f"{id_filter.size if id_filter is not None else 0}."
         )
 
         return result

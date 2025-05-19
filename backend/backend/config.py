@@ -20,7 +20,6 @@ from pydantic import (
     field_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from numpy.typing import NDArray
 
 if TYPE_CHECKING:
     from types import FrameType

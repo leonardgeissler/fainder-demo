@@ -17,4 +17,3 @@ def test_highlighter(test_name: str, test_case: HighlightingCase, default_engine
     assert highlights[0] == test_case["expected"][0]
     # Compare ColumnHighlights
     assert highlights[1].all() == test_case["expected"][1].all()
-
