@@ -2,11 +2,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-from fainder.execution.new_runner import run_approx_np, run_exact_np, run_exact
+from fainder.execution.new_runner import run_approx_np, run_exact_np
 from fainder.utils import load_input
 from loguru import logger
 
-from backend.config import FainderError, FainderMode, ColumnArray
+from backend.config import ColumnArray, FainderError, FainderMode
 
 if TYPE_CHECKING:
     from fainder.typing import Histogram
@@ -106,7 +106,7 @@ class FainderIndex:
 
         logger.info(
             f"Query '{query}' ({fainder_mode} mode) returned {len(result)} histograms in "
-            f"{runtime:.2f} seconds."
+            f"{runtime:.2f} seconds. With filter size {id_filter.size if id_filter else 0}."
         )
 
         return result
