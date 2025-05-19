@@ -106,7 +106,7 @@ class FainderIndex:
 
         logger.info(
             f"Query '{query}' ({fainder_mode} mode) returned {len(result)} histograms in "
-            f"{runtime:.2f} seconds. With filter size {id_filter.size if id_filter else 0}."
+            f"{runtime:.2f} seconds. With filter size {id_filter.size if id_filter is not None else 0}."
         )
 
         return result
