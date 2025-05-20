@@ -63,7 +63,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         return set(result_docs), (highlights, set())  # Return empty set for column highlights
 
     def col_op(self, items: list[ColResult]) -> DocResult:
-        logger.trace(f"Evaluating column term: with {len(items[0])} items")
+        logger.trace(f"Evaluating column term with items of length: {len(items)}")
 
         if len(items) != 1:
             raise ValueError("Column term must have exactly one item")
@@ -102,7 +102,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         return junction(items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
 
     def negation(self, items: Sequence[TResult]) -> TResult:
-        logger.trace(f"Evaluating negation with {len(items[0])} items")
+        logger.trace(f"Evaluating negation with items of length: {len(items)}")
 
         if len(items) != 1:
             raise ValueError("Negation term must have exactly one item")
@@ -120,7 +120,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         return all_columns - to_negate_cols
 
     def query(self, items: Sequence[DocResult]) -> DocResult:
-        logger.trace(f"Evaluating query with {len(items[0])} items")
+        logger.trace(f"Evaluating query with {len(items)} items")
 
         if len(items) != 1:
             raise ValueError("Query must have exactly one item")

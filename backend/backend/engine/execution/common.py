@@ -162,7 +162,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
 
     def percentile_op(self, tree: ParseTree) -> None:
         # Set attributes for all children using the parent's values
-        logger.trace(f"Processing ppercentile node: {tree}")
+        logger.trace(f"Processing percentile node: {tree}")
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             write_group = self.write_groups[id(tree)]
             read_groups = self.read_groups[id(tree)]

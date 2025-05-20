@@ -74,7 +74,7 @@ class ApplicationState:
                     self._load_indices(settings)
                 )
             except (FileNotFoundError, IndexingError) as e:
-                logger.warning(f"Failed to load indices: {e}. Recreating...")
+                logger.warning("Failed to load indices: {}. Recreating...", e)
                 (metadata, croissant_store, tantivy_index, fainder_index, hnsw_index, engine) = (
                     self._recreate_indices(settings)
                 )

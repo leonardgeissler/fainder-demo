@@ -87,7 +87,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
             self.updates_scores(result_docs, scores)
             return set(result_docs), (highlights, set())
 
-        logger.trace(f"Starting threaded keyword search for: {items}")
+        logger.trace(f"Evaluating keyword term: {items}")
 
         # Submit task to thread pool and store the future with a unique ID
         task_id = id(items[0])
@@ -103,7 +103,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
             logger.trace(f"Thread executing column name search for: {column}")
             return self.hnsw_index.search(column, k, None)
 
-        logger.trace(f"Starting threaded column name search for: {items}")
+        logger.trace(f"Evaluating column name term: {items}")
 
         column = items[0]
         k = int(items[1])
@@ -124,7 +124,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
             )
             return self.fainder_index.search(percentile, comparison, reference, self.fainder_mode)
 
-        logger.trace(f"Starting threaded percentile search for: {items}")
+        logger.trace(f"Evaluating percentile term: {items}")
 
         percentile = float(items[0])
         comparison: str = items[1]
@@ -139,7 +139,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
         return future
 
     def col_op(self, items: Sequence[ColResult | Future[ColResult]]) -> DocResult:
-        logger.trace("Evaluating column term")
+        logger.trace(f"Evaluating column term with items of length: {len(items)}")
 
         if len(items) != 1:
             raise ValueError("Column term must have exactly one item")
@@ -170,11 +170,10 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
         return junction(resolved_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
 
     def negation(self, items: Sequence[TResult | Future[TResult]]) -> TResult:
-        logger.trace(f"Evaluating negation with {len(items)} items")
+        logger.trace(f"Evaluating negation with items of length: {len(items)}")
 
         if len(items) != 1:
             raise ValueError("Negation term must have exactly one item")
-
         # Resolve the item if it's a future
         item = self._resolve_item(items[0])
 
