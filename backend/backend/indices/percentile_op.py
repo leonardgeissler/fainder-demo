@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fainder.execution.new_runner import run_approx_np, run_exact_np
+import numpy as np
+from fainder.execution.new_runner import run_approx_np, run_exact
 from fainder.utils import load_input
 from loguru import logger
 
@@ -99,12 +100,13 @@ class FainderIndex:
                         "Conversion index and histograms must be loaded for exact mode."
                     )
 
-                result, runtime = run_exact_np(
+                result_set, runtime = run_exact(
                     fainder_index=self.conversion_index,
                     hists=self.hists,
                     query=query,
                     id_filter=id_filter,
                 )
+                result = np.array(list(result_set), dtype=np.uint32)
 
         logger.info(
             f"Query '{query}' ({fainder_mode} mode) returned {len(result)} histograms in "
