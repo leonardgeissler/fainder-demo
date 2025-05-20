@@ -110,21 +110,25 @@ class IntermediateResultStore:
         col_ids: set[uint32],
         doc_to_cols: dict[int, set[int]],
     ) -> None:
-        logger.trace(
+        logger.opt(lazy=True).trace(
             f"Adding column IDs to write group {write_group} length of col_ids: {len(col_ids)}"
         )
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
-            logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
+            logger.opt(lazy=True).trace(
+                f"Write group {write_group} is not used, skipping adding column IDs"
+            )
             return
 
         if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
-            logger.trace("Column IDs exceed filtering limit, skipping adding column IDs")
+            logger.opt(lazy=True).trace(
+                "Column IDs exceed filtering limit, skipping adding column IDs"
+            )
             return
 
-        logger.trace(f"Write group {write_group} is used, adding column IDs")
+        logger.opt(lazy=True).trace(f"Write group {write_group} is used, adding column IDs")
         if write_group in self.results:
             self.results[write_group].add_col_ids(col_ids=col_ids, doc_to_cols=doc_to_cols)
         else:
@@ -138,21 +142,25 @@ class IntermediateResultStore:
         doc_ids: set[int],
         col_to_doc: NDArray[uint32],
     ) -> None:
-        logger.trace(
+        logger.opt(lazy=True).trace(
             f"Adding document IDs to write group {write_group} length of doc_ids: {len(doc_ids)}"
         )
         if write_group not in self.write_groups_used:
             raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
-            logger.trace(f"Write group {write_group} is not used, skipping adding document IDs")
+            logger.opt(lazy=True).trace(
+                f"Write group {write_group} is not used, skipping adding document IDs"
+            )
             return
 
         if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
-            logger.trace("Document IDs exceed filtering limit, skipping adding document IDs")
+            logger.opt(lazy=True).trace(
+                "Document IDs exceed filtering limit, skipping adding document IDs"
+            )
             return
 
-        logger.trace(f"Write group {write_group} is used, adding document IDs")
+        logger.opt(lazy=True).trace(f"Write group {write_group} is used, adding document IDs")
         if write_group in self.results:
             self.results[write_group].add_doc_ids(doc_ids=doc_ids, col_to_doc=col_to_doc)
         else:
@@ -169,17 +177,17 @@ class IntermediateResultStore:
         for read_group in read_groups:
             if read_group not in self.results or self.results[read_group].is_empty():
                 # This means this group does not have an intermediate result yet this happens alot
-                logger.trace(
+                logger.opt(lazy=True).trace(
                     f"Read group {read_group} does not have an intermediate result, skipping"
                 )
                 continue
 
-            logger.trace(
+            logger.opt(lazy=True).trace(
                 f"Processing read group {read_group} with results {self.results[read_group]}"
             )
             intermediate = self.results[read_group].build_hist_filter(metadata)
 
-            logger.trace(
+            logger.opt(lazy=True).trace(
                 f"Intermediate result size: {len(intermediate) if intermediate else 'None'}"
             )
             self.write_groups_actually_used[read_group] = (
@@ -224,7 +232,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.reset(fainder_mode, enable_highlighting)
 
     def reset(self, fainder_mode: FainderMode, enable_highlighting: bool = False) -> None:
-        logger.trace("Resetting executor")
+        logger.opt(lazy=True).trace("Resetting executor")
         self.scores: dict[int, float] = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
@@ -274,31 +282,35 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         """Start processing the parse tree."""
         self.write_groups = {}
         self.read_groups = {}
-        logger.trace(tree.pretty())
+        logger.opt(lazy=True).trace(tree.pretty())
         groups = ResultGroupAnnotator()
         groups.apply(tree, parallel=True)
         self.write_groups = groups.write_groups
         self.read_groups = groups.read_groups
         self.parent_write_group = groups.parent_write_group
         self.intermediate_results.write_groups_used = groups.write_groups_used
-        logger.trace(f"Write groups: {self.write_groups}")
-        logger.trace(f"Read groups: {self.read_groups}")
-        logger.trace(f"Parent write groups: {self.parent_write_group}")
-        logger.trace(f"Write groups used: {self.intermediate_results.write_groups_used}")
+        logger.opt(lazy=True).trace(f"Write groups: {self.write_groups}")
+        logger.opt(lazy=True).trace(f"Read groups: {self.read_groups}")
+        logger.opt(lazy=True).trace(f"Parent write groups: {self.parent_write_group}")
+        logger.opt(lazy=True).trace(
+            f"Write groups used: {self.intermediate_results.write_groups_used}"
+        )
 
         result = self.transform(tree)
 
         self.write_groups_actually_used = self.intermediate_results.write_groups_actually_used
         self.write_groups_used = self.intermediate_results.write_groups_used
-        logger.trace(f"Write groups actually used: {self.write_groups_actually_used}")
-        logger.trace(f"Write groups used: {self.write_groups_used}")
+        logger.opt(lazy=True).trace(
+            f"Write groups actually used: {self.write_groups_actually_used}"
+        )
+        logger.opt(lazy=True).trace(f"Write groups used: {self.write_groups_used}")
 
         return result
 
     ### Operator implementations ###
 
     def keyword_op(self, items: list[Token]) -> tuple[DocResult, int]:
-        logger.trace(f"Evaluating keyword term: {items}")
+        logger.opt(lazy=True).trace(f"Evaluating keyword term: {items}")
 
         result_docs, scores, highlights = self.tantivy_index.search(
             items[0], self.enable_highlighting, self.min_usability_score, self.rank_by_usability
@@ -315,7 +327,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return (set(result_docs), (highlights, set())), parent_write_group
 
     def col_op(self, items: list[tuple[ColResult, int]]) -> tuple[DocResult, int]:
-        logger.trace("Evaluating column term")
+        logger.opt(lazy=True).trace("Evaluating column term")
 
         if len(items) != 1:
             raise ValueError("Column term must have exactly one item")
@@ -332,7 +344,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return (doc_ids, ({}, set())), parent_write_group
 
     def name_op(self, items: list[Token]) -> tuple[ColResult, int]:
-        logger.trace(f"Evaluating column term: {items}")
+        logger.opt(lazy=True).trace(f"Evaluating column term: {items}")
 
         column = items[0]
         k = int(items[1])
@@ -347,7 +359,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return result, parent_write_group
 
     def percentile_op(self, items: list[Token]) -> tuple[ColResult, int]:
-        logger.trace(f"Evaluating percentile term: {items}")
+        logger.opt(lazy=True).trace(f"Evaluating percentile term: {items}")
 
         percentile = float(items[0])
         comparison: str = items[1]
@@ -358,10 +370,10 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         write_group = self._get_write_group(items[0])
         if hist_filter is not None and len(hist_filter) == 0:
-            logger.trace("Empty histogram filter, returning empty result")
+            logger.opt(lazy=True).trace("Empty histogram filter, returning empty result")
             return set(), write_group
 
-        logger.trace(
+        logger.opt(lazy=True).trace(
             f"Length of histogram filter: "
             f"{len(hist_filter) if hist_filter is not None else 'None'}"
         )
@@ -375,7 +387,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return result, parent_write_group
 
     def conjunction(self, items: Sequence[tuple[TResult, int]]) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating conjunction with items: {len(items)}")
+        logger.opt(lazy=True).trace(f"Evaluating conjunction with items: {len(items)}")
 
         clean_items, write_group = self._clean_items(items)
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
@@ -391,7 +403,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return result, self._get_parent_write_group(write_group)
 
     def disjunction(self, items: Sequence[tuple[TResult, int]]) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating disjunction with items: {len(items)}")
+        logger.opt(lazy=True).trace(f"Evaluating disjunction with items: {len(items)}")
 
         clean_items, write_group = self._clean_items(items)
         result = junction(clean_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
@@ -408,7 +420,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return result, self._get_parent_write_group(write_group)
 
     def negation(self, items: Sequence[tuple[TResult, int]]) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating negation with {len(items)} items")
+        logger.opt(lazy=True).trace(f"Evaluating negation with {len(items)} items")
 
         if len(items) != 1:
             raise ValueError("Negation term must have exactly one item")
@@ -439,7 +451,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         return result_col, self._get_parent_write_group(write_group)
 
     def query(self, items: list[tuple[DocResult, int]]) -> DocResult:
-        logger.trace(f"Evaluating query with {len(items)} items")
+        logger.opt(lazy=True).trace(f"Evaluating query with {len(items)} items")
 
         if len(items) != 1:
             raise ValueError("Query must have exactly one item")

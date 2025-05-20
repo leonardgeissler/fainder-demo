@@ -47,13 +47,13 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
 
     def _create_group_id(self) -> int:
         """Create a new group ID."""
-        logger.trace(f"new group id: {self.current_write_group + 1}")
+        logger.opt(lazy=True).trace(f"new group id: {self.current_write_group + 1}")
         self.current_write_group += 1
         return self.current_write_group
 
     def __default__(self, tree: ParseTree) -> None:
         # Set attributes for all children using the parent's values
-        logger.trace(f"Processing default node: {tree}")
+        logger.opt(lazy=True).trace(f"Processing default node: {tree}")
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             write_group = self.write_groups[id(tree)]
             read_groups = self.read_groups[id(tree)]
@@ -62,14 +62,14 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 # Store in our dictionaries rather than on the objects directly
                 self.write_groups[id(child)] = write_group
                 self.read_groups[id(child)] = read_groups
-                logger.trace(
+                logger.opt(lazy=True).trace(
                     f"Child {child} has write group {write_group} and read group {read_groups}"
                 )
         else:
             raise ValueError(f"Node {tree} does not have write or read groups")
 
     def query(self, tree: ParseTree) -> None:
-        logger.trace(f"Processing query node: {tree}")
+        logger.opt(lazy=True).trace(f"Processing query node: {tree}")
         # Set attributes for query node and children
         self.write_groups[id(tree)] = 0
         self.read_groups[id(tree)] = [0]
@@ -82,7 +82,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
             self.read_groups[id(child)] = [0]
 
     def conjunction(self, tree: ParseTree) -> None:
-        logger.trace(f"Processing conjunction node: {tree}")
+        logger.opt(lazy=True).trace(f"Processing conjunction node: {tree}")
         # For conjunction, all children read and write to the same groups
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             write_group = self.write_groups[id(tree)]
@@ -96,7 +96,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
             raise ValueError(f"Node {tree} does not have write or read groups")
 
     def disjunction(self, tree: ParseTree) -> None:
-        logger.trace(f"Processing disjunction node: {tree}")
+        logger.opt(lazy=True).trace(f"Processing disjunction node: {tree}")
         # For disjunction, give each child a new write group and add to read groups
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             parent_write_group = self.write_groups[id(tree)]
@@ -112,7 +112,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
             raise ValueError(f"Node {tree} does not have write or read groups")
 
     def negation(self, tree: ParseTree) -> None:
-        logger.trace(f"Processing negation node: {tree}")
+        logger.opt(lazy=True).trace(f"Processing negation node: {tree}")
         # For negation, increment the write group and add to read groups
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             parent_group = self.write_groups[id(tree)]
@@ -131,7 +131,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
 
     def col_op(self, tree: ParseTree) -> None:
         # Set attributes for all children using the parent's values
-        logger.trace(f"Processing col node: {tree}")
+        logger.opt(lazy=True).trace(f"Processing col node: {tree}")
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             if self.parallel:
                 # For parallel processing, treat col_op as a disjunction
@@ -154,7 +154,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                     # Store in our dictionaries rather than on the objects directly
                     self.write_groups[id(child)] = write_group
                     self.read_groups[id(child)] = read_groups
-                    logger.trace(
+                    logger.opt(lazy=True).trace(
                         f"Child {child} has write group {write_group} and read group {read_groups}"
                     )
         else:
@@ -162,7 +162,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
 
     def percentile_op(self, tree: ParseTree) -> None:
         # Set attributes for all children using the parent's values
-        logger.trace(f"Processing percentile node: {tree}")
+        logger.opt(lazy=True).trace(f"Processing percentile node: {tree}")
         if id(tree) in self.write_groups and id(tree) in self.read_groups:
             write_group = self.write_groups[id(tree)]
             read_groups = self.read_groups[id(tree)]
@@ -176,7 +176,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 # Store in our dictionaries rather than on the objects directly
                 self.write_groups[id(child)] = write_group
                 self.read_groups[id(child)] = read_groups
-                logger.trace(
+                logger.opt(lazy=True).trace(
                     f"Child {child} has write group {write_group} and read group {read_groups}"
                 )
         else:

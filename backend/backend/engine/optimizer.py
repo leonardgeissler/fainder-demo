@@ -136,9 +136,9 @@ class CostSorter(Visitor[Token], OptimizationRule):
         )
 
         # Sort children by cost
-        logger.trace(f"Before sorting: {tree.children}")
+        logger.opt(lazy=True).trace(f"Before sorting: {tree.children}")
         tree.children.sort(key=lambda x: getattr(x, "cost", 0))
-        logger.trace(f"After sorting: {tree.children}")
+        logger.opt(lazy=True).trace(f"After sorting: {tree.children}")
 
         # Store the cost on the tree node
         tree.cost = cost  # type: ignore

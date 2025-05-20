@@ -172,7 +172,9 @@ class IntermediateResultStoreFuture:
             raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
-            logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
+            logger.opt(lazy=True).trace(
+                f"Write group {write_group} is not used, skipping adding column IDs"
+            )
             return
 
         if write_group not in self.results:
@@ -189,7 +191,9 @@ class IntermediateResultStoreFuture:
             raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
-            logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
+            logger.opt(lazy=True).trace(
+                f"Write group {write_group} is not used, skipping adding column IDs"
+            )
             return
 
         if write_group not in self.results:
@@ -206,21 +210,25 @@ class IntermediateResultStoreFuture:
             raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
-            logger.trace(f"Write group {write_group} is not used, skipping adding column IDs")
+            logger.opt(lazy=True).trace(
+                f"Write group {write_group} is not used, skipping adding column IDs"
+            )
             return
 
         if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
-            logger.trace(f"Column IDs exceed filtering limit: {len(col_ids)}")
+            logger.opt(lazy=True).trace(f"Column IDs exceed filtering limit: {len(col_ids)}")
             return
 
-        logger.trace(f"Write group {write_group} is used, adding column IDs")
+        logger.opt(lazy=True).trace(f"Write group {write_group} is used, adding column IDs")
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, col_ids=col_ids, fainder_mode=self.fainder_mode
             )
         else:
             self.results[write_group].add_col_ids(col_ids, doc_to_cols)
-        logger.trace(f"Adding column IDs to write group {write_group}: length {len(col_ids)}")
+        logger.opt(lazy=True).trace(
+            f"Adding column IDs to write group {write_group}: length {len(col_ids)}"
+        )
 
     def add_doc_ids(
         self, write_group: int, doc_ids: set[int], col_to_doc: NDArray[uint32]
@@ -230,21 +238,25 @@ class IntermediateResultStoreFuture:
             raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
-            logger.trace(f"Write group {write_group} is not used, skipping adding document IDs")
+            logger.opt(lazy=True).trace(
+                f"Write group {write_group} is not used, skipping adding document IDs"
+            )
             return
 
         if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
-            logger.trace(f"Document IDs exceed filtering limit: {len(doc_ids)}")
+            logger.opt(lazy=True).trace(f"Document IDs exceed filtering limit: {len(doc_ids)}")
             return
 
-        logger.trace(f"Write group {write_group} is used, adding document IDs")
+        logger.opt(lazy=True).trace(f"Write group {write_group} is used, adding document IDs")
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
                 write_group, doc_ids=doc_ids, fainder_mode=self.fainder_mode
             )
         else:
             self.results[write_group].add_doc_ids(doc_ids, col_to_doc)
-        logger.trace(f"Adding document IDs to write group {write_group}: length {len(doc_ids)}")
+        logger.opt(lazy=True).trace(
+            f"Adding document IDs to write group {write_group}: length {len(doc_ids)}"
+        )
 
     def get_hist_filter(self, read_groups: list[int], metadata: Metadata) -> ColResult | None:
         """Build a histogram filter from the intermediate results."""
@@ -252,15 +264,15 @@ class IntermediateResultStoreFuture:
         if len(read_groups) == 0:
             return hist_filter
 
-        logger.trace(f"read groups {read_groups}")
+        logger.opt(lazy=True).trace(f"read groups {read_groups}")
         for read_group in read_groups:
             if read_group not in self.results or self.results[read_group].is_empty():
-                logger.trace(
+                logger.opt(lazy=True).trace(
                     f"Read group {read_group} does not have an intermediate result, skipping"
                 )
                 continue
 
-            logger.trace(
+            logger.opt(lazy=True).trace(
                 f"Processing read group {read_group} with results {self.results[read_group]}"
             )
             intermediate = self.results[read_group].build_hist_filter(metadata)
@@ -272,13 +284,13 @@ class IntermediateResultStoreFuture:
             if intermediate is None:
                 continue
 
-            logger.trace(f"intermediate length {len(intermediate)}")
+            logger.opt(lazy=True).trace(f"intermediate length {len(intermediate)}")
             if hist_filter is None:
                 hist_filter = intermediate
             else:
                 hist_filter &= intermediate
 
-        logger.trace(
+        logger.opt(lazy=True).trace(
             f"Hist filter length: {len(hist_filter) if hist_filter is not None else 'None'}"
         )
         return hist_filter
@@ -334,7 +346,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         """Start processing the parse tree."""
         self.write_groups = {}
         self.read_groups = {}
-        logger.trace(tree.pretty())
+        logger.opt(lazy=True).trace(tree.pretty())
         groups = ResultGroupAnnotator()
         groups.apply(tree, parallel=True)
 
@@ -342,10 +354,10 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.read_groups = groups.read_groups
         self.parent_write_group = groups.parent_write_group
         self.intermediate_results.write_groups_used = groups.write_groups_used
-        logger.trace(f"Write groups used: {groups.write_groups_used}")
-        logger.trace(f"Write groups: {self.write_groups}")
-        logger.trace(f"Read groups: {self.read_groups}")
-        logger.trace(f"Parent write groups: {self.parent_write_group}")
+        logger.opt(lazy=True).trace(f"Write groups used: {groups.write_groups_used}")
+        logger.opt(lazy=True).trace(f"Write groups: {self.write_groups}")
+        logger.opt(lazy=True).trace(f"Read groups: {self.read_groups}")
+        logger.opt(lazy=True).trace(f"Parent write groups: {self.parent_write_group}")
         # create intermediate results for all write groups
         for write_group in self.write_groups.values():
             self.intermediate_results.results[write_group] = IntermediateResultFuture(
@@ -356,8 +368,10 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         self.write_groups_actually_used = self.intermediate_results.write_groups_actually_used
         self.write_groups_used = self.intermediate_results.write_groups_used
-        logger.trace(f"Write groups actually used: {self.write_groups_actually_used}")
-        logger.trace(f"Write groups used: {self.write_groups_used}")
+        logger.opt(lazy=True).trace(
+            f"Write groups actually used: {self.write_groups_actually_used}"
+        )
+        logger.opt(lazy=True).trace(f"Write groups used: {self.write_groups_used}")
 
         return result
 
@@ -412,7 +426,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def keyword_op(self, items: list[Token]) -> Future[tuple[DocResult, int]]:
         def _keyword_task(token: Token) -> tuple[DocResult, int]:
             """Task function for keyword search to be run in a thread"""
-            logger.trace(f"Thread executing keyword search for: {token}")
+            logger.opt(lazy=True).trace(f"Thread executing keyword search for: {token}")
             write_group = self._get_write_group(token)
             result_docs, scores, highlights = self.tantivy_index.search(
                 token, self.enable_highlighting, self.min_usability_score, self.rank_by_usability
@@ -421,7 +435,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             parent_write_group = self._get_parent_write_group(write_group)
             return (set(result_docs), (highlights, set())), parent_write_group
 
-        logger.trace(f"Evaluating keyword term: {items}")
+        logger.opt(lazy=True).trace(f"Evaluating keyword term: {items}")
 
         # Submit task to thread pool and store the future with a unique ID
         future = self._thread_pool.submit(_keyword_task, items[0])
@@ -433,12 +447,12 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def name_op(self, items: list[Token]) -> Future[tuple[ColResult, int]]:
         def _name_task(column: Token, k: int) -> tuple[ColResult, int]:
             """Task function for column name search to be run in a thread"""
-            logger.trace(f"Thread executing column name search for: {column}")
+            logger.opt(lazy=True).trace(f"Thread executing column name search for: {column}")
             write_group = self._get_write_group(column)
             parent_write_group = self._get_parent_write_group(write_group)
             return self.hnsw_index.search(column, k, None), parent_write_group
 
-        logger.trace(f"Evaluating column name term: {items}")
+        logger.opt(lazy=True).trace(f"Evaluating column name term: {items}")
 
         column = items[0]
         k = int(items[1])
@@ -455,13 +469,13 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             percentile = float(items[0])
             comparison: str = items[1]
             reference = float(items[2])
-            logger.trace(
+            logger.opt(lazy=True).trace(
                 f"Thread executing percentile search with {percentile} {comparison} {reference}"
             )
             hist_filter = self.intermediate_results.get_hist_filter(
                 self._get_read_groups(items[0]), self.metadata
             )
-            logger.trace(
+            logger.opt(lazy=True).trace(
                 f"Length hist filter: {len(hist_filter) if hist_filter is not None else 'None'}"
             )
             write_group = self._get_write_group(items[0])
@@ -476,7 +490,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             )
             return result_hists, parent_write_group
 
-        logger.trace(f"Evaluating percentile term: {items}")
+        logger.opt(lazy=True).trace(f"Evaluating percentile term: {items}")
 
         # Submit task to thread pool and store the future with a unique ID
         return self._thread_pool.submit(_percentile_task, items)
@@ -484,7 +498,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def col_op(
         self, items: list[tuple[ColResult, int] | Future[tuple[ColResult, int]]]
     ) -> tuple[DocResult, int]:
-        logger.trace("Evaluating column term")
+        logger.opt(lazy=True).trace("Evaluating column term")
 
         if len(items) != 1:
             raise ValueError("Column term must have exactly one item")
@@ -505,7 +519,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def conjunction(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
     ) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating conjunction with number of items: {len(items)}")
+        logger.opt(lazy=True).trace(f"Evaluating conjunction with number of items: {len(items)}")
 
         clean_items, write_group = self._resolve_items(items)
         result = junction(clean_items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
@@ -522,7 +536,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def disjunction(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
     ) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating disjunction with number of items: {len(items)}")
+        logger.opt(lazy=True).trace(f"Evaluating disjunction with number of items: {len(items)}")
 
         clean_items, write_group = self._resolve_items(items)
         result = junction(clean_items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
@@ -538,7 +552,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def negation(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
     ) -> tuple[TResult, int]:
-        logger.trace(f"Evaluating negation with {len(items)} items")
+        logger.opt(lazy=True).trace(f"Evaluating negation with {len(items)} items")
 
         if len(items) != 1:
             raise ValueError("Negation term must have exactly one item")
@@ -569,7 +583,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     def query(
         self, items: list[tuple[DocResult, int] | Future[tuple[DocResult, int]]]
     ) -> DocResult:
-        logger.trace(f"Evaluating query with {len(items)} items")
+        logger.opt(lazy=True).trace(f"Evaluating query with {len(items)} items")
 
         clean_item = items[0].result() if isinstance(items[0], Future) else items[0]
 
