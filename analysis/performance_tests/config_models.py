@@ -67,6 +67,10 @@ class QueryGenerationConfig:
         default=10,
         metadata={"description": "Maximum number of mixed terms with fixed structure not"}
     )
+    max_num_terms_double_expected_form: int = field(
+        default=20,
+        metadata={"description": "Maximum number of terms in double expected form"}
+    )
 
 @dataclass
 class EngineConfig:
@@ -103,7 +107,8 @@ class ExperimentConfig:
             "early_exit",
             "multiple_percentile_combinations",
             "multiple_percentile_combinations_with_kw"
-            "expected_form_not_queries"
+            "expected_form_not_queries",
+            "double_expected_form_queries"
         ],
         metadata={"description": "Test categories to enable"}
     )

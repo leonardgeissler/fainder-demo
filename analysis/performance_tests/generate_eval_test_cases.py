@@ -312,6 +312,75 @@ def expected_form_extented(
     return queries
 
 
+def double_expected_form( 
+    keywords: list[str],
+    terms: list[str],
+    column_names: list[str],
+    ks: list[int],
+    max_terms: int,
+) -> dict[str, dict[str, Any]]:
+    """
+    Generate expected form for double queries.
+
+    Args:
+        keywords: List of keywords to combine
+        terms: List of terms to combine
+        column_names: List of column names to combine
+        ks: List of ks to combine
+    """
+
+    # query structure: (kw('test') AND col(name('age',1) AND pp(..) AND col(name('date',1) AND pp(..))) OR (kw('test2') AND col(name('age',1) AND pp(..) AND col(name('date',1) AND pp(..))))
+    queries: dict[str, dict[str, Any]] = {}
+    query_counter = 1
+    # get 2 keywords (different)
+    # get 4 column names (different)
+    # get 4 ks (can be the same)
+    def get_unique_pairs(items):
+        return [(a, b) for i, a in enumerate(items) for b in items[i+1:]]
+
+    # Get unique pairs of keywords, column names
+    for kw1, kw2 in get_unique_pairs(keywords):
+        # Get two pairs of unique column names
+        for (col1, col2), (col3, col4) in zip(get_unique_pairs(column_names), get_unique_pairs(column_names)):
+            # Get unique k values 
+            for k1, k2 in get_unique_pairs(ks):
+                # Get unique term combinations
+                for term1, term2, term3, term4 in [
+                    (t1,t2,t3,t4) 
+                    for i,t1 in enumerate(terms)
+                    for j,t2 in enumerate(terms[i+1:], i+1) 
+                    for k,t3 in enumerate(terms[j+1:], j+1)
+                    for t4 in terms[k+1:]
+                ]:
+                    query = (
+                        f"(kw('{kw1}') AND "
+                        f"col(name('{col1}';{k1}) AND {term1}) AND "
+                        f"col(name('{col2}';{k2}) AND {term2})) OR "
+                        f"(kw('{kw2}') AND "
+                        f"col(name('{col3}';{k1}) AND {term3}) AND " 
+                        f"col(name('{col4}';{k2}) AND {term4}))"
+                    )
+
+                    queries[f"double_expected_form_{query_counter}"] = {
+                        "query": query,
+                        "ids": [
+                            {"keyword_id": kw1},
+                            {"percentile_id": term1}, 
+                            {"percentile_id": term2},
+                            {"column_id": (col1, k1)},
+                            {"keyword_id": kw2},
+                            {"percentile_id": term3},
+                            {"percentile_id": term4}, 
+                            {"column_id": (col3, k1)},
+                            {"column_id": (col4, k2)},
+                        ],
+                    }
+                    query_counter += 1
+                    if query_counter > max_terms:
+                        return queries
+
+    return queries
+
 def early_exit(
     queries: dict[str, dict[str, Any]],
     form: str = "expected_form",
@@ -507,6 +576,14 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         max_terms=config.query_generation.max_num_mixed_terms_with_fixed_structure_not,
     )
 
+    double_expected_form_queries = double_expected_form(
+        keywords=config.keywords.default_keywords,
+        terms=percentile_terms_list,
+        column_names=config.keywords.default_col_names,
+        ks=config.keywords.default_ks,
+        max_terms=config.query_generation.max_num_terms_double_expected_form,
+    )
+
 
     test_cases = {
         "base_keyword_queries": {"queries": keywordsqueries},
@@ -525,6 +602,9 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         },
         "expected_form_not_queries": {
             "queries": expected_form_not_queries
+        },
+        "double_expected_form_queries": {
+            "queries": double_expected_form_queries
         },
     }
 

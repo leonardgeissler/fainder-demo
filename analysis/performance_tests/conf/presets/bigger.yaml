@@ -1,0 +1,9 @@
+# @package _global_
+defaults:
+  - override /engines: default
+  - override /experiment: default
+  - override /keywords: default
+  - override /percentiles: bigger
+  - override /query_generation: bigger
+
+

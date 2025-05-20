@@ -4,6 +4,7 @@ enabled_tests:
   - early_exit
   - multiple_percentile_combinations_with_kw
   - expected_form_not_queries
+  - double_expected_form_queries
 
 fainder_modes:
   - full_recall

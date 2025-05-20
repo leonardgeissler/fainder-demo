@@ -1,5 +1,6 @@
 import csv
 import json
+from math import log
 import subprocess
 import sys
 import time
@@ -279,10 +280,21 @@ def main(hydra_config: DictConfig) -> None:
     logger.info(f"Hydra config: {OmegaConf.to_yaml(hydra_config)}")
     # Convert hydra config to pydantic model
     config = PerformanceConfig.from_dict(OmegaConf.to_container(hydra_config, resolve=True)) # type: ignore
+    logger.info(f"Performance config: {config}")
     
     # Setup directories and files
     paths = setup_directories(config)
     csv_paths = create_csv_files(paths)
+
+    # Load test cases
+    if config.use_json_test_cases:
+        logger.info("Using JSON test cases")
+        with Path("test_cases/performance_test_cases.json").open("r") as f:
+            test_cases = json.load(f)
+    else:
+        logger.info("Using generated test cases")
+        test_cases = generate_all_test_cases(config)
+    logger.info(f"Generated {len(test_cases)} test cases")  
     
     # Initialize logging
     initialize_logging(paths["log_dir"])
@@ -290,16 +302,6 @@ def main(hydra_config: DictConfig) -> None:
     # Initialize engines
     engines = initialize_engines(config)
     logger.info(f"Initialized engines: {list(engines.keys())}")
-    
-    # Load test cases
-    if config.use_json_test_cases:
-        with Path("test_cases/performance_test_cases.json").open("r") as f:
-            test_cases = json.load(f)
-    else:
-        test_cases = generate_all_test_cases(config)
-    
-    
-    logger.info(f"Running performance tests with {len(test_cases)} test categories")
     logger.info(f"Using modes: {config.experiment.fainder_modes}")
     
     # Run all tests

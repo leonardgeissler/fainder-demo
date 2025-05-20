@@ -1,13 +1,14 @@
 enabled_tests:
   - base_keyword_queries
   - base_percentile_queries
-  - percentile_combinations
   - mixed_combinations_with_fixed_structure
   - mixed_combinations_with_fixed_structure_extented
+  - percentile_combinations
   - early_exit
   - multiple_percentile_combinations
   - multiple_percentile_combinations_with_kw
   - expected_form_not_queries
+  - double_expected_form_queries
 
 fainder_modes:
   - full_precision

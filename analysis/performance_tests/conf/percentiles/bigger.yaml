@@ -1,0 +1,16 @@
+# Percentile related constants
+default_thresholds:
+  - 1
+  - 100
+  - 1000000
+  - 1000000000
+
+default_percentiles:
+  - 0.3
+  - 0.5
+  - 0.9
+  - 1
+
+default_operators:
+  - ge
+  - le
