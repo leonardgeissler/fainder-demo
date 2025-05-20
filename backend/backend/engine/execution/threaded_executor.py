@@ -5,7 +5,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any
 
 import numpy as np
-from lark import ParseTree, Token, Transformer
+from lark import ParseTree, Token, Transformer_NonRecursive
 from loguru import logger
 from numpy import uint32
 
@@ -17,7 +17,7 @@ from .common import ColResult, DocResult, TResult, junction, negation
 from .executor import Executor
 
 
-class ThreadedExecutor(Transformer[Token, DocResult], Executor):
+class ThreadedExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
     """This transformer evaluates a parse tree bottom-up
     and computes the query result in parallel using Threading."""
 

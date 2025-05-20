@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 
 import numpy as np
-from lark import ParseTree, Token, Transformer
+from lark import ParseTree, Token, Transformer_NonRecursive
 from loguru import logger
 from numpy import uint32
 from numpy.typing import NDArray
@@ -308,7 +308,7 @@ class IntermediateResultStoreFuture:
         return hist_filter
 
 
-class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
+class ThreadedPrefilteringExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
     """This transformer evaluates a parse tree bottom-up
     and computes the query result in parallel using Threading.
     It also uses prefiltering to reduce the number of documents
