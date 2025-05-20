@@ -2,7 +2,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 
 import numpy as np
-from lark import ParseTree, Token, Transformer
+from lark import ParseTree, Token, Transformer_NonRecursive
 from loguru import logger
 from numpy import uint32
 from numpy.typing import NDArray
@@ -215,7 +215,7 @@ class IntermediateResultStore:
         return reducing(hist_filters, "and")
 
 
-class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
+class PrefilteringExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
     """Uses prefiltering to reduce the number of documents before executing the query."""
 
     def __init__(
@@ -291,7 +291,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self.read_groups = {}
         logger.opt(lazy=True).trace(tree.pretty())
         groups = ResultGroupAnnotator()
-        groups.apply(tree, parallel=True)
+        groups.apply(tree)
         self.write_groups = groups.write_groups
         self.read_groups = groups.read_groups
         self.parent_write_group = groups.parent_write_group
