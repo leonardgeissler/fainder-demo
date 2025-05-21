@@ -1,5 +1,6 @@
 import json
 from itertools import combinations
+from math import e
 from pathlib import Path
 from typing import Any
 
@@ -491,7 +492,39 @@ def expected_form_not(
     return queries
                         
 
+def middle_exit(
+    keywords: list[str],
+    terms: list[str],
+    max_terms: int,
+) -> dict[str, dict[str, Any]]:
+    """
+    Ads an in the middle of a long query 
+    """
+    queries: dict[str, dict[str, Any]] = {}
+    query_counter = 1
+    for keyword in keywords:
+        for term in terms:
+            for term2 in terms:
+                for term3 in terms:
+                    for term4 in terms:
+                        if term == term2 or term == term3 or term == term4 or term2 == term3 or term2 == term4 or term3 == term4:
+                            continue
 
+                        query = f"kw('{keyword}') AND col({term} AND NOT {term}) AND col(NOT {term2} AND NOT {term3} AND NOT {term4})"
+                        queries[f"middle_exit_{query_counter}"] = {
+                            "query": query,
+                            "ids": [
+                                {"keyword_id": keyword},
+                                {"percentile_id": term},
+                            ],
+                        }
+                        query_counter += 1
+                        if query_counter > max_terms:
+                            return queries
+
+    return queries
+
+    
 
 def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     """
@@ -591,6 +624,12 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         max_terms=config.query_generation.max_num_terms_double_expected_form,
     )
 
+    middle_exit_queries = middle_exit(
+        keywords=config.keywords.default_keywords,
+        terms=percentile_terms_list,
+        max_terms=config.query_generation.max_num_middle_exit,  
+    )
+
 
     test_cases = {
         "base_keyword_queries": {"queries": keywordsqueries},
@@ -613,6 +652,9 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         "double_expected_form_queries": {
             "queries": double_expected_form_queries
         },
+        "middle_exit": {
+            "queries": middle_exit_queries
+        }
     }
 
     # Filter test cases based on enabled_tests

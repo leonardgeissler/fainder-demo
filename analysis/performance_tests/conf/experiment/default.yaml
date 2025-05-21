@@ -9,6 +9,7 @@ enabled_tests:
   - multiple_percentile_combinations_with_kw
   - expected_form_not_queries
   - double_expected_form_queries
+  - middle_exit
 
 fainder_modes:
   - full_precision
