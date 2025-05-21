@@ -46,7 +46,12 @@ class Optimizer:
 
     """
 
-    def __init__(self, cost_sorting: bool = True, keyword_merging: bool = True) -> None:
+    def __init__(
+        self,
+        cost_sorting: bool = True,
+        keyword_merging: bool = True,
+        split_up_junctions: bool = True,
+    ) -> None:
         self.opt_rules: list[OptimizationRule] = [QuoteRemover()]
         if cost_sorting:
             self.opt_rules.append(CostSorter())
@@ -56,26 +61,44 @@ class Optimizer:
                     "Using keyword merging without cost sorting may lead to suboptimal results"
                 )
             self.opt_rules.append(MergeKeywords())
+        if split_up_junctions:
+            if cost_sorting is False or keyword_merging is False:
+                logger.warning(
+                    "Using split up junctions without cost sorting"
+                    " or keyword merging may lead to suboptimal results"
+                )
+            self.opt_rules.append(SplitUpJunctions())
 
     def optimize(self, tree: ParseTree) -> ParseTree:
         """
         Optimizes the given ParseTree in-place using a sequence of optimization techniques.
         """
+        logger.debug(f"Unoptimized tree: {tree.pretty()}")
+        logger.trace(f"Unoptimized tree data: {tree}")
         for rule in self.opt_rules:
             rule.apply(tree)
+        logger.debug(f"Optimized tree: {tree.pretty()}")
+        logger.trace(f"Optimized tree data: {tree}")
         return tree
 
 
 def create_optimizer(
-    executor_type: ExecutorType, cost_sorting: bool = True, keyword_merging: bool = True
+    executor_type: ExecutorType,
+    cost_sorting: bool = True,
+    keyword_merging: bool = True,
+    split_up_junctions: bool = True,
 ) -> Optimizer:
     """
     Creates an optimizer based on the executor type.
     """
     if executor_type == ExecutorType.PREFILTERING:
-        return Optimizer(cost_sorting=True, keyword_merging=True)
+        return Optimizer(cost_sorting=True, keyword_merging=True, split_up_junctions=True)
     # TODO: Handle other executor types properly
-    return Optimizer(cost_sorting=cost_sorting, keyword_merging=keyword_merging)
+    return Optimizer(
+        cost_sorting=cost_sorting,
+        keyword_merging=keyword_merging,
+        split_up_junctions=split_up_junctions,
+    )
 
 
 class QuoteRemover(Visitor[Token], OptimizationRule):
@@ -97,6 +120,51 @@ class QuoteRemover(Visitor[Token], OptimizationRule):
 
     def apply(self, tree: ParseTree) -> None:
         self.visit(tree)
+
+
+class SplitUpJunctions(Visitor[Token], OptimizationRule):
+    """
+    This vistor splits up conjunctions and disjunctions with more
+    than two terms into Rules with two terms.
+    """
+
+    def __default__(self, tree: ParseTree) -> ParseTree:
+        return tree
+
+    def apply(self, tree: ParseTree) -> None:
+        self.visit(tree)
+
+    def disjunction(self, tree: ParseTree) -> ParseTree:
+        if len(tree.children) > 2:
+            # Split the disjunction into multiple rules
+            new_children: list[Token | Tree[Token]] = []
+            for i in range(0, len(tree.children), 2):
+                if i + 1 < len(tree.children):
+                    new_children.append(
+                        Tree(
+                            Token("RULE", "disjunction"), [tree.children[i], tree.children[i + 1]]
+                        )
+                    )
+                else:
+                    new_children.append(tree.children[i])
+            tree.children = new_children
+        return tree
+
+    def conjunction(self, tree: ParseTree) -> ParseTree:
+        if len(tree.children) > 2:
+            # Split the conjunction into multiple rules
+            new_children: list[Token | Tree[Token]] = []
+            for i in range(0, len(tree.children), 2):
+                if i + 1 < len(tree.children):
+                    new_children.append(
+                        Tree(
+                            Token("RULE", "conjunction"), [tree.children[i], tree.children[i + 1]]
+                        )
+                    )
+                else:
+                    new_children.append(tree.children[i])
+            tree.children = new_children
+        return tree
 
 
 class ParentAnnotator(Visitor[Token], OptimizationRule):
@@ -136,9 +204,7 @@ class CostSorter(Visitor[Token], OptimizationRule):
         )
 
         # Sort children by cost
-        logger.opt(lazy=True).trace(f"Before sorting: {tree.children}")
         tree.children.sort(key=lambda x: getattr(x, "cost", 0))
-        logger.opt(lazy=True).trace(f"After sorting: {tree.children}")
 
         # Store the cost on the tree node
         tree.cost = cost  # type: ignore
