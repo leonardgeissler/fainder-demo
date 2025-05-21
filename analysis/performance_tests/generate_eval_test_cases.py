@@ -73,14 +73,14 @@ def generate_percentile_queries(
     """
 
     queries: dict[str, dict[str, Any]] = {}
-    query_counter = 9
+    query_counter = 0
 
     for op in operators:
         for i, threshold in enumerate(thresholds):
             for h, percentile in enumerate(percentile_values):
+                query_counter += 1
                 if query_counter > max_terms:
                     break
-                query_counter += 1
                 queries[f"percentile_{op}_{i}_{h}"] = {
                     "query": f"col(pp({percentile};{op};{threshold}))",
                     "percentile_id": f"pp({percentile};{op};{threshold})",
