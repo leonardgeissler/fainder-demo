@@ -9,28 +9,22 @@ class Parser(Lark):
     query:          tbl_expr
 
     ?tbl_expr:      tbl_term
-                    | tbl_expr "OR" tbl_term -> disjunction
-
+                    | tbl_term ("OR" tbl_term)+ -> disjunction
     ?tbl_term:      tbl_factor
-                    | tbl_term "AND" tbl_factor -> conjunction
-
+                    | tbl_factor ("AND" tbl_factor)+ -> conjunction
     ?tbl_factor:    tbl_operator
                     | "NOT" tbl_factor -> negation
                     | "(" tbl_expr ")"
-
     ?tbl_operator:  _KEYWORD_KW "(" keyword_op ")"
                     | _COLUMN_KW "(" col_op ")"
 
     ?col_expr:      col_term
-                    | col_expr "OR" col_term -> disjunction
-
+                    | col_term ("OR" col_term)+ -> disjunction
     ?col_term:      col_factor
-                    | col_term "AND" col_factor -> conjunction
-
+                    | col_factor ("AND" col_factor)+ -> conjunction
     ?col_factor:    col_operator
                     | "NOT" col_factor -> negation
                     | "(" col_expr ")"
-
     ?col_operator:  _NAME_KW "(" name_op ")"
                     | _PERCENTILE_KW "(" percentile_op ")"
 
@@ -60,7 +54,7 @@ class Parser(Lark):
         self,
         parser: Literal["earley", "lalr"] = "lalr",
         lexer: Literal["auto", "basic", "contextual", "dynamic", "dynamic_complete"] = "auto",
-        strict: bool = False,
+        strict: bool = True,
     ) -> None:
         super().__init__(  # pyright: ignore[reportUnknownMemberType]
             Parser.GRAMMAR, start="query", parser=parser, lexer=lexer, strict=strict
