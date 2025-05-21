@@ -52,7 +52,7 @@ class QueryGenerationConfig:
         metadata={"description": "Maximum number of terms in generated queries"}
     )
     max_num_query_per_num_terms: int = field(
-        default=20,
+        default=5,
         metadata={"description": "Maximum number of queries to generate per term count"}
     )
     max_num_mixed_terms_with_fixed_structure: int = field(
@@ -70,6 +70,10 @@ class QueryGenerationConfig:
     max_num_terms_double_expected_form: int = field(
         default=20,
         metadata={"description": "Maximum number of terms in double expected form"}
+    )
+    max_num_terms_percentilequeries: int = field(
+        default=20,
+        metadata={"description": "Maximum number of terms in percentile queries"}
     )
 
 @dataclass

@@ -3,6 +3,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any
 
+from backend.main import query
 from loguru import logger
 
 from .config_models import PerformanceConfig
@@ -60,6 +61,7 @@ def generate_percentile_queries(
     percentile_values: list[float],
     thresholds: list[int],
     operators: list[str],
+    max_terms: int = 10,
 ) -> dict[str, dict[str, Any]]:
     """
     Generate percentile queries for testing.
@@ -71,10 +73,14 @@ def generate_percentile_queries(
     """
 
     queries: dict[str, dict[str, Any]] = {}
+    query_counter = 9
 
     for op in operators:
         for i, threshold in enumerate(thresholds):
             for h, percentile in enumerate(percentile_values):
+                if query_counter > max_terms:
+                    break
+                query_counter += 1
                 queries[f"percentile_{op}_{i}_{h}"] = {
                     "query": f"col(pp({percentile};{op};{threshold}))",
                     "percentile_id": f"pp({percentile};{op};{threshold})",
@@ -506,6 +512,7 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         percentile_values=config.percentiles.default_percentiles,
         thresholds=config.percentiles.default_thresholds,
         operators=config.percentiles.default_operators,
+        max_terms=config.query_generation.max_num_terms_percentilequeries
     )
 
     percentile_combinations_queries = percentile_term_combinations(
