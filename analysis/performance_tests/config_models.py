@@ -75,6 +75,10 @@ class QueryGenerationConfig:
         default=20,
         metadata={"description": "Maximum number of terms in percentile queries"}
     )
+    max_num_middle_exit: int = field(
+        default=20,
+        metadata={"description": "Maximum number of middle exit terms"}
+    )
 
 @dataclass
 class EngineConfig:

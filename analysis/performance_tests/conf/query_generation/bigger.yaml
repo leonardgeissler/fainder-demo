@@ -12,3 +12,5 @@ max_num_mixed_terms_with_fixed_structure_not: 5
 max_num_terms_double_expected_form: 30
 
 max_num_terms_percentilequeries: 20
+
+max_num_middle_exit: 20
