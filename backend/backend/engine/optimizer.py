@@ -14,9 +14,9 @@ Costs for each operator in the query tree. Currently, we define operator costs a
 magic number. In the future, we may want to use a more sophisticated cost model.
 """
 LEAF_COSTS = {
-    "keyword_op": 1,
+    "keyword_op": -1,
     "percentile_op": 2,
-    "name_op": 1,
+    "name_op": -1,
 }
 NODE_COSTS = {
     "col_op": 1,
