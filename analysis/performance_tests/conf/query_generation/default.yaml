@@ -1,0 +1,14 @@
+# Maximum number of terms to combine
+min_num_terms_query: 2
+max_num_terms_query: 4
+max_num_query_per_num_terms: 20
+
+# Mixed terms configuration
+max_num_mixed_terms_with_fixed_structure: 30
+max_num_mixed_terms_extended_with_fixed_structure: 20
+
+max_num_mixed_terms_with_fixed_structure_not: 1
+
+max_num_terms_double_expected_form: 20
+
+max_num_terms_percentilequeries: 10

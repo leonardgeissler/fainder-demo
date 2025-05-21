@@ -1,0 +1,18 @@
+defaults:
+  - _self_
+  - engines: default
+  - experiment: default
+  - keywords: default
+  - percentiles: default
+  - query_generation: default
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+
+# Paths for logs
+log_dir: logs
+performance_log_dir: ${log_dir}/performance
+profiling_log_dir: profiling
+
+# Execution settings
+disable_profiling: true
+use_json_test_cases: false
