@@ -1,0 +1,9 @@
+enabled_tests:
+  - base_percentile_queries
+
+fainder_modes:
+  - full_recall
+  - exact
+
+# Number of times to run each query for more reliable timing measurements
+num_runs: 3

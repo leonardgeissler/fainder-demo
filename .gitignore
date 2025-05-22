@@ -55,3 +55,4 @@ logs/
 
 # tantivy lock
 *.lock
+/analysis/performance_tests/figures
