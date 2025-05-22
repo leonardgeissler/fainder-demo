@@ -20,7 +20,7 @@
           :rules="[
             (v) =>
               !v ||
-              v.every((file) => file?.type === 'application/json') ||
+              v.every((file: any) => file?.type === 'application/json') ||
               'Only JSON files are allowed',
           ]"
         />
@@ -47,12 +47,19 @@
   </v-main>
 </template>
 
-<script setup>
-const files = ref(null);
-const isUploading = ref(false);
-const alert = ref(null);
+<script setup lang="ts">
+import { ref, type Ref } from "vue";
 
-const handleSubmit = async () => {
+interface Alert {
+  type: "success" | "error";
+  message: string;
+}
+
+const files: Ref<File[] | null> = ref(null);
+const isUploading: Ref<boolean> = ref(false);
+const alert: Ref<Alert | null> = ref(null);
+
+const handleSubmit = async (): Promise<void> => {
   if (!files.value) return;
 
   isUploading.value = true;
@@ -60,7 +67,7 @@ const handleSubmit = async () => {
 
   try {
     const formData = new FormData();
-    files.value.forEach((file) => {
+    files.value.forEach((file: File) => {
       formData.append("files", file);
     });
 
@@ -78,11 +85,18 @@ const handleSubmit = async () => {
       message: "Files uploaded successfully",
     };
     files.value = null;
-  } catch (error) {
-    alert.value = {
-      type: "error",
-      message: `Upload failed: ${error.message}`,
-    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      alert.value = {
+        type: "error",
+        message: `Upload failed: ${error.message}`,
+      };
+    } else {
+      alert.value = {
+        type: "error",
+        message: "Upload failed: An unknown error occurred",
+      };
+    }
   } finally {
     isUploading.value = false;
   }
