@@ -53,7 +53,7 @@ class SimpleExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
     ### Operator implementations ###
 
     def keyword_op(self, items: list[Token]) -> DocResult:
-        logger.opt(lazy=True).trace(f"Evaluating keyword term: {items}")
+        logger.trace("Evaluating keyword term: {}", items)
 
         result_docs, scores, highlights = self.tantivy_index.search(
             items[0], self.enable_highlighting, self.min_usability_score, self.rank_by_usability
@@ -66,7 +66,7 @@ class SimpleExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
         )  # Return empty array for column highlights
 
     def col_op(self, items: list[ColResult]) -> DocResult:
-        logger.opt(lazy=True).trace(f"Evaluating column term with items of length: {len(items)}")
+        logger.trace("Evaluating column term with items of length: {}", len(items))
 
         if len(items) != 1:
             raise ValueError("Column term must have exactly one item")
@@ -78,7 +78,7 @@ class SimpleExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
         return doc_ids, ({}, np.array([], dtype=uint32))
 
     def name_op(self, items: list[Token]) -> ColResult:
-        logger.opt(lazy=True).trace(f"Evaluating column term: {items}")
+        logger.trace("Evaluating column term: {}", items)
 
         column = items[0]
         k = int(items[1])
@@ -86,7 +86,7 @@ class SimpleExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
         return self.hnsw_index.search(column, k, None)
 
     def percentile_op(self, items: list[Token]) -> ColResult:
-        logger.opt(lazy=True).trace(f"Evaluating percentile term: {items}")
+        logger.trace("Evaluating percentile term: {}", items)
 
         percentile = float(items[0])
         comparison: str = items[1]
@@ -95,17 +95,17 @@ class SimpleExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
         return self.fainder_index.search(percentile, comparison, reference, self.fainder_mode)
 
     def conjunction(self, items: Sequence[TResult]) -> TResult:
-        logger.opt(lazy=True).trace(f"Evaluating conjunction with items of length: {len(items)}")
+        logger.trace("Evaluating conjunction with items of length: {}", len(items))
 
         return junction(items, "and", self.enable_highlighting, self.metadata.doc_to_cols)
 
     def disjunction(self, items: Sequence[TResult]) -> TResult:
-        logger.opt(lazy=True).trace(f"Evaluating disjunction with items of length: {len(items)}")
+        logger.trace("Evaluating disjunction with items of length: {}", len(items))
 
         return junction(items, "or", self.enable_highlighting, self.metadata.doc_to_cols)
 
     def negation(self, items: Sequence[TResult]) -> TResult:
-        logger.opt(lazy=True).trace(f"Evaluating negation with items of length: {len(items)}")
+        logger.trace("Evaluating negation with items of length: {}", len(items))
 
         if len(items) != 1:
             raise ValueError("Negation term must have exactly one item")
@@ -121,7 +121,7 @@ class SimpleExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
         return negation(to_negate_cols, len(self.metadata.col_to_doc))
 
     def query(self, items: Sequence[DocResult]) -> DocResult:
-        logger.opt(lazy=True).trace(f"Evaluating query with {len(items)} items")
+        logger.trace(f"Evaluating query with {len(items)} items")
 
         if len(items) != 1:
             raise ValueError("Query must have exactly one item")
