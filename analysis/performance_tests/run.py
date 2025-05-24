@@ -82,9 +82,12 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
 
 def setup_directories(config: PerformanceConfig) -> Dict[str, Path]:
     """Set up directory structure for logs and results"""
-    # Get git hash for organization
+    # Get git branch name and hash for organization
+    process = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], shell=False, stdout=subprocess.PIPE)
+    git_branch = process.communicate()[0].strip().decode('utf-8')
+    
     process = subprocess.Popen(['git', 'rev-parse', 'HEAD'], shell=False, stdout=subprocess.PIPE)
-    git_head_hash = process.communicate()[0].strip().decode('utf-8')
+    git_head_hash = f"{git_branch}_{process.communicate()[0].strip().decode('utf-8')}"
     
     # Create base directories
     paths = {}
