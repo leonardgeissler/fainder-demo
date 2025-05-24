@@ -90,7 +90,7 @@ class ApplicationState:
             )
 
         except Exception as e:
-            logger.error(f"Failed to initialize application state: {e}")
+            logger.error("Failed to initialize application state: {}", e)
             raise e
 
     def update_indices(self) -> None:

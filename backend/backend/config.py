@@ -254,9 +254,9 @@ def configure_logging(level: str, modules: Sequence[str] = ()) -> None:
         if (mod_logger) and (isinstance(mod_logger, logging.Logger)):
             mod_logger.handlers = [InterceptHandler(level=0)]
             mod_logger.propagate = False
-            logger.opt(lazy=True).trace(f"InterceptHandler in place for logger {logger_name}")
+            logger.trace("InterceptHandler in place for logger {}", logger_name)
         else:
-            logger.debug(f"No logger found named {logger_name}")
+            logger.debug("No logger found named {}", logger_name)
 
     # NOTE: This is a helper to list all loggers in the system
     # for k, _ in logging.Logger.manager.loggerDict.items():
