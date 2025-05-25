@@ -57,6 +57,8 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
+        parallel=settings.fainder_parallel,
+        num_workers=settings.max_workers,
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
     tantivy_index = TantivyIndex(index_path=str(settings.tantivy_path), recreate=False)
