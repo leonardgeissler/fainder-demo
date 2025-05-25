@@ -20,6 +20,8 @@ from backend.config import Settings
 from backend.indices import TantivyIndex, get_tantivy_schema
 from backend.util import dump_json, load_json
 
+from fainder.execution.parallel_processing import partition_histogram_ids
+
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
@@ -263,6 +265,33 @@ def generate_embedding_index(
     logger.info("Saving HNSW index")
     index.save_index((output_path / "index.bin").as_posix())
 
+def save_histograms_parallel(
+    hists: Sequence[tuple[int | np.integer[Any], Histogram]],
+    output_path: Path
+): 
+    workers = os.cpu_count() or 2
+    workers = max(1, workers - 1)  
+    logger.info("Partitioning histogram IDs for parallel processing with {} workers", workers)
+    hist_id_chunks = partition_histogram_ids(
+        [int(id_) for id_, _ in hists], num_partitions=workers
+    )
+    logger.info("Partitioned histogram IDs into {} chunks of length {}", len(hist_id_chunks), len(hist_id_chunks[0]) if hist_id_chunks else 0)
+    for i in range(workers):
+        logger.info("Saving histograms for worker {}", i)
+        # split up the histograms into chunks for each worker
+        chunk_hists = [(id_, hist) for id_, hist in hists if id_ in hist_id_chunks[i]]
+        logger.info(
+            "Worker {} will process {} histograms", i, len(chunk_hists)
+        )
+        save_output(
+            output_path / f"histograms_{i}.zst",
+            chunk_hists,
+            name="histograms",
+        )
+        logger.info( 
+            "Saved {} histograms to file: {}", len(chunk_hists), output_path / f"histograms_{i}.zst"
+        )
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -273,6 +302,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--no-embeddings", action="store_true", help="Skip generating embedding index"
+    )
+    parser.add_argument(
+        "--save-hists-parallel",
+        action="store_true",
+        help="Save histograms in parallel chunks for Fainder",
     )
     parser.add_argument(
         "--log-level",
@@ -326,3 +360,5 @@ if __name__ == "__main__":
             ef_construction=settings.hnsw_ef_construction,
             n_bidirectional_links=settings.hnsw_n_bidirectional_links,
         )
+    if not args.save_hists_parallel:
+        save_histograms_parallel(hists, output_path=settings.fainder_path)

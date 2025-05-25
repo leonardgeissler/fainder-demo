@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-from fainder.execution.new_runner import run_approx_np, run_exact_np
+from fainder.execution.new_runner import run_approx_np, run_exact_np, run_exact_np_parallel, init_parallel_processor
 from fainder.utils import load_input
 from loguru import logger
 
@@ -22,6 +22,7 @@ class FainderIndex:
         rebinning_path: Path | None,
         conversion_path: Path | None,
         histogram_path: Path | None,
+        parallel: bool = True,
     ) -> None:
         self.rebinning_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = (
             load_input(rebinning_path, "rebinning index") if rebinning_path else None
@@ -29,9 +30,19 @@ class FainderIndex:
         self.conversion_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = (
             load_input(conversion_path, "conversion index") if conversion_path else None
         )
-        self.hists: list[tuple[np.uint32, Histogram]] | None = (
+        self.histogram_path: Path | None = histogram_path
+        self.parallel: bool = parallel
+        
+        if not parallel:
+            self.hists: list[tuple[np.uint32, Histogram]] | None = (
             load_input(histogram_path, "histograms") if histogram_path else None
         )
+        else:
+            # Initialize parallel processor if histogram path is available
+            if self.histogram_path is not None:
+                logger.info(f"Initializing parallel processor with histograms from: {self.histogram_path}")
+                # Use split files by default (assuming they were generated during indexing)
+                init_parallel_processor(self.histogram_path, use_split_files=True)
 
     def update(
         self,
@@ -45,7 +56,16 @@ class FainderIndex:
         self.conversion_index = (
             load_input(conversion_path, "conversion index") if conversion_path else None
         )
-        self.hists = load_input(histogram_path, "histograms") if histogram_path else None
+        self.histogram_path = histogram_path
+        
+        # We don't load histograms in the main thread anymore
+        self.hists = None
+        
+        # Update parallel processor if histogram path is available
+        if self.histogram_path is not None:
+            logger.info(f"Updating parallel processor with histograms from: {self.histogram_path}")
+            # Use split files by default (assuming they were generated during indexing)
+            init_parallel_processor(self.histogram_path, use_split_files=True)
 
     def search(
         self,
@@ -95,17 +115,30 @@ class FainderIndex:
                     id_filter=id_filter,
                 )
             case FainderMode.EXACT:
-                if self.conversion_index is None or self.hists is None:
-                    raise FainderError(
-                        "Conversion index and histograms must be loaded for exact mode."
+                if not self.parallel:
+                    if self.conversion_index is None or self.hists is None:
+                        raise FainderError(
+                            "Conversion index and histograms must be loaded for exact mode."
+                        )
+                    
+                    result, runtime = run_exact_np(
+                        fainder_index=self.conversion_index,
+                        hists=self.hists,
+                        query=query,
+                        id_filter=id_filter,
                     )
+                else:
+                    if self.conversion_index is None or self.histogram_path is None:
+                        raise FainderError(
+                            "Conversion index and histogram path must be loaded for exact mode."
+                        )
 
-                result, runtime = run_exact_np(
-                    fainder_index=self.conversion_index,
-                    hists=self.hists,
-                    query=query,
-                    id_filter=id_filter,
-                )
+                    result, runtime = run_exact_np_parallel(
+                        fainder_index=self.conversion_index,
+                        histogram_path=self.histogram_path,
+                        query=query,
+                        id_filter=id_filter,
+                    )
 
         logger.info(
             "Query '{}' ({} mode) returned {} histograms in {} seconds. With filtersize: {}",
