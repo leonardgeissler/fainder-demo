@@ -7,7 +7,6 @@ from backend.engine.conversion import col_to_hist_ids, doc_to_col_ids
 from backend.config import Metadata
 import pytest
 
-from numpy.typing import ArrayLike
 
 
 
@@ -124,13 +123,14 @@ def test_breaking_point_fainder(
         start_time = time.perf_counter()
         result_keyword, _ = simple_engine.execute(keyword_query)
         time_keyword = time.perf_counter() - start_time
-        result_keyword_hists = col_to_hist_ids(doc_to_col_ids(set(result_keyword), metadata.doc_to_cols), metadata.num_hists)
+        import numpy as np
+        result_keyword_hists = col_to_hist_ids(doc_to_col_ids(np.array(list(result_keyword), dtype=np.uint), metadata.doc_to_cols), metadata.num_hists)
         
         query_string = f"{keyword_query} AND {query['query']}"
         start_time = time.perf_counter()
         result_keyword_filter, _ = prefiltering_engine.execute(query_string, fainder_mode=query["fainder_mode"])
         time_with_keyword_filter = time.perf_counter() - start_time
-        result_keyword_filter_hists = col_to_hist_ids(doc_to_col_ids(set(result_keyword_filter), metadata.doc_to_cols), metadata.num_hists)
+        result_keyword_filter_hists = col_to_hist_ids(doc_to_col_ids(np.array(list(result_keyword_filter), dtype=np.uint), metadata.doc_to_cols), metadata.num_hists)
 
         # use result_keyword and result_without_filtering to calculate the filter size right and wrong
         filter_size_right = len(result_keyword_filter_hists)
