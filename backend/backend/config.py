@@ -96,6 +96,7 @@ class Settings(BaseSettings):
     fainder_alpha: float = 1.0
     fainder_transform: Literal["standard", "robust", "quantile", "power"] | None = None
     fainder_cluster_algorithm: Literal["agglomerative", "hdbscan", "kmeans"] = "kmeans"
+    fainder_parallel: bool = True
 
     # Embedding/HNSW settings
     use_embeddings: bool = True

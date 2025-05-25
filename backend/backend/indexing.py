@@ -267,10 +267,10 @@ def generate_embedding_index(
 
 def save_histograms_parallel(
     hists: Sequence[tuple[int | np.integer[Any], Histogram]],
-    output_path: Path
-): 
-    workers = os.cpu_count() or 2
-    workers = max(1, workers - 1)  
+    output_path: Path,
+    max_workers: int
+):  
+    workers = max_workers - 1
     logger.info("Partitioning histogram IDs for parallel processing with {} workers", workers)
     hist_id_chunks = partition_histogram_ids(
         [int(id_) for id_, _ in hists], num_partitions=workers
@@ -361,4 +361,4 @@ if __name__ == "__main__":
             n_bidirectional_links=settings.hnsw_n_bidirectional_links,
         )
     if not args.save_hists_parallel:
-        save_histograms_parallel(hists, output_path=settings.fainder_path)
+        save_histograms_parallel(hists, output_path=settings.fainder_path, max_workers=settings.max_workers)

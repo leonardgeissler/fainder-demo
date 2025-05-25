@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -23,6 +24,7 @@ class FainderIndex:
         conversion_path: Path | None,
         histogram_path: Path | None,
         parallel: bool = True,
+        num_workers: int = os.cpu_count() or 1
     ) -> None:
         self.rebinning_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = (
             load_input(rebinning_path, "rebinning index") if rebinning_path else None
@@ -42,7 +44,7 @@ class FainderIndex:
             if self.histogram_path is not None:
                 logger.info(f"Initializing parallel processor with histograms from: {self.histogram_path}")
                 # Use split files by default (assuming they were generated during indexing)
-                init_parallel_processor(self.histogram_path, use_split_files=True)
+                init_parallel_processor(self.histogram_path, num_workers, use_split_files=True)
 
     def update(
         self,
