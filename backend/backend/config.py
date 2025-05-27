@@ -32,7 +32,7 @@ IntegerArray = Annotated[
     BeforeValidator(lambda data: np.array(data, dtype=np.uint32)),
     PlainSerializer(lambda data: data.tolist()),
 ]
-DocumentArray = NDArray[np.uint]
+DocumentArray = NDArray[np.uint32]
 ColumnArray = NDArray[np.uint32]
 
 

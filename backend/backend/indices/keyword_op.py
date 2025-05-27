@@ -133,4 +133,4 @@ class TantivyIndex:
                     highlights[doc_id][field_name] = html_snippet
 
         logger.info("Processing results took {:.5f}s", time.perf_counter() - process_start)
-        return np.array(results, dtype=int), scores, highlights
+        return np.array(results, dtype=np.uint32), scores, highlights

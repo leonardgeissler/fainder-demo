@@ -61,10 +61,8 @@ class FainderIndex:
                 f"Invalid percentile predicate: {percentile};{comparison};{reference}"
             )
 
-        id_filter = hist_filter
-        result: ColumnArray
-
         # Predicate evaluation
+        result: ColumnArray
         query: PctlQuery = (percentile, comparison, reference)  # type: ignore
         match fainder_mode:
             case FainderMode.LOW_MEMORY:
@@ -74,7 +72,7 @@ class FainderIndex:
                     fainder_index=self.rebinning_index,
                     query=query,
                     index_mode="recall",
-                    id_filter=id_filter,
+                    id_filter=hist_filter,
                 )
             case FainderMode.FULL_PRECISION:
                 if self.conversion_index is None:
@@ -83,7 +81,7 @@ class FainderIndex:
                     fainder_index=self.conversion_index,
                     query=query,
                     index_mode="precision",
-                    id_filter=id_filter,
+                    id_filter=hist_filter,
                 )
             case FainderMode.FULL_RECALL:
                 if self.conversion_index is None:
@@ -92,7 +90,7 @@ class FainderIndex:
                     fainder_index=self.conversion_index,
                     query=query,
                     index_mode="recall",
-                    id_filter=id_filter,
+                    id_filter=hist_filter,
                 )
             case FainderMode.EXACT:
                 if self.conversion_index is None or self.hists is None:
@@ -104,16 +102,16 @@ class FainderIndex:
                     fainder_index=self.conversion_index,
                     hists=self.hists,
                     query=query,
-                    id_filter=id_filter,
+                    id_filter=hist_filter,
                 )
 
         logger.info(
-            "Query '{}' ({} mode) returned {} histograms in {} seconds. With filtersize: {}",
+            "Query '{}' ({} mode) returned {} histograms in {} seconds. With filter size: {}",
             query,
             fainder_mode,
             len(result),
             f"{runtime:.2f}",
-            id_filter.size if id_filter is not None else "no filter",
+            hist_filter.size if hist_filter is not None else "no filter",
         )
 
         return result
