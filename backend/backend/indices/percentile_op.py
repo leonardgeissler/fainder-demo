@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-from fainder.execution.new_runner import run_approx_np, run_exact_np
+from fainder.execution.new_runner import run_approx, run_exact
 from fainder.utils import load_input
 from loguru import logger
 
@@ -70,7 +70,7 @@ class FainderIndex:
             case FainderMode.LOW_MEMORY:
                 if self.rebinning_index is None:
                     raise FainderError("Rebinning index must be loaded for low_memory mode.")
-                result, runtime = run_approx_np(
+                result, runtime = run_approx(
                     fainder_index=self.rebinning_index,
                     query=query,
                     index_mode="recall",
@@ -79,7 +79,7 @@ class FainderIndex:
             case FainderMode.FULL_PRECISION:
                 if self.conversion_index is None:
                     raise FainderError("Conversion index must be loaded for full_precision mode.")
-                result, runtime = run_approx_np(
+                result, runtime = run_approx(
                     fainder_index=self.conversion_index,
                     query=query,
                     index_mode="precision",
@@ -88,7 +88,7 @@ class FainderIndex:
             case FainderMode.FULL_RECALL:
                 if self.conversion_index is None:
                     raise FainderError("Conversion index must be loaded for full_recall mode.")
-                result, runtime = run_approx_np(
+                result, runtime = run_approx(
                     fainder_index=self.conversion_index,
                     query=query,
                     index_mode="recall",
@@ -100,7 +100,7 @@ class FainderIndex:
                         "Conversion index and histograms must be loaded for exact mode."
                     )
 
-                result, runtime = run_exact_np(
+                result, runtime = run_exact(
                     fainder_index=self.conversion_index,
                     hists=self.hists,
                     query=query,
