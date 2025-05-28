@@ -4,7 +4,6 @@ from collections.abc import Sequence
 import numpy as np
 from lark import ParseTree, Token, Transformer
 from loguru import logger
-from numpy import uint32
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
 from backend.engine.conversion import col_to_doc_ids
@@ -62,7 +61,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
 
         return result_docs, (
             highlights,
-            np.array([], dtype=uint32),
+            np.array([], dtype=np.uint32),
         )  # Return empty array for column highlights
 
     def col_op(self, items: list[ColResult]) -> DocResult:
@@ -75,7 +74,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids)
 
-        return doc_ids, ({}, np.array([], dtype=uint32))
+        return doc_ids, ({}, np.array([], dtype=np.uint32))
 
     def name_op(self, items: list[Token]) -> ColResult:
         logger.trace("Evaluating column term: {}", items)
@@ -114,7 +113,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
             doc_result = negation(to_negate, len(self.metadata.doc_to_cols))
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
-            col_highlights: ColumnHighlights = np.array([], dtype=uint32)
+            col_highlights: ColumnHighlights = np.array([], dtype=np.uint32)
             return doc_result, (doc_highlights, col_highlights)
 
         to_negate_cols = items[0]

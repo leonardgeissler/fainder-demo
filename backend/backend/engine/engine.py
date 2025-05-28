@@ -99,7 +99,7 @@ class Engine:
         result, highlights = self.executor.execute(parse_tree)
 
         # Sort by score
-        result_list: list[int] = self.convert_numpy_to_list(result)
+        result_list: list[int] = result.tolist()
 
         result_list.sort(key=lambda x: self.executor.scores.get(x, -1), reverse=True)
         return result_list, highlights

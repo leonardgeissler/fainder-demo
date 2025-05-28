@@ -7,7 +7,6 @@ from typing import Any
 import numpy as np
 from lark import ParseTree, Token, Transformer
 from loguru import logger
-from numpy import uint32
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
 from backend.engine.conversion import col_to_doc_ids
@@ -85,7 +84,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
                 token, self.enable_highlighting, self.min_usability_score, self.rank_by_usability
             )
             self.updates_scores(result_docs, scores)
-            return result_docs, (highlights, np.array([], dtype=uint32))
+            return result_docs, (highlights, np.array([], dtype=np.uint32))
 
         logger.trace("Evaluating keyword term: {}", items)
 
@@ -154,7 +153,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids)
 
-        return doc_ids, ({}, np.array([], dtype=uint32))
+        return doc_ids, ({}, np.array([], dtype=np.uint32))
 
     def conjunction(self, items: Sequence[TResult | Future[TResult]]) -> TResult:
         logger.trace("Evaluating conjunction with items of length: {}", len(items))
@@ -185,7 +184,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
             doc_result = negation(to_negate, len(self.metadata.doc_to_cols))
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
-            col_highlights: ColumnHighlights = np.array([], dtype=uint32)
+            col_highlights: ColumnHighlights = np.array([], dtype=np.uint32)
             return doc_result, (doc_highlights, col_highlights)
 
         to_negate_cols = item

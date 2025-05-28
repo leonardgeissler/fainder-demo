@@ -4,7 +4,6 @@ from collections.abc import Sequence
 import numpy as np
 from lark import ParseTree, Token, Transformer
 from loguru import logger
-from numpy import uint32
 from numpy.typing import NDArray
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
@@ -69,7 +68,7 @@ class IntermediateResult:
         self._col_ids = col_ids
         self._doc_ids = None
 
-    def add_doc_ids(self, doc_ids: DocumentArray, col_to_doc: NDArray[uint32]) -> None:
+    def add_doc_ids(self, doc_ids: DocumentArray, col_to_doc: NDArray[np.uint32]) -> None:
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
             doc_ids = reducing([doc_ids, helper_doc_ids], "and")
@@ -140,7 +139,7 @@ class IntermediateResultStore:
         self,
         write_group: int,
         doc_ids: DocumentArray,
-        col_to_doc: NDArray[uint32],
+        col_to_doc: NDArray[np.uint32],
     ) -> None:
         logger.trace(
             "Adding document IDs to write group {} length of doc_ids: {}",
@@ -197,7 +196,7 @@ class IntermediateResultStore:
                 continue
 
             if len(intermediate) == 0:
-                return np.array([], dtype=uint32)
+                return np.array([], dtype=np.uint32)
 
             if hist_filters is None:
                 hist_filters = [intermediate]
@@ -321,7 +320,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         parent_write_group = self._get_parent_write_group(write_group)
 
-        return ((result_docs, (highlights, np.array([], dtype=uint32))), parent_write_group)
+        return ((result_docs, (highlights, np.array([], dtype=np.uint32))), parent_write_group)
 
     def col_op(self, items: list[tuple[ColResult, int]]) -> tuple[DocResult, int]:
         logger.trace("Evaluating column term")
@@ -339,7 +338,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         if self.enable_highlighting:
             return (doc_ids, ({}, col_ids)), parent_write_group
 
-        return (doc_ids, ({}, np.array([], dtype=uint32))), parent_write_group
+        return (doc_ids, ({}, np.array([], dtype=np.uint32))), parent_write_group
 
     def name_op(self, items: list[Token]) -> tuple[ColResult, int]:
         logger.trace("Evaluating column term: {}", items)
@@ -369,7 +368,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         write_group = self._get_write_group(items[0])
         if hist_filter is not None and len(hist_filter) == 0:
             logger.trace("Empty histogram filter, returning empty result")
-            return np.array([], dtype=uint32), write_group
+            return np.array([], dtype=np.uint32), write_group
 
         logger.trace(
             "Length of histogram filter: {}",
@@ -429,7 +428,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
             doc_result = negation(to_negate, len(self.metadata.doc_to_cols))
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
-            col_highlights: ColumnHighlights = np.array([], dtype=uint32)
+            col_highlights: ColumnHighlights = np.array([], dtype=np.uint32)
             self.intermediate_results.add_doc_id_results(
                 write_group, doc_result, self.metadata.col_to_doc
             )

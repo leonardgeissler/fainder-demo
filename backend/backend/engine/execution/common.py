@@ -95,7 +95,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 self.read_groups[id(child)] = read_group
                 self.parent_write_group[write_group] = write_group
         else:
-            raise ValueError(f"Node {tree} does not have write or read groups")
+            raise ValueError("Node {} does not have write or read groups", tree)
 
     def disjunction(self, tree: ParseTree) -> None:
         logger.trace("Processing disjunction node: {}", tree)
@@ -111,7 +111,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 self.read_groups[id(child)] = [current_write_group, *parent_read_groups]
                 self.parent_write_group[current_write_group] = parent_write_group
         else:
-            raise ValueError(f"Node {tree} does not have write or read groups")
+            raise ValueError("Node {} does not have write or read groups", tree)
 
     def negation(self, tree: ParseTree) -> None:
         logger.trace("Processing negation node: {}", tree)
@@ -129,7 +129,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                 self.read_groups[id(child)] = read_groups
 
         else:
-            raise ValueError(f"Node {tree} does not have write or read groups")
+            raise ValueError("Node {} does not have write or read groups", tree)
 
     def col_op(self, tree: ParseTree) -> None:
         # Set attributes for all children using the parent's values
@@ -188,7 +188,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                     read_groups,
                 )
         else:
-            raise ValueError(f"Node {tree} does not have write or read groups")
+            raise ValueError("Node {} does not have write or read groups", tree)
 
 
 def exceeds_filtering_limit(
@@ -252,35 +252,21 @@ def merge_highlights(
             doc_highlights[doc_id] = merged_highlights
 
     # Merge column highlights
-    col_highlights = union_column_array(left[1], right[1])
-    col_highlights = intersection_column_array(
-        col_highlights, doc_to_col_ids(doc_ids, doc_to_cols)
-    )
+    col_highlights = union_array(left[1], right[1])
+    col_highlights = intersection_array(col_highlights, doc_to_col_ids(doc_ids, doc_to_cols))
 
     return doc_highlights, col_highlights
 
 
-def intersection_document_array(a: DocumentArray, b: DocumentArray) -> DocumentArray:
+def intersection_array(a: DocumentArray, b: DocumentArray) -> DocumentArray:
     mask = np.isin(a, b)
     return a[mask]
 
 
-def intersection_column_array(a: ColumnArray, b: ColumnArray) -> ColumnArray:
-    mask = np.isin(a, b)
-    return a[mask]
-
-
-def union_column_array(a: ColumnArray, b: ColumnArray) -> ColumnArray:
-    """Get the union of two column arrays."""
+def union_array(a: DocumentArray, b: DocumentArray) -> DocumentArray:
     return np.union1d(a, b)
 
 
-def union_document_array(a: DocumentArray, b: DocumentArray) -> DocumentArray:
-    """Get the union of two document arrays."""
-    return np.union1d(a, b)
-
-
-# @jit
 def reducing(
     arrays: Sequence[TArray],
     operator: Literal["and", "or"],
@@ -292,7 +278,6 @@ def reducing(
         return intersection.view(type(arrays[0]))
     if operator == "or":
         union = arrays[0]
-        logger.trace(f"Union of {union} and {arrays[1:]}")
         for arr in arrays[1:]:
             union = np.union1d(union, arr)
         return union.view(type(arrays[0]))
@@ -331,9 +316,9 @@ def junction(
             # Merge all other items
             for item in items[1:]:
                 if operator == "and":
-                    doc_ids = intersection_document_array(doc_ids, item[0])
+                    doc_ids = intersection_array(doc_ids, item[0])
                 else:
-                    doc_ids = union_document_array(doc_ids, item[0])
+                    doc_ids = union_array(doc_ids, item[0])
                 highlights = merge_highlights(highlights, item[1], doc_ids, doc_to_cols)
 
             return doc_ids, highlights  # type: ignore

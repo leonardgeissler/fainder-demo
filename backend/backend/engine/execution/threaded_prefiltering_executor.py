@@ -6,7 +6,6 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import numpy as np
 from lark import ParseTree, Token, Transformer
 from loguru import logger
-from numpy import uint32
 from numpy.typing import NDArray
 
 from backend.config import (
@@ -85,7 +84,7 @@ class IntermediateResultFuture:
         self._col_ids = col_ids
         self._doc_ids = None
 
-    def add_doc_ids(self, doc_ids: DocumentArray, col_to_doc: NDArray[uint32]) -> None:
+    def add_doc_ids(self, doc_ids: DocumentArray, col_to_doc: NDArray[np.uint32]) -> None:
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
             doc_ids = reducing([doc_ids, helper_doc_ids], "and")
@@ -235,7 +234,7 @@ class IntermediateResultStoreFuture:
         logger.trace("Adding column IDs to write group {}: length {}", write_group, len(col_ids))
 
     def add_doc_ids(
-        self, write_group: int, doc_ids: DocumentArray, col_to_doc: NDArray[uint32]
+        self, write_group: int, doc_ids: DocumentArray, col_to_doc: NDArray[np.uint32]
     ) -> None:
         """Add document IDs to the intermediate result."""
         if write_group not in self.write_groups_used:
@@ -431,7 +430,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             )
             self.updates_scores(result_docs, scores)
             parent_write_group = self._get_parent_write_group(write_group)
-            return (result_docs, (highlights, np.array([], dtype=uint32))), parent_write_group
+            return (result_docs, (highlights, np.array([], dtype=np.uint32))), parent_write_group
 
         logger.trace("Evaluating keyword term: {}", items)
 
@@ -481,7 +480,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             )
             write_group = self._get_write_group(items[0])
             if hist_filter is not None and len(hist_filter) == 0:
-                return np.array([], dtype=uint32), write_group
+                return np.array([], dtype=np.uint32), write_group
             result_hists = self.fainder_index.search(
                 percentile, comparison, reference, self.fainder_mode, hist_filter
             )
@@ -515,7 +514,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         if self.enable_highlighting:
             return (doc_ids, ({}, col_ids)), parent_write_group
 
-        return ((doc_ids, ({}, np.array([], dtype=uint32))), parent_write_group)
+        return ((doc_ids, ({}, np.array([], dtype=np.uint32))), parent_write_group)
 
     def conjunction(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
@@ -564,7 +563,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             to_negate, _ = item
 
             doc_highlights: DocumentHighlights = {}
-            col_highlights: ColumnHighlights = np.array([], dtype=uint32)
+            col_highlights: ColumnHighlights = np.array([], dtype=np.uint32)
             doc_result = negation(to_negate, len(self.metadata.doc_to_cols))
             result = (doc_result, (doc_highlights, col_highlights))
             self.intermediate_results.add_doc_ids(
