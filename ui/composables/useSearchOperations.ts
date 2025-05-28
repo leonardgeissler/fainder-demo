@@ -17,14 +17,14 @@ export const useSearchOperations = () => {
   const loadResults = async (
     queryStr: string,
     page = 1,
-    fainder_mode?: string,
-    result_highlighting?: boolean,
+    fainderMode?: string,
+    resultHighlighting?: boolean,
   ) => {
     isLoading.value = true;
     error.value = { message: "", details: null };
 
     console.log(
-      `Loading results for query: ${queryStr}, page: ${page}, fainder_mode: ${fainder_mode}, result_highlighting: ${result_highlighting}`,
+      `Loading results for query: ${queryStr}, page: ${page}, fainderMode: ${fainderMode}, resultHighlighting: ${resultHighlighting}`,
     );
 
     try {
@@ -40,9 +40,9 @@ export const useSearchOperations = () => {
         body: JSON.stringify({
           query: queryStr,
           page: page,
-          per_page: perPage.value,
-          fainder_mode: fainder_mode || "low_memory",
-          result_highlighting: result_highlighting,
+          perPage: perPage.value,
+          fainderMode: fainderMode || "low_memory",
+          resultHighlighting: resultHighlighting,
         }),
       });
 

@@ -33,8 +33,8 @@ interface RouteQuery {
 // types for search data
 interface SearchParams {
   query: string;
-  fainder_mode?: string;
-  result_highlighting?: LocationQueryValueRaw;
+  fainderMode?: string;
+  resultHighlightning?: LocationQueryValueRaw;
 }
 
 const route = useRoute();
@@ -43,8 +43,8 @@ const query = ref<string | undefined>(q.query);
 
 async function searchData({
   query: searchQuery,
-  fainder_mode: newfainder_mode,
-  result_highlighting,
+  fainderMode: newFainderMode,
+  resultHighlightning,
 }: SearchParams) {
   // If query is empty or undefined, reset the URL without query parameters
   if (!searchQuery || searchQuery.trim() === "") {
@@ -59,8 +59,8 @@ async function searchData({
     path: "/results",
     query: {
       query: searchQuery,
-      fainder_mode: newfainder_mode,
-      result_highlighting: result_highlighting,
+      fainderMode: newFainderMode,
+      resultHighlightning: resultHighlightning,
     },
   });
 }

@@ -201,9 +201,9 @@
                       <div class="metadata-item">
                         <span class="metadata-label">Creator</span>
                         <span
-                          v-if="selectedResult?.['creator-name']"
+                          v-if="selectedResult?.['creatorName']"
                           class="metadata-value highlight-text"
-                          v-html="selectedResult?.['creator-name']"
+                          v-html="selectedResult?.['creatorName']"
                         />
                         <span
                           v-else
@@ -259,9 +259,9 @@
                       >
                         <div class="field-header mb-2">
                           <span
-                            v-if="field.marked_name"
+                            v-if="field.markedName"
                             class="text-h6 highlight-text"
-                            v-html="field.marked_name"
+                            v-html="field.markedName"
                           />
                           <span v-else class="text-h6"> {{ field.name }}</span>
                           <v-chip class="ml-2" density="compact">{{
@@ -313,19 +313,31 @@
                                 <tr>
                                   <td class="stat-label">25%:</td>
                                   <td class="stat-value">
-                                    {{ formatNumber(field.statistics["25%"]) }}
+                                    {{
+                                      formatNumber(
+                                        field.statistics["firstQuartile"],
+                                      )
+                                    }}
                                   </td>
                                 </tr>
                                 <tr>
                                   <td class="stat-label">Median:</td>
                                   <td class="stat-value">
-                                    {{ formatNumber(field.statistics["50%"]) }}
+                                    {{
+                                      formatNumber(
+                                        field.statistics["secondQuartile"],
+                                      )
+                                    }}
                                   </td>
                                 </tr>
                                 <tr>
                                   <td class="stat-label">75%:</td>
                                   <td class="stat-value">
-                                    {{ formatNumber(field.statistics["75%"]) }}
+                                    {{
+                                      formatNumber(
+                                        field.statistics["thirdQuartile"],
+                                      )
+                                    }}
                                   </td>
                                 </tr>
                                 <tr>
@@ -355,7 +367,7 @@
                         </div>
                         <!-- Date Data -->
                         <div
-                          v-else-if="field.min_date && field.max_date"
+                          v-else-if="field.minDate && field.maxDate"
                           class="field-content date"
                         >
                           <div class="date-timeline">
@@ -363,18 +375,18 @@
                               <div class="timeline-wrapper">
                                 <div class="timeline-bar">
                                   <div class="timeline-start">
-                                    {{ formatDate(field.min_date) }}
+                                    {{ formatDate(field.minDate) }}
                                   </div>
                                   <div class="timeline-line" />
                                   <div class="timeline-end">
-                                    {{ formatDate(field.max_date) }}
+                                    {{ formatDate(field.maxDate) }}
                                   </div>
                                 </div>
                                 <div class="timeline-duration">
                                   {{
                                     calculateDateDifference(
-                                      field.min_date,
-                                      field.max_date,
+                                      field.minDate,
+                                      field.maxDate,
                                     )
                                   }}
                                 </div>
@@ -387,19 +399,19 @@
                                 <tr>
                                   <td class="stat-label">Earliest Date:</td>
                                   <td class="stat-value">
-                                    {{ formatDateFull(field.min_date) }}
+                                    {{ formatDateFull(field.minDate) }}
                                   </td>
                                 </tr>
                                 <tr>
                                   <td class="stat-label">Latest Date:</td>
                                   <td class="stat-value">
-                                    {{ formatDateFull(field.max_date) }}
+                                    {{ formatDateFull(field.maxDate) }}
                                   </td>
                                 </tr>
-                                <tr v-if="field.unique_dates !== undefined">
+                                <tr v-if="field.uniqueDates !== undefined">
                                   <td class="stat-label">Unique Dates:</td>
                                   <td class="stat-value">
-                                    {{ formatNumber(field.unique_dates) }}
+                                    {{ formatNumber(field.uniqueDates) }}
                                   </td>
                                 </tr>
                                 <tr>
@@ -407,8 +419,8 @@
                                   <td class="stat-value">
                                     {{
                                       calculateDateDifference(
-                                        field.min_date,
-                                        field.max_date,
+                                        field.minDate,
+                                        field.maxDate,
                                         true,
                                       )
                                     }}
@@ -423,16 +435,16 @@
                           <div class="categorical-summary">
                             <div class="categorical-layout">
                               <div class="unique-values-section">
-                                <div v-if="field.n_unique" class="large-stat">
+                                <div v-if="field.nUnique" class="large-stat">
                                   <div class="stat-title">Unique Values</div>
                                   <div class="stat-number">
-                                    {{ formatNumber(field.n_unique) }}
+                                    {{ formatNumber(field.nUnique) }}
                                   </div>
                                 </div>
                               </div>
                               <div class="value-distribution">
                                 <table
-                                  v-if="field.most_common"
+                                  v-if="field.mostCommon"
                                   class="statistics-table"
                                 >
                                   <thead>
@@ -446,7 +458,7 @@
                                   <tbody>
                                     <template
                                       v-for="[value, count] in Object.entries(
-                                        field.most_common,
+                                        field.mostCommon,
                                       ).slice(0, 3)"
                                       :key="value"
                                     >
@@ -480,9 +492,9 @@
                       <tr>
                         <td><strong>Creator</strong></td>
                         <td
-                          v-if="selectedResult?.['creator-name']"
+                          v-if="selectedResult?.['creatorName']"
                           class="highlight-text"
-                          v-html="selectedResult?.['creator-name']"
+                          v-html="selectedResult?.['creatorName']"
                         />
                         <td
                           v-else
@@ -493,9 +505,9 @@
                       <tr>
                         <td><strong>Publisher</strong></td>
                         <td
-                          v-if="selectedResult?.['publisher-name']"
+                          v-if="selectedResult?.['publisherName']"
                           class="highlight-text"
-                          v-html="selectedResult?.['publisher-name']"
+                          v-html="selectedResult?.['publisherName']"
                         />
                         <td
                           v-else
@@ -576,9 +588,9 @@ const {
   currentPage,
   totalPages,
   query,
-  fainder_mode,
+  fainderMode,
   perPage,
-  result_highlighting: result_highlighting,
+  resultHighlighting: resultHighlighting,
 } = useSearchState();
 
 console.log(selectedResultIndex.value);
@@ -592,9 +604,9 @@ const selectedResult = computed<Types.Result | null>(() =>
 query.value = Array.isArray(route.query.query)
   ? route.query.query[0] || ""
   : route.query.query || "";
-fainder_mode.value = Array.isArray(route.query.fainder_mode)
-  ? route.query.fainder_mode[0] || "low_memory"
-  : route.query.fainder_mode || "low_memory";
+fainderMode.value = Array.isArray(route.query.fainderMode)
+  ? route.query.fainderMode[0] || "low_memory"
+  : route.query.fainderMode || "low_memory";
 
 const descriptionPanel = ref<number[]>([0]); // Array with 0 means first panel is open
 const recordSetPanel = ref<number[]>([0]); // Single panel
@@ -665,8 +677,8 @@ watch(windowHeight, (newHeight) => {
     searchOperations.loadResults(
       query.value,
       currentPage.value,
-      fainder_mode.value,
-      result_highlighting.value,
+      fainderMode.value,
+      resultHighlighting.value,
     );
   }
 });
@@ -701,8 +713,8 @@ watch(currentPage, async (newPage) => {
   await searchOperations.loadResults(
     query.value,
     newPage,
-    fainder_mode.value,
-    result_highlighting.value,
+    fainderMode.value,
+    resultHighlighting.value,
   );
 
   // Update URL with new page
@@ -712,8 +724,8 @@ watch(currentPage, async (newPage) => {
       query: query.value,
       page: newPage,
       index: selectedResultIndex.value,
-      fainder_mode: fainder_mode.value,
-      result_highlighting: String(result_highlighting.value),
+      fainderMode: fainderMode.value,
+      resultHighlighting: String(resultHighlighting.value),
       theme: theme.global.name.value,
     },
   });
@@ -757,8 +769,8 @@ const retrySearch = async () => {
   await searchOperations.loadResults(
     query.value,
     currentPage.value,
-    fainder_mode.value,
-    result_highlighting.value,
+    fainderMode.value,
+    resultHighlighting.value,
   );
 };
 
@@ -766,8 +778,8 @@ const retrySearch = async () => {
 await searchOperations.loadResults(
   query.value,
   currentPage.value,
-  fainder_mode.value,
-  result_highlighting.value,
+  fainderMode.value,
+  resultHighlighting.value,
 );
 
 const chartOptions = ref<ChartOptions<"bar">>({

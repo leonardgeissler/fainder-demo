@@ -61,7 +61,7 @@
             </template>
             <v-list-item-title>
               {{
-                syntax_highlighting
+                syntaxHighlighting
                   ? "Disable Syntax Highlighting"
                   : "Enable Syntax Highlighting"
               }}
@@ -132,18 +132,18 @@ import { useRoute } from "vue-router";
 
 interface SearchParams {
   query: string;
-  fainder_mode: string;
-  result_highlighting: boolean;
+  fainderMode: string;
+  resultHighlighting: boolean;
 }
 
 const { loadResults } = useSearchOperations();
 const route = useRoute();
 const theme = useTheme();
-const { query, fainder_mode, currentPage, selectedResultIndex } =
+const { query, fainderMode, currentPage, selectedResultIndex } =
   useSearchState();
 const colorMode = useColorMode();
 
-const syntax_highlighting = useCookie("fainder_syntax_highlighting", {
+const syntaxHighlighting = useCookie("fainderSyntaxHighlighting", {
   default: () => true,
 });
 
@@ -178,23 +178,23 @@ function toggleTheme(): void {
 }
 
 function toggleHighlight(): void {
-  syntax_highlighting.value = !syntax_highlighting.value;
+  syntaxHighlighting.value = !syntaxHighlighting.value;
 }
 
 const showSearchDialog = ref(false);
 
 async function searchData({
   query: searchQuery,
-  fainder_mode: newfainder_mode,
-  result_highlighting,
+  fainderMode: newfainderMode,
+  resultHighlighting,
 }: SearchParams): Promise<void> {
   query.value = searchQuery;
-  fainder_mode.value = newfainder_mode;
+  fainderMode.value = newfainderMode;
 
   currentPage.value = 1;
   selectedResultIndex.value = 0;
 
-  await loadResults(searchQuery, 1, newfainder_mode, result_highlighting);
+  await loadResults(searchQuery, 1, newfainderMode, resultHighlighting);
 
   await navigateTo({
     path: "/results",
@@ -202,8 +202,8 @@ async function searchData({
       query: searchQuery,
       page: 1,
       index: 0,
-      fainder_mode: newfainder_mode,
-      result_highlighting: String(result_highlighting),
+      fainderMode: newfainderMode,
+      resultHighlighting: String(resultHighlighting),
       theme: theme.global.name.value,
     },
   });

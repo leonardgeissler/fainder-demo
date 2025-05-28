@@ -71,7 +71,7 @@
             "@id": "Rainfall_Data_Germany_Complete.csv_fileobject",
             "@type": "cr:FileObject",
             "name": "Rainfall_Data_Germany_Complete.csv",
-            "description": "City: Name of the city.\nLatitude: City's latitude in degrees.\nLongitude: City's longitude in degrees.\nMonth: The month number (1-12).\nYear: The year of the data.\nRainfall (mm): Rainfall amount in millimeters.\nElevation (m): City’s elevation above sea level in meters.\nClimate_Type: The climate classification of the city.\nTemperature (°C): Average temperature for the month in Celsius.\nHumidity (%): Average humidity level for the month in percentage."
+            "description": "City: Name of the city.\nLatitude: City's latitude in degrees.\nLongitude: City's longitude in degrees.\nMonth: The month number (1-12).\nYear: The year of the data.\nRainfall (mm): Rainfall amount in millimeters.\nElevation (m): City\u2019s elevation above sea level in meters.\nClimate_Type: The climate classification of the city.\nTemperature (\u00b0C): Average temperature for the month in Celsius.\nHumidity (%): Average humidity level for the month in percentage."
         }
     ],
     "recordSet": [
@@ -93,8 +93,8 @@
                     "@type": "cr:Field",
                     "name": "City",
                     "description": "name",
-                    "n_unique": 10,
-                    "most_common": {
+                    "nUnique": 10,
+                    "mostCommon": {
                         "Berlin": 108,
                         "Munich": 108,
                         "Hamburg": 108,
@@ -106,7 +106,7 @@
                         "Leipzig": 108,
                         "Hanover": 108
                     },
-                    "id": 23
+                    "id": 0
                 },
                 {
                     "dataType": [
@@ -124,8 +124,8 @@
                     "@type": "cr:Field",
                     "name": "Latitude",
                     "description": "",
-                    "n_unique": 10,
-                    "most_common": {
+                    "nUnique": 10,
+                    "mostCommon": {
                         "52.52": 108,
                         "48.1351": 108,
                         "53.5511": 108,
@@ -137,7 +137,7 @@
                         "51.3397": 108,
                         "52.3759": 108
                     },
-                    "id": 24
+                    "id": 1
                 },
                 {
                     "dataType": [
@@ -155,8 +155,8 @@
                     "@type": "cr:Field",
                     "name": "Longitude",
                     "description": "",
-                    "n_unique": 10,
-                    "most_common": {
+                    "nUnique": 10,
+                    "mostCommon": {
                         "13.405": 108,
                         "11.582": 108,
                         "9.9937": 108,
@@ -168,7 +168,7 @@
                         "12.3731": 108,
                         "9.732": 108
                     },
-                    "id": 25
+                    "id": 2
                 },
                 {
                     "dataType": [
@@ -219,12 +219,12 @@
                         "mean": 6.5,
                         "std": 3.453651812701086,
                         "min": 1.0,
-                        "25%": 3.75,
-                        "50%": 6.5,
-                        "75%": 9.25,
+                        "firstQuartile": 3.75,
+                        "secondQuartile": 6.5,
+                        "thirdQuartile": 9.25,
                         "max": 12.0
                     },
-                    "id": 0
+                    "id": 3
                 },
                 {
                     "dataType": [
@@ -275,12 +275,12 @@
                         "mean": 2019.0,
                         "std": 2.5831850934577054,
                         "min": 2015.0,
-                        "25%": 2017.0,
-                        "50%": 2019.0,
-                        "75%": 2021.0,
+                        "firstQuartile": 2017.0,
+                        "secondQuartile": 2019.0,
+                        "thirdQuartile": 2021.0,
                         "max": 2023.0
                     },
-                    "id": 1
+                    "id": 4
                 },
                 {
                     "dataType": [
@@ -331,12 +331,12 @@
                         "mean": 99.21178703703703,
                         "std": 57.560449162073006,
                         "min": 0.0,
-                        "25%": 49.5,
-                        "50%": 99.42500000000001,
-                        "75%": 149.5275,
+                        "firstQuartile": 49.5,
+                        "secondQuartile": 99.42500000000001,
+                        "thirdQuartile": 149.5275,
                         "max": 199.91
                     },
-                    "id": 2
+                    "id": 5
                 },
                 {
                     "dataType": [
@@ -387,12 +387,12 @@
                         "mean": 127.2,
                         "std": 145.90981001930697,
                         "min": 6.0,
-                        "25%": 37.0,
-                        "50%": 83.5,
-                        "75%": 113.0,
+                        "firstQuartile": 37.0,
+                        "secondQuartile": 83.5,
+                        "thirdQuartile": 113.0,
                         "max": 519.0
                     },
-                    "id": 3
+                    "id": 6
                 },
                 {
                     "dataType": [
@@ -410,12 +410,12 @@
                     "@type": "cr:Field",
                     "name": "Climate_Type",
                     "description": "",
-                    "n_unique": 2,
-                    "most_common": {
+                    "nUnique": 2,
+                    "mostCommon": {
                         "Oceanic": 648,
                         "Continental": 432
                     },
-                    "id": 26
+                    "id": 7
                 },
                 {
                     "dataType": [
@@ -426,12 +426,12 @@
                             "@id": "Rainfall_Data_Germany_Complete.csv_fileobject"
                         },
                         "extract": {
-                            "column": "Temperature (°C)"
+                            "column": "Temperature (\u00b0C)"
                         }
                     },
                     "@id": "Rainfall_Data_Germany_Complete.csv/Temperature+(%C2%B0C)",
                     "@type": "cr:Field",
-                    "name": "Temperature (°C)",
+                    "name": "Temperature (\u00b0C)",
                     "description": "",
                     "histogram": {
                         "bins": [
@@ -466,12 +466,12 @@
                         "mean": 14.72425925925926,
                         "std": 11.433379761007405,
                         "min": -5.0,
-                        "25%": 4.975,
-                        "50%": 14.850000000000001,
-                        "75%": 24.3,
+                        "firstQuartile": 4.975,
+                        "secondQuartile": 14.850000000000001,
+                        "thirdQuartile": 24.3,
                         "max": 34.9
                     },
-                    "id": 4
+                    "id": 8
                 },
                 {
                     "dataType": [
@@ -522,18 +522,18 @@
                         "mean": 65.1537037037037,
                         "std": 20.303774700420504,
                         "min": 30.0,
-                        "25%": 47.0,
-                        "50%": 66.0,
-                        "75%": 83.0,
+                        "firstQuartile": 47.0,
+                        "secondQuartile": 66.0,
+                        "thirdQuartile": 83.0,
                         "max": 99.0
                     },
-                    "id": 5
+                    "id": 9
                 }
             ],
             "@id": "Rainfall_Data_Germany_Complete.csv",
             "@type": "cr:RecordSet",
             "name": "Rainfall_Data_Germany_Complete.csv",
-            "description": "City: Name of the city.\nLatitude: City's latitude in degrees.\nLongitude: City's longitude in degrees.\nMonth: The month number (1-12).\nYear: The year of the data.\nRainfall (mm): Rainfall amount in millimeters.\nElevation (m): City’s elevation above sea level in meters.\nClimate_Type: The climate classification of the city.\nTemperature (°C): Average temperature for the month in Celsius.\nHumidity (%): Average humidity level for the month in percentage."
+            "description": "City: Name of the city.\nLatitude: City's latitude in degrees.\nLongitude: City's longitude in degrees.\nMonth: The month number (1-12).\nYear: The year of the data.\nRainfall (mm): Rainfall amount in millimeters.\nElevation (m): City\u2019s elevation above sea level in meters.\nClimate_Type: The climate classification of the city.\nTemperature (\u00b0C): Average temperature for the month in Celsius.\nHumidity (%): Average humidity level for the month in percentage."
         }
     ],
     "version": 1,
@@ -565,7 +565,7 @@
     "@type": "sc:Dataset",
     "name": "Germany City Rainfall Data",
     "url": "https://www.kaggle.com/datasets/heidarmirhajisadati/germany-city-rainfall-data/versions/1",
-    "description": "\n**This dataset, provides detailed weather and climate statistics for major cities in Germany from 2015 to 2023.** \n\nIt includes rainfall amounts, temperatures, humidity levels, and other geographical and climatic details, making it ideal for analyzing weather patterns, climate change, and their impacts across different regions.\n\n1. **City:** Name of the city.\n\n2. **Latitude:** City's latitude in degrees.\n\n3. **Longitude:** City's longitude in degrees.\n\n4. **Month:** The month number (1-12).\n\n5. **Year:** The year of the data.\n\n6. **Rainfall (mm):** Rainfall amount in millimeters.\n\n7. **Elevation (m):** City’s elevation above sea level in meters.\n\n8. **Climate_Type:** The climate classification of the city.\n\n9. **Temperature (°C):** Average temperature for the month in Celsius.\n\n10. **Humidity (%):** Average humidity level for the month in percentage.\n\n",
+    "description": "\n**This dataset, provides detailed weather and climate statistics for major cities in Germany from 2015 to 2023.** \n\nIt includes rainfall amounts, temperatures, humidity levels, and other geographical and climatic details, making it ideal for analyzing weather patterns, climate change, and their impacts across different regions.\n\n1. **City:** Name of the city.\n\n2. **Latitude:** City's latitude in degrees.\n\n3. **Longitude:** City's longitude in degrees.\n\n4. **Month:** The month number (1-12).\n\n5. **Year:** The year of the data.\n\n6. **Rainfall (mm):** Rainfall amount in millimeters.\n\n7. **Elevation (m):** City\u2019s elevation above sea level in meters.\n\n8. **Climate_Type:** The climate classification of the city.\n\n9. **Temperature (\u00b0C):** Average temperature for the month in Celsius.\n\n10. **Humidity (%):** Average humidity level for the month in percentage.\n\n",
     "kaggleRef": "heidarmirhajisadati/germany-city-rainfall-data",
     "usability": 1.0,
     "id": 0

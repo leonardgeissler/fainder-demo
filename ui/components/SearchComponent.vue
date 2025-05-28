@@ -213,13 +213,13 @@ words # The search page will contain multiple search bars
 
         <v-card-text>
           <v-select
-            v-model="temp_fainder_mode"
-            :items="fainder_modes"
+            v-model="tempFainderMode"
+            :items="fainderModes"
             label="Fainder Mode"
             variant="outlined"
           />
           <v-switch
-            v-model="temp_result_highlighting"
+            v-model="tempResultHighlighting"
             label="Enable Result Highlighting"
             color="primary"
           />
@@ -265,7 +265,7 @@ declare global {
 }
 
 function highlightSyntax(value: string) {
-  if (syntax_highlighting.value === false) {
+  if (syntaxHighlighting.value === false) {
     return value;
   }
   let highlighted = String(value);
@@ -317,11 +317,11 @@ function registerTemplate() {
   codeInput.registerTemplate(
     "syntax-highlighted",
     new codeInput.Template(
-      function (result_element: HTMLElement) {
+      function (resultElement: HTMLElement) {
         /* Highlight function - with `pre code` code element */
-        /* Highlight code in result_element - code is already escaped so it doesn't become HTML */
-        result_element.innerHTML = highlightSyntax(result_element.innerHTML);
-        return result_element.innerHTML;
+        /* Highlight code in resultElement - code is already escaped so it doesn't become HTML */
+        resultElement.innerHTML = highlightSyntax(resultElement.innerHTML);
+        return resultElement.innerHTML;
       },
 
       true /* Optional - Is the `pre` element styled as well as the `code` element?
@@ -341,7 +341,7 @@ function registerTemplate() {
 }
 
 const heightCodeInput = computed(() => {
-  return `${visable_rows.value * 48}px`;
+  return `${visableRows.value * 48}px`;
 });
 
 const props = defineProps({
@@ -365,38 +365,35 @@ const props = defineProps({
 
 const emit = defineEmits(["searchData"]);
 const route = useRoute();
-const temp_fainder_mode = ref(route.query.fainder_mode || "low_memory");
+const tempFainderMode = ref(route.query.fainderMode || "low_memory");
 
-const visable_rows = ref(props.lines);
-const number_of_rows = ref(props.lines);
+const visableRows = ref(props.lines);
+const numberOfRows = ref(props.lines);
 
 const searchTerms = ref<Term[]>([]);
 
-const { fainder_mode, result_highlighting } = useSearchState();
+const { fainderMode, resultHighlighting } = useSearchState();
 
-const syntax_highlighting = useCookie("fainder_syntax_highlighting", {
+const syntaxHighlighting = useCookie("fainderSyntaxHighlighting", {
   default: () => true,
 });
 
-console.debug(
-  "`fainder_syntax_highlighting` cookie: ",
-  syntax_highlighting.value,
-);
+console.debug("`fainderSyntaxHighlighting` cookie: ", syntaxHighlighting.value);
 
 // Initialize fainder_mode if not already set
-if (!fainder_mode.value) {
-  fainder_mode.value = String(route.query.fainder_mode) || "low_memory";
+if (!fainderMode.value) {
+  fainderMode.value = String(route.query.fainderMode) || "low_memory";
 }
-console.debug("Initial fainder_mode:", fainder_mode?.value);
+console.debug("Initial fainderMode:", fainderMode?.value);
 
-const temp_result_highlighting = ref(result_highlighting.value); // Default to true
+const tempResultHighlighting = ref(resultHighlighting.value); // Default to true
 
 const searchQuery = ref(props.searchQuery);
 const syntaxError = computed(() => {
   if (
     !searchQuery.value ||
     searchQuery.value.trim() === "" ||
-    !syntax_highlighting.value
+    !syntaxHighlighting.value
   ) {
     return "";
   }
@@ -405,7 +402,7 @@ const syntaxError = computed(() => {
 
 const isValid = ref(true);
 const showSettings = ref(false);
-const fainder_modes = [
+const fainderModes = [
   { title: "Low Memory", value: "low_memory" },
   { title: "Full Precision", value: "full_precision" },
   { title: "Full Recall", value: "full_recall" },
@@ -429,7 +426,7 @@ const percentileFilter = ref({
 registerTemplate();
 
 // on change of syntax_highlighting value, update isValid
-watch(syntax_highlighting, (value) => {
+watch(syntaxHighlighting, (value) => {
   if (!value) {
     isValid.value = true;
   } else {
@@ -442,7 +439,7 @@ watch(syntax_highlighting, (value) => {
     path: route.path,
     query: {
       ...route.query,
-      syntax_highlighting: String(value),
+      syntaxHighlighting: String(value),
     },
   });
   // update searchQuery to trigger update
@@ -482,9 +479,9 @@ const handleKeyDown = (
     } else if (event.shiftKey) {
       if (!props.inline) {
         console.debug("Shift+Enter key pressed increasing rows");
-        visable_rows.value += 1; // on shift+enter, increase the number of rows
+        visableRows.value += 1; // on shift+enter, increase the number of rows
       }
-      number_of_rows.value += 1;
+      numberOfRows.value += 1;
     }
   } else if (event.key === "Backspace") {
     // Check if cursor is at the end of the last line and the line is empty
@@ -494,11 +491,11 @@ const handleKeyDown = (
       event.target.value.substring(lastLineStart).trim() === "";
     const isAtEnd = cursorPos === event.target.value.length;
 
-    if (isLastLineEmpty && isAtEnd && visable_rows.value > 1) {
+    if (isLastLineEmpty && isAtEnd && visableRows.value > 1) {
       if (!props.inline) {
-        visable_rows.value -= 1;
+        visableRows.value -= 1;
       }
-      number_of_rows.value -= 1;
+      numberOfRows.value -= 1;
       console.debug("Backspace key pressed decreasing rows");
     }
   }
@@ -568,14 +565,14 @@ async function searchData() {
     query = query ? `${query} AND ${filterTerms}` : filterTerms;
   }
 
-  const s_query = query;
-  console.log("Search query:", s_query);
-  console.log("Index type:", fainder_mode.value);
-  console.log("Result Highlighting status:", result_highlighting.value);
+  const sQuery = query;
+  console.log("Search query:", sQuery);
+  console.log("Index type:", fainderMode.value);
+  console.log("Result Highlighting status:", resultHighlighting.value);
   emit("searchData", {
-    query: s_query,
-    fainder_mode: fainder_mode.value,
-    result_highlighting: result_highlighting.value,
+    query: sQuery,
+    fainderMode: fainderMode.value,
+    resultHighlighting: resultHighlighting.value,
   });
 }
 
@@ -724,18 +721,18 @@ function cancelSettings() {
 
 function saveSettings() {
   showSettings.value = false;
-  fainder_mode.value = String(temp_fainder_mode.value);
-  result_highlighting.value = temp_result_highlighting.value;
-  console.log("New fainder_mode:", fainder_mode.value);
-  console.log("New result highlighting state:", result_highlighting.value);
+  fainderMode.value = String(tempFainderMode.value);
+  resultHighlighting.value = tempResultHighlighting.value;
+  console.log("New fainderMode:", fainderMode.value);
+  console.log("New result highlighting state:", resultHighlighting.value);
   // update route
   const route = useRoute();
   navigateTo({
     path: route.path,
     query: {
       ...route.query,
-      fainder_mode: temp_fainder_mode.value,
-      result_highlighting: String(temp_result_highlighting.value),
+      fainderMode: tempFainderMode.value,
+      resultHighlighting: String(tempResultHighlighting.value),
     },
   });
 }
@@ -744,7 +741,7 @@ function saveSettings() {
 <style scoped>
 .search-input {
   max-height: v-bind(textareaMaxHeight);
-  overflow-y: v-bind("number_of_rows === 1 ? 'hidden' : 'auto'") !important;
+  overflow-y: v-bind("numberOfRows === 1 ? 'hidden' : 'auto'") !important;
   overflow-x: auto;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   border-radius: 8px;
