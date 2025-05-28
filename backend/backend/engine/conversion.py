@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from backend.config import ColumnArray, DocumentArray
 
 
-def doc_to_col_ids(doc_ids: DocumentArray, doc_to_cols: list[list[int]]) -> ColumnArray:
+def doc_to_col_ids(doc_ids: DocumentArray, doc_to_cols: list[NDArray[np.uint32]]) -> ColumnArray:
     return np.fromiter(
         (col_id for doc_id in doc_ids for col_id in doc_to_cols[int(doc_id)]),
         dtype=np.uint32,

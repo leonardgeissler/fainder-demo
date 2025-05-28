@@ -59,7 +59,7 @@ class IntermediateResult:
             else col_ids
         )
 
-    def add_col_ids(self, col_ids: ColumnArray, doc_to_cols: list[list[int]]) -> None:
+    def add_col_ids(self, col_ids: ColumnArray, doc_to_cols: list[NDArray[np.uint32]]) -> None:
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
             col_ids = reducing([helper_col_ids, col_ids], "and")
@@ -111,7 +111,7 @@ class IntermediateResultStore:
         self,
         write_group: int,
         col_ids: ColumnArray,
-        doc_to_cols: list[list[int]],
+        doc_to_cols: list[NDArray[np.uint32]],
     ) -> None:
         logger.trace(
             "Adding column IDs to write group {} length of col_ids: {}", write_group, col_ids.size

@@ -6,6 +6,7 @@ import numpy as np
 from lark import ParseTree, Token
 from lark.visitors import Visitor_Recursive
 from loguru import logger
+from numpy.typing import NDArray
 
 from backend.config import ColumnArray, DocumentArray, DocumentHighlights, FainderMode, Highlights
 from backend.engine.constants import FILTERING_STOP_POINTS
@@ -206,7 +207,10 @@ def is_doc_result(val: Sequence[Any]) -> TypeGuard[Sequence[DocResult]]:
 
 
 def merge_highlights(
-    left: Highlights, right: Highlights, doc_ids: DocumentArray, doc_to_cols: list[list[int]]
+    left: Highlights,
+    right: Highlights,
+    doc_ids: DocumentArray,
+    doc_to_cols: list[NDArray[np.uint32]],
 ) -> Highlights:
     """Merge highlights for documents that are in the result set."""
     pattern = r"<mark>(.*?)</mark>"
@@ -295,12 +299,11 @@ def negation(
     return result.view(type(item))
 
 
-# @jit
 def junction(
     items: Sequence[TResult],
     operator: Literal["and", "or"],
     enable_highlighting: bool = False,
-    doc_to_cols: list[list[int]] | None = None,
+    doc_to_cols: list[NDArray[np.uint32]] | None = None,
 ) -> TResult:
     """Combine query results using a junction operator (AND/OR)."""
     if len(items) < 2:

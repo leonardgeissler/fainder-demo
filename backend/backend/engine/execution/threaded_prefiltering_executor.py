@@ -75,7 +75,7 @@ class IntermediateResultFuture:
         """Add a future that will resolve to column IDs"""
         self.col_result_futures.append(future)
 
-    def add_col_ids(self, col_ids: ColumnArray, doc_to_cols: list[list[int]]) -> None:
+    def add_col_ids(self, col_ids: ColumnArray, doc_to_cols: list[NDArray[np.uint32]]) -> None:
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
             col_ids = reducing([helper_col_ids, col_ids], "and")
@@ -210,7 +210,7 @@ class IntermediateResultStoreFuture:
         self.results[write_group].add_col_future(future)
 
     def add_col_ids(
-        self, write_group: int, col_ids: ColumnArray, doc_to_cols: list[list[int]]
+        self, write_group: int, col_ids: ColumnArray, doc_to_cols: list[NDArray[np.uint32]]
     ) -> None:
         """Add column IDs to the intermediate result."""
         if write_group not in self.write_groups_used:
@@ -283,14 +283,17 @@ class IntermediateResultStoreFuture:
             if intermediate is None:
                 continue
 
-            logger.trace("Intermediate length: {}", len(intermediate))
+            logger.trace(
+                "Intermediate length: {}",
+                intermediate.size,
+            )
             if hist_filter is None:
                 hist_filter = intermediate
             else:
                 hist_filter = reducing([hist_filter, intermediate], "and")
 
         logger.trace(
-            "Hist filter length: {}", len(hist_filter) if hist_filter is not None else "None"
+            "Hist filter length: {}", (hist_filter.size if hist_filter is not None else "None")
         )
         return hist_filter
 

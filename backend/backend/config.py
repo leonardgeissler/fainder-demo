@@ -58,7 +58,7 @@ class FainderMode(str, Enum):
 
 
 class Metadata(BaseModel):
-    doc_to_cols: list[list[int]]
+    doc_to_cols: list[IntegerArray]
     doc_to_path: list[str]
     col_to_doc: IntegerArray
     name_to_vector: dict[str, int]

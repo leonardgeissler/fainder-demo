@@ -3,7 +3,6 @@ from functools import lru_cache
 
 from backend.config import (
     CacheInfo,
-    DocumentArray,
     ExecutorType,
     FainderMode,
     Highlights,
@@ -75,10 +74,6 @@ class Engine:
     def cache_info(self) -> CacheInfo:
         hits, misses, max_size, curr_size = self.execute.cache_info()
         return CacheInfo(hits=hits, misses=misses, max_size=max_size, curr_size=curr_size)
-
-    def convert_numpy_to_list(self, result: DocumentArray) -> list[int]:
-        arr = result.tolist()
-        return [int(x) for x in arr]
 
     def _execute(
         self,
