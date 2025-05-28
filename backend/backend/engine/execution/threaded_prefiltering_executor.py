@@ -169,7 +169,7 @@ class IntermediateResultStoreFuture:
     ) -> None:
         """Add a future that will resolve to document IDs"""
         if write_group not in self.write_groups_used:
-            raise ValueError("Write group {} is not used", write_group)
+            raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
             logger.trace("Write group {} is not used, skipping adding column IDs", write_group)
@@ -186,7 +186,7 @@ class IntermediateResultStoreFuture:
     ) -> None:
         """Add a future that will resolve to column IDs"""
         if write_group not in self.write_groups_used:
-            raise ValueError("Write group {} is not used", write_group)
+            raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
             logger.trace("Write group {} is not used, skipping adding column IDs", write_group)
@@ -203,7 +203,7 @@ class IntermediateResultStoreFuture:
     ) -> None:
         """Add column IDs to the intermediate result."""
         if write_group not in self.write_groups_used:
-            raise ValueError("Write group {} is not used", write_group)
+            raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
             logger.trace("Write group {} is not used, skipping adding column IDs", write_group)
@@ -227,7 +227,7 @@ class IntermediateResultStoreFuture:
     ) -> None:
         """Add document IDs to the intermediate result."""
         if write_group not in self.write_groups_used:
-            raise ValueError("Write group {} is not used", write_group)
+            raise ValueError(f"Write group {write_group} is not used")
 
         if write_group in self.write_groups_used and self.write_groups_used[write_group] < 1:
             logger.trace("Write group {} is not used, skipping adding document IDs", write_group)

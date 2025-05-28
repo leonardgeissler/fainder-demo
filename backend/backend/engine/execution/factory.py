@@ -71,4 +71,4 @@ def create_executor(
                 max_workers=max_workers,
             )
         case _:
-            raise ValueError("Unknown executor type: {}", executor_type)
+            raise ValueError(f"Unknown executor type: {executor_type}")
