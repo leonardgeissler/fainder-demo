@@ -215,6 +215,9 @@ class ApplicationState:
             rebinning_path=rebinning_path,
             conversion_path=conversion_path,
             histogram_path=settings.histogram_path,
+            parallel=settings.fainder_parallel,
+            num_workers=settings.max_workers,
+            contiguous=settings.fainder_contiguous_chunks,
         )
 
         logger.info("Initializing HNSW index")
@@ -311,6 +314,9 @@ class ApplicationState:
             rebinning_path=rebinning_path,
             conversion_path=conversion_path,
             histogram_path=settings.histogram_path,
+            parallel=settings.fainder_parallel,
+            num_workers=settings.max_workers,
+            contiguous=settings.fainder_contiguous_chunks,
         )
 
         hnsw_index = HnswIndex(

@@ -62,6 +62,7 @@ def default_engine() -> Engine:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
+        parallel=False,  # Use single-threaded Fainder for testing
     )
     hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
     return Engine(
@@ -97,6 +98,7 @@ def small_fainder_engine() -> Engine:
         rebinning_path=rebinning_path,
         conversion_path=conversion_path,
         histogram_path=settings.histogram_path,
+        parallel=False,  # Use single-threaded Fainder for testing
     )
     hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
     return Engine(
@@ -130,6 +132,7 @@ def prefiltering_engine() -> Engine:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
+        parallel=False,  # Use single-threaded Fainder for testing
     )
     hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
     return Engine(

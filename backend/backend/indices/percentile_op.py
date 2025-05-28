@@ -1,8 +1,10 @@
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-from fainder.execution.new_runner import run_approx, run_exact
+from fainder.execution.new_runner import run_approx, run_exact, run_exact_parallel
+from fainder.execution.parallel_processing import ParallelHistogramProcessor
 from fainder.utils import load_input
 from loguru import logger
 
@@ -22,19 +24,41 @@ class FainderIndex:
         rebinning_path: Path | None,
         conversion_path: Path | None,
         histogram_path: Path | None,
+        parallel: bool = True,
+        num_workers: int = os.cpu_count() or 1,
+        contiguous: bool = True,
     ) -> None:
         self.rebinning_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = None
         self.conversion_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = None
+        self.histogram_path: Path | None = histogram_path
         self.hists: list[tuple[np.uint32, Histogram]] | None = None
+        self.parallel = parallel
+        self.parallel_processor: ParallelHistogramProcessor | None = None
 
-        # Load the indices if paths are provided
-        self.update(rebinning_path, conversion_path, histogram_path)
+        self.update(
+            rebinning_path=rebinning_path,
+            conversion_path=conversion_path,
+            histogram_path=histogram_path,
+            parallel=parallel,
+            num_workers=num_workers,
+            contiguous=contiguous,
+        )
+
+    def __del__(self) -> None:
+        """Clean up parallel processor when FainderIndex is destroyed."""
+        if hasattr(self, "parallel_processor") and self.parallel_processor is not None:
+            logger.info("Shutting down parallel processor in destructor")
+            self.parallel_processor.shutdown()
+            self.parallel_processor = None
 
     def update(
         self,
         rebinning_path: Path | None,
         conversion_path: Path | None,
         histogram_path: Path | None,
+        parallel: bool = True,
+        num_workers: int = os.cpu_count() or 1,
+        contiguous: bool = True,
     ) -> None:
         """Update the Fainder indices with new files."""
         if rebinning_path and rebinning_path.exists():
@@ -51,11 +75,33 @@ class FainderIndex:
 
         if histogram_path and histogram_path.exists():
             logger.info(f"Loading histograms from {histogram_path}")
+            self.histogram_path = histogram_path
             self.hists = load_input(histogram_path, "histograms")
         elif histogram_path:
             logger.warning(f"Histogram path {histogram_path} does not exist")
+        
+        self.parallel = parallel
 
-    def search(
+        # Clean up existing parallel processor if it exists
+        if hasattr(self, "parallel_processor") and self.parallel_processor is not None:
+            logger.info("Shutting down existing parallel processor")
+            self.parallel_processor.shutdown()
+            self.parallel_processor = None
+
+        self.parallel_processor = None
+
+        if parallel and histogram_path is not None:
+            # If parallel processing is enabled and histogram path is available,
+            logger.info(
+                f"Initializing parallel processor with histograms from: {self.histogram_path}"
+            )
+            self.parallel_processor = ParallelHistogramProcessor(
+                histogram_path=histogram_path,
+                num_workers=num_workers,
+                contiguous=contiguous,
+            )
+
+    def search(  # noqa: C901
         self,
         percentile: float,
         comparison: str,
@@ -69,8 +115,9 @@ class FainderIndex:
                 f"Invalid percentile predicate: {percentile};{comparison};{reference}"
             )
 
-        # Predicate evaluation
         result: ColumnArray
+
+        # Predicate evaluation
         query: PctlQuery = (percentile, comparison, reference)  # type: ignore
         match fainder_mode:
             case FainderMode.LOW_MEMORY:
@@ -101,17 +148,35 @@ class FainderIndex:
                     id_filter=hist_filter,
                 )
             case FainderMode.EXACT:
-                if self.conversion_index is None or self.hists is None:
-                    raise FainderError(
-                        "Conversion index and histograms must be loaded for exact mode."
-                    )
+                if hist_filter is not None or not self.parallel:
+                    if self.conversion_index is None or self.hists is None:
+                        raise FainderError(
+                            "Conversion index and histograms must be loaded for exact mode."
+                        )
 
-                result, runtime = run_exact(
-                    fainder_index=self.conversion_index,
-                    hists=self.hists,
-                    query=query,
-                    id_filter=hist_filter,
-                )
+                    result, runtime = run_exact(
+                        fainder_index=self.conversion_index,
+                        hists=self.hists,
+                        query=query,
+                        id_filter=hist_filter,
+                    )
+                else:
+                    if self.conversion_index is None or self.histogram_path is None:
+                        raise FainderError(
+                            "Conversion index and histogram path must be loaded for exact mode."
+                        )
+
+                    if self.parallel_processor is None:
+                        raise FainderError(
+                            "Parallel processor is not initialized. "
+                            "Cannot run exact mode in parallel."
+                        )
+
+                    result, runtime = run_exact_parallel(
+                        fainder_index=self.conversion_index,
+                        query=query,
+                        parallel_processor=self.parallel_processor,
+                    )
 
         logger.info(
             "Query '{}' ({} mode) returned {} histograms in {} seconds. With filter size: {}",
