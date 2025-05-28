@@ -185,16 +185,16 @@ const showSearchDialog = ref(false);
 
 async function searchData({
   query: searchQuery,
-  fainderMode: newfainderMode,
+  fainderMode: newFainderMode,
   resultHighlighting,
 }: SearchParams): Promise<void> {
   query.value = searchQuery;
-  fainderMode.value = newfainderMode;
+  fainderMode.value = newFainderMode;
 
   currentPage.value = 1;
   selectedResultIndex.value = 0;
 
-  await loadResults(searchQuery, 1, newfainderMode, resultHighlighting);
+  await loadResults(searchQuery, 1, newFainderMode, resultHighlighting);
 
   await navigateTo({
     path: "/results",
@@ -202,7 +202,7 @@ async function searchData({
       query: searchQuery,
       page: 1,
       index: 0,
-      fainderMode: newfainderMode,
+      fainderMode: newFainderMode,
       resultHighlighting: String(resultHighlighting),
       theme: theme.global.name.value,
     },
