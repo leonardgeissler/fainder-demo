@@ -120,7 +120,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         return all_columns - to_negate_cols
 
     def query(self, items: Sequence[DocResult]) -> DocResult:
-        logger.trace(f"Evaluating query with {len(items)} items")
+        logger.trace("Evaluating query with {} items", len(items))
 
         if len(items) != 1:
             raise ValueError("Query must have exactly one item")
