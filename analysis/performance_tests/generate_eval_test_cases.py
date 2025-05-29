@@ -32,6 +32,36 @@ def generate_simple_keyword_queries(
     }
 
 
+def generate_simple_keyword_queries_with_multiple_elements(
+    keywords: list[str],
+    num_elements: int = 5,
+    max_num_queries: int = 10,
+) -> dict[str, dict[str, Any]]:
+    """
+    Generate simple keyword queries with multiple elements.
+
+    Args:
+        keywords: List of keywords to search for
+        num_elements: Number of elements to combine in each query
+        max_num_queries: Maximum number of queries to generate
+    """
+
+    queries: dict[str, dict[str, Any]] = {}
+    query_counter = 0
+
+    combinations_list = list(combinations(keywords, num_elements))
+    for combination in combinations_list:
+        if query_counter >= max_num_queries:
+            break
+        query_counter += 1
+        query = " OR ".join([f"kw('{word}')" for word in combination])
+        queries[f"multi_element_query_{query_counter}"] = {
+            "query": query,
+            "ids": [{"keyword_id": word} for word in combination],
+        }
+
+    return queries
+
 def generate_percentile_terms(
     percentile_values: list[float],
     thresholds: list[int],
@@ -534,6 +564,13 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
 
     # Generate test cases with the config values
     keywordsqueries = generate_simple_keyword_queries(config.keywords.default_keywords)
+
+    keywordsqueries_with_multiple_elements = generate_simple_keyword_queries_with_multiple_elements(
+        keywords=config.keywords.default_keywords,
+        num_elements=config.query_generation.num_elements_keywordsqueries,
+        max_num_queries=config.query_generation.max_num_keywordsqueries,
+    )
+
     percentile_terms_list = generate_percentile_terms(
         percentile_values=config.percentiles.default_percentiles,
         thresholds=config.percentiles.default_thresholds,
@@ -631,6 +668,9 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
 
     test_cases = {
         "base_keyword_queries": {"queries": keywordsqueries},
+        "base_keyword_queries_with_multiple_elements": {
+            "queries": keywordsqueries_with_multiple_elements
+        },
         "base_percentile_queries": {"queries": percentilequeries},
         "percentile_combinations": {"queries": percentile_combinations_queries},
         "mixed_combinations_with_fixed_structure": {

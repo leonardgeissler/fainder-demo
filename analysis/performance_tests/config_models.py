@@ -110,6 +110,14 @@ class QueryGenerationConfig:
         default=20,
         metadata={"description": "Maximum number of middle exit terms"}
     )
+    num_elements_keywordsqueries: int = field(
+        default=5,
+        metadata={"description": "Number of elements for keywords queries"}
+    )
+    max_num_keywordsqueries: int = field(
+        default=10,
+        metadata={"description": "Maximum number of keyword queries to generate"}
+    )
 
 @dataclass
 class EngineConfig:
@@ -139,6 +147,7 @@ class ExperimentConfig:
     enabled_tests: List[str] = field(
         default_factory=lambda: [
             "base_keyword_queries",
+            "base_keyword_queries_with_multiple_elements",
             "base_percentile_queries",
             "percentile_combinations",
             "mixed_combinations_with_fixed_structure",

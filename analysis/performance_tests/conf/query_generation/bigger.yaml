@@ -14,3 +14,7 @@ max_num_terms_double_expected_form: 30
 max_num_terms_percentilequeries: 20
 
 max_num_middle_exit: 20
+
+num_elements_keywordsqueries: 10
+
+max_num_keywordsqueries: 20
