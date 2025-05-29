@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from fainder.typing import PercentileIndex as PctlIndex
     from fainder.typing import PercentileQuery as PctlQuery
     from numpy.typing import NDArray
+import atexit
 
 
 class FainderIndex:
@@ -35,6 +36,8 @@ class FainderIndex:
         self.parallel = parallel
         self.parallel_processor: ParallelHistogramProcessor | None = None
 
+        atexit.register(self._cleanup_parallel_processor)
+
         self.update(
             rebinning_path=rebinning_path,
             conversion_path=conversion_path,
@@ -44,10 +47,10 @@ class FainderIndex:
             contiguous=contiguous,
         )
 
-    def __del__(self) -> None:
-        """Clean up parallel processor when FainderIndex is destroyed."""
+    def _cleanup_parallel_processor(self) -> None:
+        """Clean up parallel processor when the program exits."""
         if hasattr(self, "parallel_processor") and self.parallel_processor is not None:
-            logger.info("Shutting down parallel processor in destructor")
+            logger.info("Shutting down parallel processor on exit")
             self.parallel_processor.shutdown()
             self.parallel_processor = None
 
@@ -79,7 +82,7 @@ class FainderIndex:
             self.hists = load_input(histogram_path, "histograms")
         elif histogram_path:
             logger.warning(f"Histogram path {histogram_path} does not exist")
-        
+
         self.parallel = parallel
 
         # Clean up existing parallel processor if it exists

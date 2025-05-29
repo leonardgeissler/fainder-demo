@@ -308,11 +308,11 @@ def generate_embedding_index(
 def save_histograms_parallel(
     hists: Sequence[tuple[int | np.integer[Any], Histogram]],
     output_path: Path,
-    max_workers: int,
+    n_chunks: int,
     contiguous: bool,
 ) -> None:
     """Save histograms in parallel chunks for Fainder."""
-    workers = max_workers - 1
+    workers = n_chunks - 1
     logger.info("Partitioning histogram IDs for parallel processing with {} workers", workers)
     hist_id_chunks = partition_histogram_ids(
         [int(id_) for id_, _ in hists], num_partitions=workers, contiguous=contiguous
@@ -325,9 +325,9 @@ def save_histograms_parallel(
 
     # Create directory for split histograms
     if contiguous:
-        split_dir = output_path / f"histograms_split_contiguous_{max_workers}"
+        split_dir = output_path / f"histograms_split_contiguous_{n_chunks}"
     else:
-        split_dir = output_path / f"histograms_split_round_robin_{max_workers}"
+        split_dir = output_path / f"histograms_split_round_robin_{n_chunks}"
 
     split_dir.mkdir(exist_ok=True, parents=True)
     logger.info(f"Created directory for split histograms: {split_dir}")
@@ -358,9 +358,9 @@ def parse_args() -> argparse.Namespace:
         "--no-embeddings", action="store_true", help="Skip generating embedding index"
     )
     parser.add_argument(
-        "--save-hists-parallel",
+        "--no-hists-parallel",
         action="store_true",
-        help="Save histograms in parallel chunks for Fainder",
+        help="Do not save histograms in parallel chunks for Fainder",
     )
     parser.add_argument(
         "--log-level",
@@ -421,10 +421,10 @@ if __name__ == "__main__":
             ef_construction=settings.hnsw_ef_construction,
             n_bidirectional_links=settings.hnsw_n_bidirectional_links,
         )
-    if not args.save_hists_parallel:
+    if not args.no_hists_parallel:
         save_histograms_parallel(
             hists,
             output_path=settings.fainder_path,
-            max_workers=settings.max_workers,
+            n_chunks=settings.max_workers,
             contiguous=settings.fainder_contiguous_chunks,
         )
