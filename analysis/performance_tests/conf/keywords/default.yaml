@@ -1,0 +1,34 @@
+default_keywords:
+  - test
+  - born
+  - by
+  - date
+  - status
+  - name
+  - id
+  - type
+  - category
+  - description
+
+default_col_names:
+  - age
+  - date
+  - name
+  - id
+  - status
+  - type
+  - category
+  - description
+  - price
+  - quantity
+
+default_ks:
+  - 0
+  - 2
+  - 5
+  - 7
+  - 10
+
+# Logical operators
+logical_operators:
+  - AND

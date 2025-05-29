@@ -1,0 +1,2 @@
+max_workers: 12
+fainder_contiguous_chunks: true  # Enable/disable contiguous chunks for Fainder indices

@@ -58,3 +58,4 @@ logs/
 /analysis/performance_tests/figures
 /outputs
 /test_cases
+/analysis/fainder_results_size/figures
