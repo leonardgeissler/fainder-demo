@@ -52,6 +52,10 @@ class OptimizerConfig:
         default=True,
         metadata={"description": "Enable keyword merging optimization"}
     )
+    split_up_junctions: bool = field(
+        default=True,
+        metadata={"description": "Enable splitting up junctions in query plans"}
+    )
 
 
 @dataclass

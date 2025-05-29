@@ -83,7 +83,8 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
         # Configure optimizer based on config settings
         engine.optimizer = Optimizer(
             cost_sorting=config.optimizer.cost_sorting,
-            keyword_merging=config.optimizer.keyword_merging
+            keyword_merging=config.optimizer.keyword_merging,
+            split_up_junctions=config.optimizer.split_up_junctions
         )
         
         engines[scenario.name] = engine
@@ -154,7 +155,7 @@ def create_csv_files(paths: Dict[str, Any]) -> Dict[str, Any]:
             "timestamp", "category", "test_name", "query", "scenario",
             "execution_time", "results_consistent", "fainder_mode",
             "num_results", "ids", "num_terms", "id_str", "write_groups_used", "write_groups_actually_used",
-            "fainder_max_workers", "fainder_contiguous_chunks", "optimizer_cost_sorting", "optimizer_keyword_merging"
+            "fainder_max_workers", "fainder_contiguous_chunks", "optimizer_cost_sorting", "optimizer_keyword_merging", "optimizer_split_up_junctions"
         ])
     csv_paths["main_perf_csv"] = perf_csv_path
     
@@ -179,7 +180,7 @@ def create_csv_files(paths: Dict[str, Any]) -> Dict[str, Any]:
                 "timestamp", "category", "test_name", "query", "scenario",
                 "execution_time", "results_consistent", "fainder_mode",
                 "num_results", "ids", "num_terms", "id_str", "write_groups_used", "write_groups_actually_used",
-                "fainder_max_workers", "fainder_contiguous_chunks", "optimizer_cost_sorting", "optimizer_keyword_merging"
+                "fainder_max_workers", "fainder_contiguous_chunks", "optimizer_cost_sorting", "optimizer_keyword_merging", "optimizer_split_up_junctions"
             ])
         individual_csv_paths[test_name] = test_csv_path
     

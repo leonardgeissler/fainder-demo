@@ -185,6 +185,7 @@ def log_performance_csv(
     fainder_contiguous_chunks: bool = True,
     optimizer_cost_sorting: bool = True,
     optimizer_keyword_merging: bool = True,
+    optimizer_split_up_junctions: bool = True,
 ) -> None:
     """Log performance data to CSV file with one row per scenario."""
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -212,5 +213,6 @@ def log_performance_csv(
                     fainder_contiguous_chunks,
                     optimizer_cost_sorting,
                     optimizer_keyword_merging,
+                    optimizer_split_up_junctions
                 ]
             )
