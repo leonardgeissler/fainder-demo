@@ -9,7 +9,7 @@ from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Me
 from backend.engine.conversion import col_to_doc_ids
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .common import ColResult, DocResult, TResult, junction, negation
+from .common import ColResult, DocResult, TResult, junction, negate_array
 from .executor import Executor
 
 
@@ -110,14 +110,14 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
             raise ValueError("Negation term must have exactly one item")
         if isinstance(items[0], tuple):
             to_negate, _ = items[0]
-            doc_result = negation(to_negate, len(self.metadata.doc_to_cols))
+            doc_result = negate_array(to_negate, len(self.metadata.doc_to_cols))
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
             col_highlights: ColumnHighlights = np.array([], dtype=np.uint32)
             return doc_result, (doc_highlights, col_highlights)
 
         to_negate_cols = items[0]
-        return negation(to_negate_cols, len(self.metadata.col_to_doc))
+        return negate_array(to_negate_cols, len(self.metadata.col_to_doc))
 
     def query(self, items: Sequence[DocResult]) -> DocResult:
         logger.trace("Evaluating query with {} items", len(items))

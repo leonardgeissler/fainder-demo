@@ -256,22 +256,22 @@ def merge_highlights(
             doc_highlights[doc_id] = merged_highlights
 
     # Merge column highlights
-    col_highlights = union_array(left[1], right[1])
-    col_highlights = intersection_array(col_highlights, doc_to_col_ids(doc_ids, doc_to_cols))
+    col_highlights = union_arrays(left[1], right[1])
+    col_highlights = intersect_arrays(col_highlights, doc_to_col_ids(doc_ids, doc_to_cols))
 
     return doc_highlights, col_highlights
 
 
-def intersection_array(a: DocumentArray, b: DocumentArray) -> DocumentArray:
+def intersect_arrays(a: DocumentArray, b: DocumentArray) -> DocumentArray:
     mask = np.isin(a, b)
     return a[mask]
 
 
-def union_array(a: DocumentArray, b: DocumentArray) -> DocumentArray:
+def union_arrays(a: DocumentArray, b: DocumentArray) -> DocumentArray:
     return np.union1d(a, b)
 
 
-def reducing(
+def reduce_arrays(
     arrays: Sequence[TArray],
     operator: Literal["and", "or"],
 ) -> TArray:
@@ -288,7 +288,7 @@ def reducing(
     raise ValueError(f"Invalid operator: {operator}")
 
 
-def negation(
+def negate_array(
     item: TArray,
     number_of_ids: int,
 ) -> TArray:
@@ -319,14 +319,14 @@ def junction(
             # Merge all other items
             for item in items[1:]:
                 if operator == "and":
-                    doc_ids = intersection_array(doc_ids, item[0])
+                    doc_ids = intersect_arrays(doc_ids, item[0])
                 else:
-                    doc_ids = union_array(doc_ids, item[0])
+                    doc_ids = union_arrays(doc_ids, item[0])
                 highlights = merge_highlights(highlights, item[1], doc_ids, doc_to_cols)
 
             return doc_ids, highlights  # type: ignore
         doc_ids_list = [item[0] for item in items]
-        return reducing(doc_ids_list, operator), ({}, np.array([], dtype=np.uint32))  # type: ignore
+        return reduce_arrays(doc_ids_list, operator), ({}, np.array([], dtype=np.uint32))  # type: ignore
 
     # Items contains column results (i.e., ColResult)
-    return reducing(items, operator)  # type: ignore
+    return reduce_arrays(items, operator)  # type: ignore

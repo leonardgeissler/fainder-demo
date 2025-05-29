@@ -22,8 +22,8 @@ from .common import (
     TResult,
     exceeds_filtering_limit,
     junction,
-    negation,
-    reducing,
+    negate_array,
+    reduce_arrays,
 )
 from .executor import Executor
 
@@ -62,18 +62,18 @@ class IntermediateResult:
     def add_col_ids(self, col_ids: ColumnArray, doc_to_cols: list[NDArray[np.uint32]]) -> None:
         if self._doc_ids is not None:
             helper_col_ids = doc_to_col_ids(self._doc_ids, doc_to_cols)
-            col_ids = reducing([helper_col_ids, col_ids], "and")
+            col_ids = reduce_arrays([helper_col_ids, col_ids], "and")
         if self._col_ids is not None:
-            col_ids = reducing([self._col_ids, col_ids], "and")
+            col_ids = reduce_arrays([self._col_ids, col_ids], "and")
         self._col_ids = col_ids
         self._doc_ids = None
 
     def add_doc_ids(self, doc_ids: DocumentArray, col_to_doc: NDArray[np.uint32]) -> None:
         if self._col_ids is not None:
             helper_doc_ids = col_to_doc_ids(self._col_ids, col_to_doc)
-            doc_ids = reducing([doc_ids, helper_doc_ids], "and")
+            doc_ids = reduce_arrays([doc_ids, helper_doc_ids], "and")
         if self._doc_ids is not None:
-            doc_ids = reducing([doc_ids, self._doc_ids], "and")
+            doc_ids = reduce_arrays([doc_ids, self._doc_ids], "and")
         self._doc_ids = doc_ids
         self._col_ids = None
 
@@ -205,7 +205,7 @@ class IntermediateResultStore:
 
         if hist_filters is None or len(hist_filters) == 0:
             return None
-        return reducing(hist_filters, "and")
+        return reduce_arrays(hist_filters, "and")
 
 
 class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
@@ -425,7 +425,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
         clean_items, write_group = self._clean_items(items)
         if isinstance(clean_items[0], tuple):
             to_negate, _ = clean_items[0]
-            doc_result = negation(to_negate, len(self.metadata.doc_to_cols))
+            doc_result = negate_array(to_negate, len(self.metadata.doc_to_cols))
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
             col_highlights: ColumnHighlights = np.array([], dtype=np.uint32)
@@ -437,7 +437,7 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
             return result, self._get_parent_write_group(write_group)
 
         to_negate_cols: ColResult = clean_items[0]
-        negated_cols = negation(to_negate_cols, len(self.metadata.col_to_doc))
+        negated_cols = negate_array(to_negate_cols, len(self.metadata.col_to_doc))
         self.intermediate_results.add_col_id_results(
             write_group, negated_cols, self.metadata.doc_to_cols
         )
