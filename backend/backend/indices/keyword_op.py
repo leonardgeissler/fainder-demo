@@ -76,6 +76,7 @@ class TantivyIndex:
         search_start = time.perf_counter()
         search_result = searcher.search(parsed_query, limit=MAX_DOCS).hits
         logger.info("Tantivy search took {:.5f}s", time.perf_counter() - search_start)
+        logger.info("Tantivy search took {:.5f}s", time.perf_counter() - search_start)
 
         results: list[int] = []
         scores: list[float] = []

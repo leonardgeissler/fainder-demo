@@ -110,7 +110,7 @@
             :query-builder="false"
             :simple-builder="true"
             @search-data="
-              (data) => {
+              (data: SearchParams) => {
                 searchData(data);
                 showSearchDialog = false;
               }
@@ -126,18 +126,16 @@
   </v-app>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useTheme } from "vuetify";
 import { useRoute } from "vue-router";
 
-function gotoHome() {
-  console.log("go to home");
-  // keep everything in the query except the query string
-  return navigateTo({
-    path: "/",
-    query: { ...route.query, query: undefined, theme: theme.global.name.value },
-  });
+interface SearchParams {
+  query: string;
+  fainder_mode: string;
+  result_highlighting: boolean;
 }
+
 const { loadResults } = useSearchOperations();
 const route = useRoute();
 const theme = useTheme();
@@ -149,13 +147,24 @@ const syntax_highlighting = useCookie("fainder_syntax_highlighting", {
   default: () => true,
 });
 
-const internalSearchQuery = computed(() => route.query.query);
+const internalSearchQuery = computed(
+  () => route.query.query as string | undefined,
+);
 const searchComponentKey = ref(0);
 
 const currentTheme = route.query.theme || colorMode.value;
 theme.global.name.value = currentTheme === "dark" ? "dark" : "light";
 
-function toggleTheme() {
+function gotoHome(): ReturnType<typeof navigateTo> {
+  console.log("go to home");
+  // keep everything in the query except the query string
+  return navigateTo({
+    path: "/",
+    query: { ...route.query, query: undefined, theme: theme.global.name.value },
+  });
+}
+
+function toggleTheme(): void {
   theme.global.name.value =
     theme.global.name.value === "dark" ? "light" : "dark";
 
@@ -168,7 +177,7 @@ function toggleTheme() {
   });
 }
 
-function toggleHighlight() {
+function toggleHighlight(): void {
   syntax_highlighting.value = !syntax_highlighting.value;
 }
 
@@ -178,7 +187,7 @@ async function searchData({
   query: searchQuery,
   fainder_mode: newfainder_mode,
   result_highlighting,
-}) {
+}: SearchParams): Promise<void> {
   query.value = searchQuery;
   fainder_mode.value = newfainder_mode;
 
@@ -194,7 +203,7 @@ async function searchData({
       page: 1,
       index: 0,
       fainder_mode: newfainder_mode,
-      result_highlighting: result_highlighting,
+      result_highlighting: String(result_highlighting),
       theme: theme.global.name.value,
     },
   });

@@ -231,7 +231,7 @@
             </v-expansion-panels>
 
             <v-expansion-panels
-              v-if="selectedResult?.recordSet?.length > 0"
+              v-if="(selectedResult?.recordSet ?? []).length > 0"
               v-model="recordSetPanel"
               elevation="0"
             >
@@ -272,7 +272,11 @@
                         <div v-if="field.histogram" class="field-content">
                           <div class="histogram-container">
                             <Bar
-                              :data="getChartData(field, fieldIndex)"
+                              :data="
+                                getChartData(field, fieldIndex) || {
+                                  datasets: [],
+                                }
+                              "
                               :options="chartOptions"
                             />
                           </div>
@@ -511,7 +515,7 @@
                         <td
                           class="highlight-text"
                           v-html="
-                            selectedResult?.datePublished.substring(0, 10) ||
+                            selectedResult?.datePublished?.substring(0, 10) ||
                             '-'
                           "
                         />
@@ -521,7 +525,8 @@
                         <td
                           class="highlight-text"
                           v-html="
-                            selectedResult?.dateModified.substring(0, 10) || '-'
+                            selectedResult?.dateModified?.substring(0, 10) ||
+                            '-'
                           "
                         />
                       </tr>
@@ -545,9 +550,16 @@
   </v-main>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import "./index.css";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { Bar } from "vue-chartjs";
 import { useTheme } from "vuetify";
+import { useRoute, navigateTo } from "#imports";
+import { useSearchState } from "~/composables/useSearchState";
+import { useSearchOperations } from "~/composables/useSearchOperations";
+import type * as Types from "~/types/types";
+import type { ChartOptions, ScriptableContext, TooltipItem } from "chart.js";
 
 const route = useRoute();
 const theme = useTheme();
@@ -572,25 +584,29 @@ const {
 console.log(selectedResultIndex.value);
 
 // Add computed for selected result
-const selectedResult = computed(() =>
+const selectedResult = computed<Types.Result | null>(() =>
   results.value ? results.value[selectedResultIndex.value] : null,
 );
 
 // Initialize state from route
-query.value = route.query.query;
-fainder_mode.value = route.query.fainder_mode || "low_memory";
+query.value = Array.isArray(route.query.query)
+  ? route.query.query[0] || ""
+  : route.query.query || "";
+fainder_mode.value = Array.isArray(route.query.fainder_mode)
+  ? route.query.fainder_mode[0] || "low_memory"
+  : route.query.fainder_mode || "low_memory";
 
-const descriptionPanel = ref([0]); // Array with 0 means first panel is open
-const recordSetPanel = ref([0]); // Single panel
-const metadataPanel = ref([0]); // Initialize metadata panel
-const totalVisible = ref(7);
-const selectedFileIndex = ref(0);
+const descriptionPanel = ref<number[]>([0]); // Array with 0 means first panel is open
+const recordSetPanel = ref<number[]>([0]); // Single panel
+const metadataPanel = ref<number[]>([0]); // Initialize metadata panel
+const totalVisible = ref<number>(7);
+const selectedFileIndex = ref<number>(0);
 
-const showFullDescription = ref(false);
+const showFullDescription = ref<boolean>(false);
 const maxLength = 750;
 
 const isLongDescription = computed(() => {
-  return selectedResult.value?.description?.length > maxLength;
+  return (selectedResult.value?.description ?? "").length > maxLength;
 });
 
 const displayedContent = computed(() => {
@@ -620,12 +636,12 @@ const recordSetItems = computed(() => {
 });
 
 // Computed property for the currently selected file
-const selectedFile = computed(() => {
+const selectedFile = computed<Types.RecordSetFile | null>(() => {
   if (!selectedResult.value?.recordSet) return null;
   return selectedResult.value.recordSet[selectedFileIndex.value];
 });
 
-const calculatePerPage = (height) => {
+const calculatePerPage = (height: number): number => {
   const availableHeight = height - headerHeight - paginationHeight;
   const itemsPerPage = Math.floor(availableHeight / itemHeight);
   // Ensure we show at least 3 items and at most 15 items
@@ -633,7 +649,7 @@ const calculatePerPage = (height) => {
 };
 
 // Add ref for window height
-const windowHeight = ref(window.innerHeight);
+const windowHeight = ref<number>(window.innerHeight);
 const itemHeight = 80; // Height of each result card in pixels
 const headerHeight = 200; // Approximate height of header elements (search + stats)
 const paginationHeight = 56; // Height of pagination controls
@@ -697,19 +713,21 @@ watch(currentPage, async (newPage) => {
       page: newPage,
       index: selectedResultIndex.value,
       fainder_mode: fainder_mode.value,
-      result_highlighting: result_highlighting.value,
+      result_highlighting: String(result_highlighting.value),
       theme: theme.global.name.value,
     },
   });
 });
 
-const selectResult = (result) => {
-  const index = results.value.indexOf(result);
+const selectResult = (result: Types.Result) => {
+  const index = results.value
+    ? (results.value as Types.Result[]).indexOf(result)
+    : -1;
   selectedResultIndex.value = index;
 
   if (result.recordSet) {
     descriptionPanel.value = [0];
-    recordSetPanel.value = result.recordSet.map(() => [0]);
+    recordSetPanel.value = result.recordSet.map(() => 0);
     showFullDescription.value = false;
     selectedFileIndex.value = 0; // Reset to first file when selecting new result
   }
@@ -727,7 +745,7 @@ const selectResult = (result) => {
 // Initialize from route on mount
 onMounted(() => {
   if (route.query.index && results.value) {
-    const index = parseInt(route.query.index);
+    const index = parseInt(route.query.index as string);
     if (index >= 0 && index < results.value.length) {
       selectedResultIndex.value = index;
     }
@@ -752,7 +770,7 @@ await searchOperations.loadResults(
   result_highlighting.value,
 );
 
-const chartOptions = ref({
+const chartOptions = ref<ChartOptions<"bar">>({
   scales: {
     x: {
       type: "linear",
@@ -780,7 +798,7 @@ const chartOptions = ref({
           size: 11,
         },
         padding: {
-          right: 10,
+          y: 10,
         },
       },
     },
@@ -788,17 +806,17 @@ const chartOptions = ref({
   plugins: {
     tooltip: {
       callbacks: {
-        title: (items) => {
+        title: (items: TooltipItem<"bar">[]) => {
           if (!items.length) return "";
           const item = items[0];
           const index = item.dataIndex;
-          const dataset = item.chart.data.datasets[0];
+          const dataset = item.chart.data.datasets[0] as Types.CustomDataset;
           const binEdges = dataset.binEdges;
           return `Range: ${binEdges[index].toFixed(2)} - ${binEdges[
             index + 1
           ].toFixed(2)}`;
         },
-        label: (item) => {
+        label: (item: TooltipItem<"bar">) => {
           return `Density: ${item.parsed.y.toFixed(4)}`;
         },
       },
@@ -832,7 +850,7 @@ const chartColors = [
   "rgba(186, 104, 200, 0.6)", // purple
 ];
 
-const getChartData = (field, index) => {
+const getChartData = (field: Types.Field, index: number) => {
   if (!field.histogram) return null;
 
   const binEdges = field.histogram.bins;
@@ -860,7 +878,8 @@ const getChartData = (field, index) => {
         barPercentage: 1,
         categoryPercentage: 1,
         segment: {
-          backgroundColor: (_) => chartColors[index % chartColors.length],
+          backgroundColor: (_: ScriptableContext<"bar">) =>
+            chartColors[index % chartColors.length],
         },
         parsing: {
           xAxisKey: "x0",
@@ -871,7 +890,7 @@ const getChartData = (field, index) => {
   };
 };
 
-const getBooleanChartData = (field) => {
+const getBooleanChartData = (field: Types.Field) => {
   return {
     labels: ["True", "False"],
     datasets: [
@@ -884,13 +903,13 @@ const getBooleanChartData = (field) => {
         borderColor: "rgba(0, 0, 0, 0.1)",
         borderWidth: 1,
         borderRadius: 0,
-        data: [field.counts.Yes, field.counts.No],
+        data: [field.counts?.Yes ?? 0, field.counts?.No ?? 0],
       },
     ],
   };
 };
 
-const booleanChartOptions = ref({
+const booleanChartOptions = ref<ChartOptions<"bar">>({
   scales: {
     y: {
       beginAtZero: true,
@@ -901,7 +920,7 @@ const booleanChartOptions = ref({
           size: 11,
         },
         padding: {
-          right: 10,
+          y: 10,
         },
       },
     },
@@ -921,7 +940,7 @@ const booleanChartOptions = ref({
   plugins: {
     tooltip: {
       callbacks: {
-        label: (context) => {
+        label: (context: TooltipItem<"bar">) => {
           return `${context.dataset.label}: ${context.raw}`;
         },
       },
@@ -942,7 +961,7 @@ const booleanChartOptions = ref({
   },
 });
 
-const formatNumber = (value) => {
+const formatNumber = (value: number | null | undefined): string => {
   if (value === undefined || value === null) return "-";
   // Check if the value is an integer
   if (Number.isInteger(value)) return value.toLocaleString();
@@ -954,7 +973,7 @@ const formatNumber = (value) => {
 };
 
 // Format date as YYYY-MM-DD
-const formatDate = (dateString) => {
+const formatDate = (dateString: string | undefined): string => {
   if (!dateString) return "-";
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString; // Return as-is if invalid
@@ -963,15 +982,15 @@ const formatDate = (dateString) => {
 };
 
 // Format date with both date and time
-const formatDateFull = (dateString) => {
+const formatDateFull = (dateString: string | undefined): string => {
   if (!dateString) return "-";
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString; // Return as-is if invalid
 
   const options = {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    year: "numeric" as const,
+    month: "long" as const,
+    day: "numeric" as const,
   };
 
   return new Intl.DateTimeFormat("en-US", options).format(date);
@@ -979,10 +998,10 @@ const formatDateFull = (dateString) => {
 
 // Calculate the difference between two dates in a human-readable format
 const calculateDateDifference = (
-  startDateStr,
-  endDateStr,
+  startDateStr: string | undefined,
+  endDateStr: string | undefined,
   detailed = false,
-) => {
+): string => {
   if (!startDateStr || !endDateStr) return "-";
 
   const startDate = new Date(startDateStr);
@@ -993,7 +1012,7 @@ const calculateDateDifference = (
   }
 
   // Calculate difference in milliseconds
-  const diffMs = Math.abs(endDate - startDate);
+  const diffMs = Math.abs(endDate.getTime() - startDate.getTime());
 
   // Convert to days, months, years
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -1032,700 +1051,3 @@ const calculateDateDifference = (
   }
 };
 </script>
-
-<style scoped>
-.app-container {
-  /*unused?*/
-  display: flex;
-  flex-direction: column;
-  max-width: 100%;
-  min-height: calc(100vh - 64px);
-  padding: 16px;
-  margin-top: 0; /* Remove top margin since search is in app bar now */
-}
-
-/* Remove .search-container styles */
-
-.results-wrapper {
-  display: flex;
-  gap: 24px;
-  flex: 1;
-  position: relative;
-  padding-left: 400px; /* Add space for fixed list-container */
-  position: relative;
-  z-index: 1;
-  margin-top: 16px; /* Add space for potential error messages */
-}
-
-.list-container {
-  flex: 0 0 auto;
-  width: 376px; /* 400px - 24px gap */
-  position: fixed;
-  left: 24px; /* Match padding from parent container */
-  top: 100px; /* Match header height */
-  bottom: 0;
-  overflow-y: auto;
-  background: rgb(var(--v-theme-background));
-  z-index: 1; /* Lower than error message */
-  padding-right: 16px;
-}
-
-.details-container {
-  flex: 1;
-  min-width: 0; /* Prevents flex child from overflowing */
-  max-width: 1500px;
-  margin: 0 auto; /* Center the container */
-  padding-bottom: 24px;
-  width: 100%;
-}
-
-.mb-6 {
-  margin-bottom: 24px;
-}
-
-.bg-grey-lighten-3 {
-  background-color: #f5f5f5;
-}
-
-.markdown-wrapper {
-  /*unused?*/
-  padding: 24px;
-}
-
-.mt-4 {
-  margin-top: 16px;
-}
-
-.search-button {
-  margin-bottom: 24px;
-  width: 100%;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  text-transform: none;
-  height: 56px;
-}
-
-.error-container {
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 16px;
-}
-
-.panel-title {
-  font-size: 1.25rem !important;
-  font-weight: bold;
-}
-
-.search-stats {
-  color: rgba(var(--v-theme-on-surface), 0.7);
-  font-size: 0.875rem;
-}
-
-.pagination-controls {
-  display: flex;
-  justify-content: center;
-  margin-top: 1rem;
-  width: 100%;
-}
-
-.pagination-controls :deep(.v-pagination) {
-  width: 100%;
-  justify-content: center;
-}
-
-.error-details {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.error-technical-details {
-  font-family: monospace;
-  font-size: 0.9em;
-  color: rgba(var(--v-theme-on-error), 0.7);
-}
-
-/* Update highlight styles for details container */
-.highlight-text :deep(mark) {
-  background-color: rgba(var(--v-theme-warning), 0.2);
-}
-
-.description-preview {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
-
-/* Update highlight text styles to handle all text variants */
-.highlight-text,
-:deep(.v-card-title),
-:deep(.v-card-subtitle),
-:deep(.v-card-text) {
-  line-height: 1.6;
-}
-
-:deep(.v-card-title mark),
-:deep(.v-card-subtitle mark),
-:deep(.v-card-text mark),
-.highlight-text :deep(mark) {
-  background-color: rgba(var(--v-theme-warning), 0.2);
-  color: inherit;
-  padding: 0 2px;
-  border-radius: 2px;
-  font-weight: 500;
-}
-
-.description-truncated {
-  position: relative;
-  max-height: 200px;
-  overflow: hidden;
-}
-
-.description-truncated::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 50px;
-  background: linear-gradient(transparent, rgb(var(--v-theme-surface)));
-}
-
-.field-list {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.field-item {
-  background-color: rgb(var(--v-theme-surface));
-  border-radius: 8px;
-  padding: 4px;
-}
-
-.field-header {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.field-content {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-  align-items: start;
-}
-
-.histogram-container {
-  height: 300px;
-}
-
-.statistics-container {
-  background-color: rgba(var(--v-theme-surface), 0.8);
-  border-radius: 8px;
-  padding: 0px;
-  height: fit-content;
-}
-
-.statistics-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.statistics-table tr {
-  border-bottom: 1px solid rgba(var(--v-border-opacity), 0.12);
-}
-
-.statistics-table tr:last-child {
-  border-bottom: none;
-}
-
-.stat-label {
-  padding: 8px 0;
-  font-weight: 500;
-  color: rgba(var(--v-theme-on-surface), 0.7);
-}
-
-.stat-value {
-  padding: 8px 0;
-  text-align: right;
-  font-family: monospace;
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.content-wrapper {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 32px;
-  padding: 0px 0;
-}
-
-.description-section {
-  font-size: 1rem;
-  line-height: 1.6;
-  max-width: 800px; /* Add maximum width */
-  min-width: 0; /* Allow shrinking */
-  overflow-wrap: break-word; /* Ensure long words don't overflow */
-}
-
-/* Add new styles for markdown content */
-.description-section :deep(.markdown-body) {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-.description-section :deep(img) {
-  max-width: 100%;
-  height: auto;
-}
-
-.description-section :deep(table) {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-  border-collapse: collapse;
-}
-
-.description-section :deep(pre) {
-  max-width: 100%;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.description-section :deep(ul),
-.description-section :deep(ol) {
-  max-width: 100%;
-  padding-left: 24px;
-  margin: 16px 0;
-  list-style-position: outside;
-}
-
-.description-section :deep(li) {
-  margin-bottom: 8px;
-  overflow-wrap: break-word;
-  word-wrap: break-word;
-  word-break: break-word;
-}
-
-.metadata-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding-left: 68px; /* Increased from 32px */
-  border-left: 1px solid rgba(var(--v-border-opacity), 0.12);
-}
-
-.metadata-item {
-  display: grid;
-  gap: 4px;
-}
-
-.metadata-label {
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-surface));
-  font-size: 1.125rem;
-  margin-bottom: 4px;
-}
-
-.metadata-value {
-  color: rgb(var(--v-theme-on-surface));
-  font-size: 0.875rem;
-}
-
-.keywords-value {
-  word-break: break-word;
-}
-
-.field-content.categorical {
-  grid-template-columns: 1fr 1fr;
-}
-
-.categorical-summary {
-  background-color: rgba(var(--v-theme-surface), 0.8);
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.mt-6 {
-  margin-top: 24px;
-}
-
-.value-label {
-  padding: 8px 0;
-  color: rgb(var(--v-theme-on-surface));
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.categorical-layout {
-  display: flex;
-  align-items: flex-start;
-  gap: 32px;
-}
-
-.unique-values-section {
-  flex: 0 0 auto;
-  padding-right: 32px;
-  border-right: 1px solid rgba(var(--v-border-opacity), 0.12);
-}
-
-.large-stat {
-  text-align: center;
-}
-
-.stat-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-surface));
-  margin-bottom: 8px;
-}
-
-.stat-number {
-  font-size: 2rem;
-  font-weight: 500;
-  color: rgba(var(--v-theme-on-surface));
-}
-
-.value-distribution {
-  flex: 1;
-  min-width: 0;
-}
-
-.statistics-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.statistics-table th {
-  font-weight: 600;
-  color: rgba(var(--v-theme-on-surface), 0.87);
-  padding: 8px 16px;
-  border-bottom: 2px solid rgba(var(--v-border-opacity), 0.12);
-}
-
-.statistics-table td {
-  padding: 0px 16px;
-  border-bottom: 1px solid rgba(var(--v-border-opacity), 0.12);
-}
-
-.stat-value {
-  text-align: right;
-  font-family: monospace;
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.boolean-summary {
-  background-color: rgba(var(--v-theme-surface), 0.8);
-  border-radius: 8px;
-  padding: 16px;
-  height: 300px;
-}
-
-/* Make the layout responsive */
-@media (max-width: 1200px) {
-  /* Changed from 768px to 1200px */
-  .content-wrapper {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-
-  .description-section {
-    max-width: 100%; /* Allow full width on smaller screens */
-  }
-
-  .metadata-section {
-    padding-left: 0;
-    border-left: none;
-    border-top: 1px solid rgba(var(--v-border-opacity), 0.12);
-    padding-top: 24px;
-  }
-
-  .categorical-layout {
-    flex-direction: column;
-    gap: 24px;
-  }
-
-  .unique-values-section {
-    padding-right: 0;
-    padding-bottom: 24px;
-    border-right: none;
-    border-bottom: 1px solid rgba(var(--v-border-opacity), 0.12);
-    width: 100%;
-  }
-
-  .value-distribution {
-    width: 100%;
-  }
-}
-
-@media (max-width: 1024px) {
-  .results-wrapper {
-    padding-left: 0;
-    flex-direction: column;
-    height: auto;
-  }
-
-  .list-container {
-    position: relative;
-    width: 100%;
-    left: 0;
-    top: 0;
-    height: auto;
-    max-height: 400px; /* Limit height on mobile */
-    margin-bottom: 24px;
-  }
-
-  .details-container {
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    padding: 0;
-  }
-
-  .field-content {
-    grid-template-columns: 1fr;
-  }
-
-  .histogram-container {
-    height: 250px;
-  }
-
-  .statistics-container {
-    max-width: 100%;
-  }
-
-  .field-content.categorical {
-    grid-template-columns: 1fr;
-  }
-
-  .categorical-summary {
-    max-width: 100%;
-  }
-
-  .value-label {
-    max-width: none;
-  }
-
-  .field-content.date {
-    grid-template-columns: 1fr;
-  }
-
-  .timeline-wrapper {
-    max-width: 100%;
-  }
-}
-
-/* Add specific mobile styles */
-@media (max-width: 600px) {
-  .pa-5 {
-    padding: 12px !important;
-  }
-
-  .list-container {
-    max-height: 300px; /* Even smaller on mobile */
-  }
-
-  .content-wrapper {
-    padding: 12px;
-  }
-
-  .timeline-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .timeline-start,
-  .timeline-end {
-    width: 100%;
-    text-align: center;
-    margin: 10px 0;
-  }
-
-  .timeline-line {
-    height: 100px;
-    width: 4px;
-    margin: 0 auto;
-    background: linear-gradient(
-      to bottom,
-      rgba(77, 182, 172, 0.8),
-      rgba(255, 167, 38, 0.8)
-    );
-  }
-
-  .timeline-line::before {
-    left: -6px;
-    top: -8px;
-  }
-
-  .timeline-line::after {
-    right: -6px;
-    top: auto;
-    bottom: -8px;
-  }
-}
-
-.description-truncated {
-  position: relative;
-  max-height: 200px;
-  overflow: hidden;
-}
-
-.description-truncated::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 50px;
-  background: linear-gradient(transparent, rgb(var(--v-theme-surface)));
-}
-
-.content-container {
-  padding: 0 8px; /* Reduced from 16px */
-}
-
-.content-container .v-card-title {
-  padding-left: 0;
-  font-size: 1.75rem !important;
-  line-height: 2rem;
-  margin-bottom: 0.5rem;
-}
-
-.content-container .v-card-subtitle {
-  padding-left: 0;
-  font-size: 1.1rem;
-}
-
-.flex-grow-1.min-w-0 {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.text-truncate {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  display: block;
-}
-
-.rounded-image {
-  border-radius: 5px;
-  overflow: hidden;
-}
-
-.pa-5 {
-  position: relative;
-  z-index: 2; /* Higher than list-container */
-}
-
-/* Update alert styles */
-:deep(.v-alert) {
-  position: relative;
-  z-index: 2;
-  margin-bottom: 16px;
-}
-
-.date-timeline {
-  background-color: rgba(var(--v-theme-surface), 0.8);
-  border-radius: 8px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.timeline-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.timeline-wrapper {
-  width: 100%;
-  max-width: 600px;
-}
-
-.timeline-bar {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  margin: 20px 0;
-}
-
-.timeline-start,
-.timeline-end {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: rgb(var(--v-theme-on-surface));
-  width: 100px;
-}
-
-.timeline-start {
-  text-align: right;
-  margin-right: 10px;
-}
-
-.timeline-end {
-  text-align: left;
-  margin-left: 10px;
-}
-
-.timeline-line {
-  flex-grow: 1;
-  height: 4px;
-  background: linear-gradient(
-    to right,
-    rgba(77, 182, 172, 0.8),
-    rgba(255, 167, 38, 0.8)
-  );
-  border-radius: 2px;
-  position: relative;
-}
-
-.timeline-line::before,
-.timeline-line::after {
-  content: "";
-  position: absolute;
-  top: -6px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-}
-
-.timeline-line::before {
-  left: -8px;
-  background-color: rgba(77, 182, 172, 0.8);
-}
-
-.timeline-line::after {
-  right: -8px;
-  background-color: rgba(255, 167, 38, 0.8);
-}
-
-.timeline-duration {
-  text-align: center;
-  font-size: 1.1rem;
-  font-weight: 500;
-  margin-top: 10px;
-}
-
-.date-statistics {
-  background-color: rgba(var(--v-theme-surface), 0.8);
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.field-content.date {
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-}
-</style>

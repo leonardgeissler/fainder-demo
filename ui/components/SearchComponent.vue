@@ -40,7 +40,7 @@ words # The search page will contain multiple search bars
             elevation="0"
             density="compact"
             class="ml-2"
-            @click="showSettings = true"
+            @click="openSettings"
           />
         </v-col>
       </v-row>
@@ -212,17 +212,64 @@ words # The search page will contain multiple search bars
         <v-card-title class="text-h5 mt-2"> Search Settings </v-card-title>
 
         <v-card-text>
-          <v-select
-            v-model="temp_fainder_mode"
-            :items="fainder_modes"
-            label="Fainder Mode"
-            variant="outlined"
-          />
-          <v-switch
-            v-model="temp_result_highlighting"
-            label="Enable Result Highlighting"
-            color="primary"
-          />
+          <v-row>
+            <v-col cols="12">
+              <v-select
+                v-model="temp_fainder_config"
+                :items="availableConfigs"
+                :loading="configsLoading"
+                label="Fainder Configuration"
+                variant="outlined"
+                :hint="`Current: ${currentConfig}`"
+                persistent-hint
+              />
+            </v-col>
+          </v-row>
+
+          <v-row>
+            <v-col cols="12">
+              <v-select
+                v-model="temp_fainder_mode"
+                :items="fainder_modes"
+                label="Fainder Mode"
+                variant="outlined"
+              />
+            </v-col>
+          </v-row>
+
+          <v-row>
+            <v-col cols="12">
+              <v-switch
+                v-model="temp_result_highlighting"
+                label="Enable Result Highlighting"
+                color="primary"
+              />
+            </v-col>
+          </v-row>
+
+          <!-- Config change progress -->
+          <v-row v-if="configChangeLoading">
+            <v-col cols="12">
+              <v-progress-linear indeterminate color="primary" class="mb-2" />
+              <div class="text-caption text-center">
+                Switching to {{ temp_fainder_config }}...
+              </div>
+            </v-col>
+          </v-row>
+
+          <!-- Error message -->
+          <v-row v-if="configError">
+            <v-col cols="12">
+              <v-alert
+                type="error"
+                variant="tonal"
+                closable
+                @click:close="configError = ''"
+              >
+                {{ configError }}
+              </v-alert>
+            </v-col>
+          </v-row>
         </v-card-text>
 
         <v-card-actions>
@@ -231,12 +278,14 @@ words # The search page will contain multiple search bars
             color="error"
             variant="text"
             icon="mdi-close"
+            :disabled="configChangeLoading"
             @click="cancelSettings"
           />
           <v-btn
             color="success"
             variant="text"
             icon="mdi-check"
+            :loading="configChangeLoading"
             @click="saveSettings"
           />
         </v-card-actions>
@@ -246,6 +295,7 @@ words # The search page will contain multiple search bars
 </template>
 
 <script setup lang="ts">
+import "./SearchComponent.css";
 import { onMounted, ref, watch, computed } from "vue";
 import parseQuery from "~/utils/queryParser";
 
@@ -411,6 +461,14 @@ const fainder_modes = [
   { title: "Exact Results", value: "exact" },
 ];
 
+// Fainder config state
+const availableConfigs = ref<string[]>([]);
+const currentConfig = ref<string>("");
+const temp_fainder_config = ref<string>("");
+const configsLoading = ref(false);
+const configChangeLoading = ref(false);
+const configError = ref("");
+
 // Simple query builder state
 const showSimpleBuilder = ref(false);
 
@@ -426,6 +484,60 @@ const percentileFilter = ref({
 });
 
 registerTemplate();
+
+const config = useRuntimeConfig();
+
+// Fetch available fainder configurations
+const fetchFainderConfigs = async () => {
+  configsLoading.value = true;
+  try {
+    const response = await $fetch<{ configs: string[]; current: string }>(
+      "/fainder_configs",
+      {
+        baseURL: config.public.apiBase,
+      },
+    );
+    availableConfigs.value = response.configs;
+    currentConfig.value = response.current;
+    temp_fainder_config.value = response.current;
+  } catch (error) {
+    console.error("Error fetching fainder configs:", error);
+    // Fallback
+    availableConfigs.value = ["default"];
+    currentConfig.value = "default";
+    temp_fainder_config.value = "default";
+  } finally {
+    configsLoading.value = false;
+  }
+};
+
+// Change fainder configuration
+const changeFainderConfig = async (configName: string): Promise<boolean> => {
+  if (configName === currentConfig.value) {
+    return true;
+  }
+
+  try {
+    await $fetch("/change_fainder", {
+      method: "POST",
+      baseURL: config.public.apiBase,
+      body: { config_name: configName },
+    });
+
+    currentConfig.value = configName;
+    return true;
+  } catch (error: unknown) {
+    console.error("Error changing fainder config:", error);
+    return false;
+  }
+};
+
+// Open settings and fetch configs
+const openSettings = async () => {
+  showSettings.value = true;
+  configError.value = ""; // Reset temporary state
+  await fetchFainderConfigs();
+};
 
 // on change of syntax_highlighting value, update isValid
 watch(syntax_highlighting, (value) => {
@@ -719,61 +831,51 @@ const hasActiveFilters = computed(() => {
 
 function cancelSettings() {
   showSettings.value = false;
+  // Reset temp values
+  temp_fainder_config.value = currentConfig.value;
 }
 
-function saveSettings() {
-  showSettings.value = false;
-  fainder_mode.value = String(temp_fainder_mode.value);
-  result_highlighting.value = temp_result_highlighting.value;
-  console.log("New fainder_mode:", fainder_mode.value);
-  console.log("New result highlighting state:", result_highlighting.value);
-  // update route
-  const route = useRoute();
-  navigateTo({
-    path: route.path,
-    query: {
-      ...route.query,
-      fainder_mode: temp_fainder_mode.value,
-      result_highlighting: String(temp_result_highlighting.value),
-    },
-  });
+async function saveSettings() {
+  configChangeLoading.value = true;
+  configError.value = ""; // Clear any previous error
+
+  try {
+    // Handle config change if needed
+    if (temp_fainder_config.value !== currentConfig.value) {
+      const success = await changeFainderConfig(temp_fainder_config.value);
+      if (!success) {
+        configError.value =
+          "Failed to update Fainder configuration. Please try again.";
+        return; // Keep dialog open to show error
+      }
+    }
+
+    // Save other settings
+    fainder_mode.value = String(temp_fainder_mode.value);
+    result_highlighting.value = temp_result_highlighting.value;
+
+    // Update route
+    const route = useRoute();
+    await navigateTo({
+      path: route.path,
+      query: {
+        ...route.query,
+        fainder_mode: temp_fainder_mode.value,
+        result_highlighting: String(temp_result_highlighting.value),
+      },
+    });
+
+    // Close dialog after short delay to show success message
+    setTimeout(() => {
+      showSettings.value = false;
+    }, 1000);
+  } finally {
+    configChangeLoading.value = false;
+  }
 }
 </script>
 
 <style scoped>
-.search-main {
-  background-color: transparent !important;
-}
-
-.inline-layout {
-  align-items: center;
-}
-
-.search-btn {
-  height: 48px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  text-transform: none;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-}
-
-.settings-btn {
-  height: 48px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  text-transform: none;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-}
-
-.input-wrapper {
-  position: relative;
-  width: 100%;
-}
-
 .search-input {
   max-height: v-bind(textareaMaxHeight);
   overflow-y: v-bind("number_of_rows === 1 ? 'hidden' : 'auto'") !important;
@@ -781,81 +883,5 @@ function saveSettings() {
   border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-/* Style for code-input element to ensure it shows all content */
-:deep(.search-input textarea) {
-  min-height: 48px;
-  padding: 8px 12px;
-  line-height: 1.5;
-}
-
-/* Add focus styles for better UX */
-:deep(.search-input:focus-within) {
-  border-color: rgb(var(--v-theme-primary));
-  box-shadow: 0 0 0 1px rgba(var(--v-theme-primary), 0.2);
-}
-
-.error-message {
-  color: rgb(var(--v-theme-error));
-  font-size: 12px;
-  margin-top: 4px;
-  min-height: 20px;
-  padding-left: 16px;
-}
-
-.query-builder {
-  background-color: rgba(var(--v-theme-surface), 0.8);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.gap-2 {
-  gap: 8px;
-}
-
-.builder-header {
-  display: flex;
-  align-items: center;
-  color: rgba(var(--v-theme-on-surface), 0.87);
-  padding-bottom: 8px;
-  margin-bottom: 12px;
-}
-
-.builder-header .v-icon {
-  opacity: 0.7;
-}
-:deep(.function) {
-  color: #569cd6;
-}
-:deep(.string) {
-  color: #ce9178;
-}
-:deep(.comparison) {
-  color: #c586c0;
-}
-:deep(.number) {
-  color: #b5cea8;
-}
-:deep(.field) {
-  color: #9cdcfe;
-}
-:deep(.not-operator) {
-  color: #c586c0;
-}
-:deep(.operator) {
-  color: #c586c0;
-}
-:deep(.bracket-0) {
-  color: #ffd700;
-}
-:deep(.bracket-1) {
-  color: #da70d6;
-}
-:deep(.bracket-2) {
-  color: #87cefa;
-}
-:deep(.bracket-3) {
-  color: #fa8072;
 }
 </style>

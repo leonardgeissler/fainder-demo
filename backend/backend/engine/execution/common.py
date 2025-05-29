@@ -189,7 +189,7 @@ class ResultGroupAnnotator(Visitor_Recursive[Token]):
                     read_groups,
                 )
         else:
-            raise ValueError("Node {} does not have write or read groups", tree)
+            raise ValueError(f"Node {tree} does not have write or read groups")
 
 
 def exceeds_filtering_limit(
