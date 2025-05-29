@@ -1,0 +1,11 @@
+enabled_tests:
+  - percentile_combinations
+  - multiple_percentile_combinations
+  - multiple_percentile_combinations_with_kw
+
+fainder_modes:
+  - full_precision
+  - exact
+
+# Number of times to run each query for more reliable timing measurements
+num_runs: 3
