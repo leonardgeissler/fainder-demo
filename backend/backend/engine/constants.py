@@ -28,8 +28,8 @@ FILTERING_STOP_POINTS: dict[FainderMode, FilteringStopPointsConfig] = {
         "num_hist_ids": 10000,
     },
     FainderMode.EXACT: {
-        "num_doc_ids": 20000,
-        "num_col_ids": 300000,
-        "num_hist_ids": 300000,
+        "num_doc_ids": 30000,
+        "num_col_ids": 3500000,
+        "num_hist_ids": 3500000,
     },
 }
