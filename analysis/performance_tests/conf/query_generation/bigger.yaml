@@ -9,15 +9,15 @@ max_num_query_per_term_count_multiple_percentile_combinations: 5
 
 # Mixed terms configuration
 max_num_mixed_terms_with_fixed_structure: 30
-max_num_mixed_terms_extended_with_fixed_structure: 20
+max_num_mixed_terms_extended_with_fixed_structure: 30
 
-max_num_mixed_terms_with_fixed_structure_not: 5
+max_num_mixed_terms_with_fixed_structure_not: 10
 
 max_num_terms_double_expected_form: 30
 
 max_num_terms_percentilequeries: 20
 
-max_num_middle_exit: 20
+max_num_middle_exit: 30
 
 num_elements_keywordsqueries: 10
 

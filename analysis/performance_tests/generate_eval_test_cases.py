@@ -1,5 +1,6 @@
 import json
 from itertools import combinations
+from math import comb
 from pathlib import Path
 from typing import Any
 
@@ -209,7 +210,7 @@ def percentile_term_combinations(
                 query = wrap_term(query)
                 queries[f"percentile_combination_{operator}_{query_counter}"] = {
                     "query": query,
-                    "ids": [{"percentile_id": terms[term]} for term in combination],
+                    "ids": num_terms,
                 }
                 query_counter += 1
                 i += 1
@@ -256,46 +257,50 @@ def expected_form(
 
 
 def multiple_percentile_combinations(
-    percentile_combinations: dict[str, dict[str, Any]],
+    list_of_percentile_combinations: dict[int, dict[str, dict[str, Any]]],
     operators: list[str],
     min_terms: int ,
     max_terms: int ,
     num_query_per_num_terms: int,
 ) -> dict[str, dict[str, Any]]:
     """
-    Combines multiple different percentile combinations into a single query.
+    Combines multiple different percentile combinations into a single query. With same number of terms in percentile combinations.
 
     Args:
-        percentile_combinations: Dictionary of percentile combinations
+        list_of_percentile_combinations: List of percentile combinations
         operators: List of logical operators to use
     """
     queries: dict[str, dict[str, Any]] = {}
 
+    min_terms_internal = min(list(list_of_percentile_combinations.keys()))
+    max_terms_internal = max(list(list_of_percentile_combinations.keys()))
     for operator in operators:
-        for i in range(min_terms, max_terms + 1):
-            h = 0
-            for j in range(1, len(percentile_combinations) + 1):
-                if j < i:
+        for num_terms_external in range(min_terms, max_terms + 1):
+            for num_terms_internal in range(min_terms_internal, max_terms_internal + 1):
+                internalterms = list_of_percentile_combinations.get(num_terms_internal, {})
+                if not internalterms:
                     continue
-                combination = list(combinations(percentile_combinations.keys(), j))
-                for k in range(len(combination)):
-                    if len(combination[k]) == 0:
+                query_counter = 0
+                for combination in combinations(internalterms.keys(), num_terms_external):
+                    if len(combination) == 0:
                         continue
                     combination_terms = [
-                        percentile_combinations[term]["query"] for term in combination[k]
+                        internalterms[term]["query"] for term in combination
                     ]
                     query = f" {operator} ".join(combination_terms)
                     query = wrap_term(query)
-                    queries[f"multiple_percentile_combination_{operator}_{i}_{k}"] = {
+                    queries[f"multiple_percentile_combination_{operator}_{num_terms_external}_{query_counter}"] = {
                         "query": query,
-                        "ids": [percentile_combinations[term]["ids"] for term in combination[k]],
+                        "ids": {"num_terms_external": num_terms_external, 
+                                "num_terms_internal": num_terms_internal,
+                                "num_terms": num_terms_external * num_terms_internal,
+                                },
                     }
-                    h += 1
-                    if h > num_query_per_num_terms:
+                    query_counter += 1
+                    if query_counter > num_query_per_num_terms:
                         break
-                if h > num_query_per_num_terms:
+                if query_counter > num_query_per_num_terms:
                     break
-
     return queries
 
 
@@ -447,7 +452,7 @@ def multiple_percentile_combinations_with_kw(
         for keyword in keywords:
             queries[query_name] = {
                 "query": f"kw('{keyword}') AND ({query['query']})",
-                "ids": [{"keyword_id": keyword}] + query["ids"],
+                "ids": query["ids"],
             }
     return queries
 
@@ -511,11 +516,7 @@ def expected_form_not(
 
                             queries[f"mixed_combination_{operator}_{query_counter}_{not_ids_str}"] = {
                                 "query": query,
-                                "ids": [
-                                    {"keyword_id": keyword},
-                                    {"percentile_id": percentile},
-                                    {"column_id": (column_name, k)},
-                                ],
+                                "ids": not_ids_str,
                             }
                         query_counter += 1
                         if query_counter > max_terms:
@@ -593,6 +594,18 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         max_terms=config.query_generation.max_num_terms_percentile_combinations,
         num_query_per_num_terms=config.query_generation.max_num_query_per_term_count_percentile_combinations,
     )
+    list_of_percentile_combinations: dict[int, dict[str, dict[str, Any]]] = {}
+    for i in range(
+        config.query_generation.min_num_terms_percentile_combinations,
+        config.query_generation.max_num_terms_percentile_combinations + 1,
+    ):
+        list_of_percentile_combinations[i] = percentile_term_combinations(
+            terms=percentile_terms_list,
+            operators=config.keywords.logical_operators,
+            min_terms=i,
+            max_terms=i,
+            num_query_per_num_terms=config.query_generation.max_num_query_per_term_count_percentile_combinations,
+        )
 
     mixed_term_combinations_with_fixed_structure_queries = (
         expected_form(
@@ -622,7 +635,7 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     )
 
     multiple_percentile_combinations_queries = multiple_percentile_combinations(
-        percentile_combinations=percentile_combinations_queries,
+        list_of_percentile_combinations=list_of_percentile_combinations,
         operators=config.keywords.logical_operators,
         min_terms=config.query_generation.min_num_terms_multiple_percentile_combinations,
         max_terms=config.query_generation.max_num_terms_multiple_percentile_combinations,
@@ -630,7 +643,7 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     )
     
     multiple_percentile_combinations_queries_or = multiple_percentile_combinations(
-        percentile_combinations=percentile_combinations_queries,
+        list_of_percentile_combinations=list_of_percentile_combinations,
         operators=["OR"],
         min_terms=config.query_generation.min_num_terms_percentile_combinations,
         max_terms=config.query_generation.max_num_terms_percentile_combinations,
