@@ -2,16 +2,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import hnswlib
+import numpy as np
 from loguru import logger
-from numpy import uint32
 from sentence_transformers import SentenceTransformer
 
-from backend.config import ColumnSearchError, Metadata
+from backend.config import ColumnArray, ColumnSearchError, Metadata
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import numpy as np
     from numpy.typing import NDArray
 
 
@@ -73,17 +72,19 @@ class HnswIndex:
         self.index.load_index(str(path))
         self.index.set_ef(self.ef)
 
-    def search(self, column_name: str, k: int, column_filter: set[uint32] | None) -> set[uint32]:
+    def search(
+        self, column_name: str, k: int, column_filter: set[np.uint32] | None
+    ) -> ColumnArray:
         if k < 0:
             raise ColumnSearchError(f"k must be a non-negative integer: {k}")
 
-        result: set[uint32] = set()
+        result: set[np.uint32] = set()
         if k == 0:
             # Exact search
             vector_id = self.name_to_vector.get(column_name, None)
             if vector_id:
                 col_ids = self.vector_to_cols.get(vector_id, set())
-                result |= {uint32(col_id) for col_id in col_ids}
+                result |= {np.uint32(col_id) for col_id in col_ids}
         else:
             if self.embedder is None:
                 raise ColumnSearchError("Embedding model is not available for approximate search")
@@ -101,7 +102,7 @@ class HnswIndex:
             )
             vector_ids, distances = self.index.knn_query(embedding, k=k, filter=filter_fn)
             result |= {
-                uint32(col_id)
+                np.uint32(col_id)
                 for vector_id in vector_ids[0]
                 for col_id in self.vector_to_cols[vector_id]
             }
@@ -113,4 +114,4 @@ class HnswIndex:
                 distances[0],
             )
 
-        return result
+        return np.array(list(result), dtype=np.uint32)

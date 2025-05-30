@@ -1,7 +1,13 @@
 import os
 from functools import lru_cache
 
-from backend.config import CacheInfo, ExecutorType, FainderMode, Highlights, Metadata
+from backend.config import (
+    CacheInfo,
+    ExecutorType,
+    FainderMode,
+    Highlights,
+    Metadata,
+)
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 from .execution.factory import create_executor
@@ -88,6 +94,7 @@ class Engine:
         result, highlights = self.executor.execute(parse_tree)
 
         # Sort by score
-        result_list = list(result)
+        result_list: list[int] = result.tolist()
+
         result_list.sort(key=lambda x: self.executor.scores.get(x, -1), reverse=True)
         return result_list, highlights

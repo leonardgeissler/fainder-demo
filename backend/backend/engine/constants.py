@@ -13,23 +13,23 @@ class FilteringStopPointsConfig(TypedDict):
 
 FILTERING_STOP_POINTS: dict[FainderMode, FilteringStopPointsConfig] = {
     FainderMode.LOW_MEMORY: {
-        "num_doc_ids": 50000,
-        "num_col_ids": 500000,
-        "num_hist_ids": 500000,
+        "num_doc_ids": 1000,
+        "num_col_ids": 10000,
+        "num_hist_ids": 10000,
     },
     FainderMode.FULL_PRECISION: {
-        "num_doc_ids": 50000,
-        "num_col_ids": 500000,
-        "num_hist_ids": 500000,
+        "num_doc_ids": 1000,
+        "num_col_ids": 10000,
+        "num_hist_ids": 10000,
     },
     FainderMode.FULL_RECALL: {
-        "num_doc_ids": 50000,
-        "num_col_ids": 500000,
-        "num_hist_ids": 500000,
+        "num_doc_ids": 1000,
+        "num_col_ids": 10000,
+        "num_hist_ids": 10000,
     },
     FainderMode.EXACT: {
-        "num_doc_ids": 100000,
-        "num_col_ids": 1000000,
-        "num_hist_ids": 1000000,
+        "num_doc_ids": 30000,
+        "num_col_ids": 3500000,
+        "num_hist_ids": 3500000,
     },
 }

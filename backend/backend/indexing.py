@@ -58,7 +58,7 @@ def generate_metadata(
     """
     # Initialize mappings
     # NOTE: We need the vector_id intermediate step because hnswlib requires int IDs for vectors
-    doc_to_cols: dict[int, set[int]] = defaultdict(set)
+    doc_to_cols: list[list[int]] = []
     doc_to_path: list[str] = []
     name_to_vector: dict[str, int] = {}
     vector_to_cols: dict[int, set[int]] = defaultdict(set)
@@ -73,6 +73,7 @@ def generate_metadata(
     num_cols = 0
     for path in croissant_path.iterdir():
         json_doc = load_json(path)
+        doc_to_cols.append([])
         for record_set in json_doc.get("recordSet", []):
             fields = record_set.get("field", [])
             num_hists += sum(1 for col in fields if "histogram" in col)
@@ -113,7 +114,7 @@ def generate_metadata(
                         col_id_no_hist += 1
 
                     col["id"] = col_id
-                    doc_to_cols[doc_id].add(col_id)
+                    doc_to_cols[doc_id].append(col_id)
                     col_to_doc[col_id] = doc_id
 
                     col_name = col["name"]
@@ -150,7 +151,7 @@ def generate_metadata(
     logger.info("Saving metadata")
     dump_json(
         {
-            "doc_to_cols": {str(k): list(v) for k, v in doc_to_cols.items()},
+            "doc_to_cols": doc_to_cols,
             "doc_to_path": doc_to_path,
             "col_to_doc": col_to_doc,
             "num_hists": num_hists,

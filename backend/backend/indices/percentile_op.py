@@ -6,9 +6,10 @@ from fainder.execution.new_runner import run_approx, run_exact
 from fainder.utils import load_input
 from loguru import logger
 
-from backend.config import FainderError, FainderMode
+from backend.config import ColumnArray, FainderError, FainderMode
 
 if TYPE_CHECKING:
+    import numpy as np
     from fainder.typing import Histogram
     from fainder.typing import PercentileIndex as PctlIndex
     from fainder.typing import PercentileQuery as PctlQuery
@@ -60,17 +61,16 @@ class FainderIndex:
         comparison: str,
         reference: float,
         fainder_mode: FainderMode,
-        hist_filter: set[np.uint32] | None = None,
-    ) -> set[np.uint32]:
+        hist_filter: ColumnArray | None = None,
+    ) -> ColumnArray:
         # Data validation
         if not (0 < percentile <= 1) or comparison not in {"ge", "gt", "le", "lt"}:
             raise FainderError(
                 f"Invalid percentile predicate: {percentile};{comparison};{reference}"
             )
 
-        id_filter = np.array(list(hist_filter), dtype=np.uint32) if hist_filter else None
-
         # Predicate evaluation
+        result: ColumnArray
         query: PctlQuery = (percentile, comparison, reference)  # type: ignore[assignment]
         match fainder_mode:
             case FainderMode.LOW_MEMORY:
@@ -80,7 +80,7 @@ class FainderIndex:
                     fainder_index=self.rebinning_index,
                     query=query,
                     index_mode="recall",
-                    id_filter=id_filter,
+                    id_filter=hist_filter,
                 )
             case FainderMode.FULL_PRECISION:
                 if self.conversion_index is None:
@@ -89,7 +89,7 @@ class FainderIndex:
                     fainder_index=self.conversion_index,
                     query=query,
                     index_mode="precision",
-                    id_filter=id_filter,
+                    id_filter=hist_filter,
                 )
             case FainderMode.FULL_RECALL:
                 if self.conversion_index is None:
@@ -98,26 +98,28 @@ class FainderIndex:
                     fainder_index=self.conversion_index,
                     query=query,
                     index_mode="recall",
-                    id_filter=id_filter,
+                    id_filter=hist_filter,
                 )
             case FainderMode.EXACT:
                 if self.conversion_index is None or self.hists is None:
                     raise FainderError(
                         "Conversion index and histograms must be loaded for exact mode."
                     )
+
                 result, runtime = run_exact(
                     fainder_index=self.conversion_index,
                     hists=self.hists,
                     query=query,
-                    id_filter=id_filter,
+                    id_filter=hist_filter,
                 )
 
         logger.info(
-            "Query '{}' ({} mode) returned {} histograms in {} seconds.",
+            "Query '{}' ({} mode) returned {} histograms in {} seconds. With filter size: {}",
             query,
             fainder_mode,
             len(result),
             f"{runtime:.2f}",
+            hist_filter.size if hist_filter is not None else "no filter",
         )
 
         return result
