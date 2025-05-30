@@ -91,7 +91,6 @@ class FainderIndex:
             self.parallel_processor.shutdown()
             self.parallel_processor = None
 
-        self.parallel_processor = None
 
         if parallel and histogram_path is not None:
             # If parallel processing is enabled and histogram path is available,

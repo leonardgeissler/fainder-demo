@@ -206,7 +206,7 @@ class ApplicationState:
             histogram_path=settings.histogram_path,
             parallel=settings.fainder_parallel,
             num_workers=settings.max_workers,
-            contiguous=settings.fainder_chunck_layout,
+            contiguous=settings.fainder_chunk_layout,
         )
 
         logger.info("Initializing HNSW index")
@@ -306,7 +306,7 @@ class ApplicationState:
             histogram_path=settings.histogram_path,
             parallel=settings.fainder_parallel,
             num_workers=settings.max_workers,
-            contiguous=settings.fainder_chunck_layout,
+            contiguous=settings.fainder_chunk_layout,
         )
 
         hnsw_index = HnswIndex(
