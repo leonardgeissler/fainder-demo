@@ -17,7 +17,7 @@ from fainder.utils import configure_run, save_output
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 
-from backend.config import Settings
+from backend.config import FainderChunkLayout, Settings
 from backend.indices import TantivyIndex, get_tantivy_schema
 from backend.utils import dump_json, load_json
 
@@ -309,13 +309,13 @@ def save_histograms_parallel(
     hists: Sequence[tuple[int | np.integer[Any], Histogram]],
     output_path: Path,
     n_chunks: int,
-    contiguous: bool,
+    chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
 ) -> None:
     """Save histograms in parallel chunks for Fainder."""
     workers = n_chunks - 1
     logger.info("Partitioning histogram IDs for parallel processing with {} workers", workers)
     hist_id_chunks = partition_histogram_ids(
-        [int(id_) for id_, _ in hists], num_partitions=workers, contiguous=contiguous
+        [int(id_) for id_, _ in hists], num_partitions=workers, chunk_layout=chunk_layout
     )
     logger.info(
         "Partitioned histogram IDs into {} chunks of length {}",
@@ -324,7 +324,7 @@ def save_histograms_parallel(
     )
 
     # Create directory for split histograms
-    if contiguous:
+    if chunk_layout == FainderChunkLayout.CONTIGUOUS:
         split_dir = output_path / f"histograms_split_contiguous_{n_chunks}"
     else:
         split_dir = output_path / f"histograms_split_round_robin_{n_chunks}"
@@ -426,5 +426,5 @@ if __name__ == "__main__":
             hists,
             output_path=settings.fainder_path,
             n_chunks=settings.max_workers,
-            contiguous=settings.fainder_contiguous_chunks,
+            chunk_layout=settings.fainder_chunk_layout,
         )

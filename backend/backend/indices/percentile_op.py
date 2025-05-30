@@ -120,8 +120,6 @@ class FainderIndex:
 
         result: ColumnArray
 
-        # Predicate evaluation
-        result: ColumnArray
         query: PctlQuery = (percentile, comparison, reference)  # type: ignore[assignment]
         match fainder_mode:
             case FainderMode.LOW_MEMORY:

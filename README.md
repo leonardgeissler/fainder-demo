@@ -56,7 +56,7 @@ FAINDER_TRANSFORM=None              # None, standard, robust, quantile, or power
 FAINDER_CLUSTER_ALGORITHM=kmeans    # kmeans, hdbscan, or agglomerative
 FAINDER_DEFAULT=default             # Name of the default fainder configuration
 FAINDER_PARALLEL=True               # Boolean to enable/disable parallel Fainder index execution
-FAINDER_CONTIGUOUS_CHUNKS=True      # Boolean to enable/disable contiguous chunks for Fainder indices
+FAINDER_CHUNK_LAYOUT=round_robin    # Chunk layout for Fainder indices (round_robin, sequential)
 
 # Similarity Search / Embeddings
 USE_EMBEDDINGS=True                 # Boolean to enable/disable embeddings
