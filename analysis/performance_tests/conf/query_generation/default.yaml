@@ -1,8 +1,11 @@
 # Maximum number of terms to combine
-min_num_terms_query: 2
-max_num_terms_query: 4
-max_num_query_per_num_terms: 20
+min_num_terms_percentile_combinations: 2
+max_num_terms_percentile_combinations: 4
+max_num_query_per_term_count_percentile_combinations: 5
 
+min_num_terms_multiple_percentile_combinations: 2
+max_num_terms_multiple_percentile_combinations: 4
+max_num_query_per_term_count_multiple_percentile_combinations: 5
 # Mixed terms configuration
 max_num_mixed_terms_with_fixed_structure: 30
 max_num_mixed_terms_extended_with_fixed_structure: 20

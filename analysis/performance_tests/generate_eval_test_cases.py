@@ -586,9 +586,9 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     percentile_combinations_queries = percentile_term_combinations(
         terms=percentile_terms_list,
         operators=config.keywords.logical_operators,
-        min_terms=config.query_generation.min_num_terms_query,
-        max_terms=config.query_generation.max_num_terms_query,
-        num_query_per_num_terms=config.query_generation.max_num_query_per_num_terms,
+        min_terms=config.query_generation.min_num_terms_percentile_combinations,
+        max_terms=config.query_generation.max_num_terms_percentile_combinations,
+        num_query_per_num_terms=config.query_generation.max_num_query_per_term_count_percentile_combinations,
     )
 
     mixed_term_combinations_with_fixed_structure_queries = (
@@ -621,20 +621,19 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     multiple_percentile_combinations_queries = multiple_percentile_combinations(
         percentile_combinations=percentile_combinations_queries,
         operators=config.keywords.logical_operators,
-        min_terms=config.query_generation.min_num_terms_query,
-        max_terms=config.query_generation.max_num_terms_query,
-        num_query_per_num_terms=config.query_generation.max_num_query_per_num_terms,
+        min_terms=config.query_generation.min_num_terms_multiple_percentile_combinations,
+        max_terms=config.query_generation.max_num_terms_multiple_percentile_combinations,
+        num_query_per_num_terms=config.query_generation.max_num_query_per_term_count_multiple_percentile_combinations,
     )
     
     multiple_percentile_combinations_queries_or = multiple_percentile_combinations(
         percentile_combinations=percentile_combinations_queries,
         operators=["OR"],
-        min_terms=config.query_generation.min_num_terms_query,
-        max_terms=config.query_generation.max_num_terms_query,
-        num_query_per_num_terms=config.query_generation.max_num_query_per_num_terms,
-
+        min_terms=config.query_generation.min_num_terms_percentile_combinations,
+        max_terms=config.query_generation.max_num_terms_percentile_combinations,
+        num_query_per_num_terms=config.query_generation.max_num_query_per_term_count_multiple_percentile_combinations,
     )
-    
+
     multiple_percentile_combinations_queries_with_kw = (
         multiple_percentile_combinations_with_kw(
             keyword=config.keywords.default_keywords[0],

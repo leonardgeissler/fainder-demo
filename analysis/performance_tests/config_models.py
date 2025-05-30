@@ -74,18 +74,31 @@ class FainderConfig:
 @dataclass
 class QueryGenerationConfig:
     """Configuration for query generation parameters"""
-    min_num_terms_query: int = field(
+    min_num_terms_percentile_combinations: int = field(
         default=2,
         metadata={"description": "Minimum number of terms in generated queries"}
     )
-    max_num_terms_query: int = field(
+    max_num_terms_percentile_combinations: int = field(
         default=4,
         metadata={"description": "Maximum number of terms in generated queries"}
     )
-    max_num_query_per_num_terms: int = field(
+    max_num_query_per_term_count_percentile_combinations: int = field(
         default=5,
         metadata={"description": "Maximum number of queries to generate per term count"}
     )
+    min_num_terms_multiple_percentile_combinations: int = field(
+        default=2,
+        metadata={"description": "Minimum number of terms in multiple percentile combinations"}
+    )
+    max_num_terms_multiple_percentile_combinations: int = field(
+        default=4,
+        metadata={"description": "Maximum number of terms in multiple percentile combinations"}
+    )
+    max_num_query_per_term_count_multiple_percentile_combinations: int = field(
+        default=5,
+        metadata={"description": "Maximum number of queries to generate per term count in multiple combinations"}
+    )
+
     max_num_mixed_terms_with_fixed_structure: int = field(
         default=30,
         metadata={"description": "Maximum number of mixed terms with fixed structure"}
