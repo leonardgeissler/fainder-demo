@@ -113,7 +113,7 @@ class FainderIndex:
         hist_filter: ColumnArray | None = None,
     ) -> ColumnArray:
         # Data validation
-        if not (0 < percentile <= 1) or comparison not in ["ge", "gt", "le", "lt"]:
+        if not (0 < percentile <= 1) or comparison not in {"ge", "gt", "le", "lt"}:
             raise FainderError(
                 f"Invalid percentile predicate: {percentile};{comparison};{reference}"
             )
@@ -121,7 +121,7 @@ class FainderIndex:
         result: ColumnArray
 
         # Predicate evaluation
-        query: PctlQuery = (percentile, comparison, reference)  # type: ignore
+        query: PctlQuery = (percentile, comparison, reference)  # type: ignore[assignment]
         match fainder_mode:
             case FainderMode.LOW_MEMORY:
                 if self.rebinning_index is None:
