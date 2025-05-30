@@ -21,3 +21,5 @@ max_num_middle_exit: 10
 num_elements_keywordsqueries: 5
 
 max_num_keywordsqueries: 10
+
+num_of_ḱws_for_multiple_pp_combinations: 1

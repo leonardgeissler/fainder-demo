@@ -1,7 +1,10 @@
 # Percentile related constants
 default_thresholds:
   - 1
+  - 50
   - 100
+  - 5000
+  - 75000
   - 1000000
   - 1000000000
 

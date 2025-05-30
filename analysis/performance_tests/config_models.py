@@ -132,6 +132,10 @@ class QueryGenerationConfig:
         metadata={"description": "Maximum number of keyword queries to generate"}
     )
 
+    num_of_ḱws_for_multiple_pp_combinations: int = field(
+        default=5,
+        metadata={"description": "Number of keywords for multiple percentile combinations"}
+    )
 @dataclass
 class EngineConfig:
     """Configuration for a single engine"""

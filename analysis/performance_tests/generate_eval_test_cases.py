@@ -436,16 +436,19 @@ def early_exit(
 
 
 def multiple_percentile_combinations_with_kw(
-    keyword: str,
+    keywords: list[str],
     multiple_percentile_combinations: dict[str, dict[str, Any]],
+    num_kws: int = 1,
 ):
     # add keyword to each query
     queries: dict[str, dict[str, Any]] = {}
+    keywords = keywords[:num_kws]  # Limit to num_kws keywords
     for query_name, query in multiple_percentile_combinations.items():
-        queries[query_name] = {
-            "query": f"kw('{keyword}') AND ({query['query']})",
-            "ids": [{"keyword_id": keyword}] + query["ids"],
-        }
+        for keyword in keywords:
+            queries[query_name] = {
+                "query": f"kw('{keyword}') AND ({query['query']})",
+                "ids": [{"keyword_id": keyword}] + query["ids"],
+            }
     return queries
 
 def expected_form_not(
@@ -636,8 +639,9 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
 
     multiple_percentile_combinations_queries_with_kw = (
         multiple_percentile_combinations_with_kw(
-            keyword=config.keywords.default_keywords[0],
-            multiple_percentile_combinations=multiple_percentile_combinations_queries_or
+            keywords=config.keywords.default_keywords,
+            multiple_percentile_combinations=multiple_percentile_combinations_queries_or,
+            num_kws=config.query_generation.num_of_ḱws_for_multiple_pp_combinations,
         )
     )
 
