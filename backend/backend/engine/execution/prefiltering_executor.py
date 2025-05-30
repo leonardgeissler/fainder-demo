@@ -8,10 +8,7 @@ from numpy import uint32
 from numpy.typing import NDArray
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
-from backend.engine.conversion import (
-    col_to_doc_ids,
-    doc_to_col_ids,
-)
+from backend.engine.conversion import col_to_doc_ids, doc_to_col_ids
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
 from .common import (
@@ -27,8 +24,9 @@ from .executor import Executor
 
 class IntermediateResult:
     """Intermediate results for prefiltering.
-    Only one of doc_ids or col_ids should be set.
-    If multiple are set, this should result in an error.
+
+    Only one of doc_ids or col_ids should be set. If multiple are set, this should result in an
+    error.
     """
 
     def __init__(
@@ -105,10 +103,7 @@ class IntermediateResultStore:
         self.write_groups_actually_used: dict[int, int] = {}
 
     def add_col_id_results(
-        self,
-        write_group: int,
-        col_ids: set[uint32],
-        doc_to_cols: dict[int, set[int]],
+        self, write_group: int, col_ids: set[uint32], doc_to_cols: dict[int, set[int]]
     ) -> None:
         logger.trace(
             "Adding column IDs to write group {} length of col_ids: {}", write_group, len(col_ids)
@@ -133,10 +128,7 @@ class IntermediateResultStore:
             )
 
     def add_doc_id_results(
-        self,
-        write_group: int,
-        doc_ids: set[int],
-        col_to_doc: NDArray[uint32],
+        self, write_group: int, doc_ids: set[int], col_to_doc: NDArray[uint32]
     ) -> None:
         logger.trace(
             "Adding document IDs to write group {} length of doc_ids: {}",
@@ -297,7 +289,9 @@ class PrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         return result
 
-    ### Operator implementations ###
+    ##########################
+    # Operator implementations
+    ##########################
 
     def keyword_op(self, items: list[Token]) -> tuple[DocResult, int]:
         logger.trace("Evaluating keyword term: {}", items)
