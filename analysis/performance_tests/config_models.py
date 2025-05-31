@@ -66,7 +66,7 @@ class FainderConfig:
         default_factory=lambda: os.cpu_count() or 4,
         metadata={"description": "Number of threads for parallel execution"}
     )
-    fainder_chunk_layout: FainderChunkLayout = field(
+    chunk_layout: FainderChunkLayout = field(
         default=FainderChunkLayout.CONTIGUOUS,
         metadata={"description": "Chunk layout strategy for Fainder indices"}
     )

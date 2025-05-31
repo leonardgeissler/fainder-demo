@@ -18,6 +18,7 @@ from backend.engine import Engine, Optimizer
 from backend.indices.keyword_op import TantivyIndex
 from backend.indices.name_op import HnswIndex as ColumnIndex
 from backend.indices.percentile_op import FainderIndex
+from torch import chunk
 
 from .config_models import PerformanceConfig
 from .eval_performance_test import execute_with_profiling, log_performance_csv, save_profiling_stats
@@ -59,7 +60,7 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
         histogram_path=settings.histogram_path,
         parallel=config.fainder.parallel,
         num_workers=config.fainder.max_workers,
-        ch
+        chunk_layout=config.fainder.chunk_layout,
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
     tantivy_index = TantivyIndex(index_path=str(settings.tantivy_path), recreate=False)
