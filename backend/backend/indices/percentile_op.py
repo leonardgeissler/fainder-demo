@@ -91,7 +91,7 @@ class FainderIndex:
             self.parallel_processor.shutdown()
             self.parallel_processor = None
 
-        if parallel and histogram_path is not None:
+        if parallel and histogram_path is not None and num_workers > 1:
             # If parallel processing is enabled and histogram path is available,
             logger.info(
                 f"Initializing parallel processor with histograms from: {self.histogram_path}"
@@ -102,6 +102,8 @@ class FainderIndex:
                 num_chunks=num_workers - 1,
                 chunk_layout=chunk_layout,
             )
+        else:
+            self.parallel = False
 
     def search(  # noqa: C901
         self,
