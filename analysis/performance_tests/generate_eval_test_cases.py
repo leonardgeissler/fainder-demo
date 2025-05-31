@@ -78,7 +78,7 @@ def generate_simple_column_name_queries(
             if query_counter > max_num_queries:
                 break
             queries[f"column_query_{col}_{k}"] = {
-                "query": f"col(name('{col}';{k})))",
+                "query": f"col(name('{col}';{k}))",
                 "ids": [{"column_id": col}],
                 "num_terms": 1,
             }
