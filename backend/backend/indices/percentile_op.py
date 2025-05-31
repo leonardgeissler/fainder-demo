@@ -99,7 +99,7 @@ class FainderIndex:
             self.parallel_processor = ParallelHistogramProcessor(
                 histogram_path=histogram_path,
                 num_workers=num_workers,
-                num_chunks=num_workers,
+                num_chunks=num_workers - 1,
                 chunk_layout=chunk_layout,
             )
 
