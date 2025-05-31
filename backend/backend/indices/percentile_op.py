@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from fainder.execution.new_runner import run_approx, run_exact, run_exact_parallel
-from fainder.execution.parallel_processing import ParallelHistogramProcessor
+from fainder.execution.parallel_processing import FainderChunkLayout, ParallelHistogramProcessor
 from fainder.utils import load_input
 from loguru import logger
 
@@ -27,7 +27,7 @@ class FainderIndex:
         histogram_path: Path | None,
         parallel: bool = True,
         num_workers: int = os.cpu_count() or 1,
-        contiguous: bool = True,
+        chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
     ) -> None:
         self.rebinning_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = None
         self.conversion_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = None
@@ -44,7 +44,7 @@ class FainderIndex:
             histogram_path=histogram_path,
             parallel=parallel,
             num_workers=num_workers,
-            contiguous=contiguous,
+            chunk_layout=chunk_layout,
         )
 
     def _cleanup_parallel_processor(self) -> None:
@@ -61,7 +61,7 @@ class FainderIndex:
         histogram_path: Path | None,
         parallel: bool = True,
         num_workers: int = os.cpu_count() or 1,
-        contiguous: bool = True,
+        chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
     ) -> None:
         """Update the Fainder indices with new files."""
         if rebinning_path and rebinning_path.exists():
@@ -91,7 +91,6 @@ class FainderIndex:
             self.parallel_processor.shutdown()
             self.parallel_processor = None
 
-
         if parallel and histogram_path is not None:
             # If parallel processing is enabled and histogram path is available,
             logger.info(
@@ -100,7 +99,8 @@ class FainderIndex:
             self.parallel_processor = ParallelHistogramProcessor(
                 histogram_path=histogram_path,
                 num_workers=num_workers,
-                contiguous=contiguous,
+                num_chunks=num_workers,
+                chunk_layout=chunk_layout,
             )
 
     def search(  # noqa: C901
