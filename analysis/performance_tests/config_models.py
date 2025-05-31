@@ -136,6 +136,12 @@ class QueryGenerationConfig:
         default=5,
         metadata={"description": "Number of keywords for multiple percentile combinations"}
     )
+
+    max_num_column_name_queries: int = field(
+        default=10,
+        metadata={"description": "Maximum number of column name queries to generate"}
+    )
+    
 @dataclass
 class EngineConfig:
     """Configuration for a single engine"""

@@ -1,6 +1,5 @@
 import json
 from itertools import combinations
-from math import comb
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +61,27 @@ def generate_simple_keyword_queries_with_multiple_elements(
             "ids": [{"keyword_id": word} for word in combination],
             "num_terms": num_elements,
         }
+
+    return queries
+
+def generate_simple_column_name_queries(
+    column_names: list[str],
+    ks: list[int],
+    max_num_queries: int = 10,
+) -> dict[str, dict[str, Any]]:
+    queries: dict[str, dict[str, Any]] = {}
+    query_counter = 0
+
+    for col in column_names:
+        for k in ks:
+            query_counter += 1
+            if query_counter > max_num_queries:
+                break
+            queries[f"column_query_{col}_{k}"] = {
+                "query": f"col({col})",
+                "ids": [{"column_id": col}],
+                "num_terms": 1,
+            }
 
     return queries
 
@@ -527,7 +547,7 @@ def expected_form_not(
                             queries[f"mixed_combination_{operator}_{query_counter}_{not_ids_str}"] = {
                                 "query": query,
                                 "ids": not_ids_str,
-                                
+
                             }
                         query_counter += 1
                         if query_counter > max_terms:
@@ -545,29 +565,26 @@ def middle_exit(
     """
     queries: dict[str, dict[str, Any]] = {}
     query_counter = 1
+    
+    # For each keyword, generate combinations of 10 unique terms
     for keyword in keywords:
-        for term in terms:
-            for term2 in terms:
-                for term3 in terms:
-                    for term4 in terms:
-                        if term == term2 or term == term3 or term == term4 or term2 == term3 or term2 == term4 or term3 == term4:
-                            continue
+        for terms_combination in combinations(terms, 10):
+            # Unpack the 10 terms
+            term, term2, term3, term4, term5, term6, term7, term8, term9, term10 = terms_combination
 
-                        query = f"kw('{keyword}') AND col({term} AND NOT {term}) AND col(NOT {term2} AND NOT {term3} AND NOT {term4})"
-                        queries[f"middle_exit_{query_counter}"] = {
-                            "query": query,
-                            "ids": [
-                                {"keyword_id": keyword},
-                                {"percentile_id": term},
-                            ],
-                        }
-                        query_counter += 1
-                        if query_counter > max_terms:
-                            return queries
-
+            query = f"kw('{keyword}') AND col({term} AND NOT {term2} AND NOT {term3} AND NOT {term4} AND NOT {term5} AND NOT {term6} AND NOT {term7} AND NOT {term8} AND NOT {term9} AND NOT {term10})"
+            queries[f"middle_exit_{query_counter}"] = {
+                "query": query,
+                "ids": [
+                    {"keyword_id": keyword},
+                    {"percentile_id": f"{term}-{term2}-{term3}-{term4}-{term5}-{term6}-{term7}-{term8}-{term9}-{term10}"},
+                ],
+            }
+            query_counter += 1
+            if query_counter > max_terms:
+                return queries
     return queries
 
-    
 
 def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     """
@@ -584,6 +601,12 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         keywords=config.keywords.default_keywords,
         num_elements=config.query_generation.num_elements_keywordsqueries,
         max_num_queries=config.query_generation.max_num_keywordsqueries,
+    )
+
+    base_column_name_queries = generate_simple_column_name_queries(
+        column_names=config.keywords.default_col_names,
+        ks=config.keywords.default_ks,
+        max_num_queries=config.query_generation.max_num_column_name_queries,
     )
 
     percentile_terms_list = generate_percentile_terms(
@@ -698,6 +721,7 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         "base_keyword_queries_with_multiple_elements": {
             "queries": keywordsqueries_with_multiple_elements
         },
+        "base_column_name_queries": {"queries": base_column_name_queries},
         "base_percentile_queries": {"queries": percentilequeries},
         "percentile_combinations": {"queries": percentile_combinations_queries},
         "mixed_combinations_with_fixed_structure": {

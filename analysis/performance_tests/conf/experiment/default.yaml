@@ -1,6 +1,7 @@
 enabled_tests:
   - base_keyword_queries
   - base_keyword_queries_with_multiple_elements
+  - base_column_name_queries
   - base_percentile_queries
   - mixed_combinations_with_fixed_structure
   - mixed_combinations_with_fixed_structure_extented
