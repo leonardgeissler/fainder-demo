@@ -57,14 +57,12 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
-        parallel=settings.fainder_parallel,
+        parallel=config.fainder.parallel,
         num_workers=config.fainder.max_workers,
         contiguous=config.fainder.fainder_contiguous_chunks,
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
     tantivy_index = TantivyIndex(index_path=str(settings.tantivy_path), recreate=False)
-    
-  
     
     engines = {}
     for scenario in config.engines.scenarios:
@@ -154,7 +152,7 @@ def create_csv_files(paths: Dict[str, Any]) -> Dict[str, Any]:
         writer.writerow([
             "timestamp", "category", "test_name", "query", "scenario",
             "execution_time", "results_consistent", "fainder_mode",
-            "num_results", "ids", "num_terms", "id_str", "write_groups_used", "write_groups_actually_used",
+            "num_results", "ids", "num_terms", "id_str", "write_groups_used", "write_groups_actually_used", "fainder_parallel",
             "fainder_max_workers", "fainder_contiguous_chunks", "optimizer_cost_sorting", "optimizer_keyword_merging", "optimizer_split_up_junctions"
         ])
     csv_paths["main_perf_csv"] = perf_csv_path
@@ -179,7 +177,7 @@ def create_csv_files(paths: Dict[str, Any]) -> Dict[str, Any]:
             writer.writerow([
                 "timestamp", "category", "test_name", "query", "scenario",
                 "execution_time", "results_consistent", "fainder_mode",
-                "num_results", "ids", "num_terms", "id_str", "write_groups_used", "write_groups_actually_used",
+                "num_results", "ids", "num_terms", "id_str", "write_groups_used", "write_groups_actually_used", "fainder_parallel",
                 "fainder_max_workers", "fainder_contiguous_chunks", "optimizer_cost_sorting", "optimizer_keyword_merging", "optimizer_split_up_junctions"
             ])
         individual_csv_paths[test_name] = test_csv_path
@@ -258,6 +256,7 @@ def run_test_case(
                 id_str,
                 write_groups_used,
                 write_groups_actually_used,
+                config.fainder.parallel,
                 config.fainder.max_workers,
                 config.fainder.fainder_contiguous_chunks,
                 config.optimizer.cost_sorting,
@@ -280,6 +279,7 @@ def run_test_case(
                     id_str,
                     write_groups_used,
                     write_groups_actually_used,
+                    config.fainder.parallel,
                     config.fainder.max_workers,
                     config.fainder.fainder_contiguous_chunks,
                     config.optimizer.cost_sorting,

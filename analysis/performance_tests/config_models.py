@@ -69,7 +69,10 @@ class FainderConfig:
         default=True,
         metadata={"description": "Boolean to enable/disable contiguous chunks for Fainder indices"}
     )
-
+    parallel: bool = field(
+        default=True,
+        metadata={"description": "Boolean to enable/disable parallel execution in Fainder"}
+    )
 
 @dataclass
 class QueryGenerationConfig:
@@ -141,7 +144,7 @@ class QueryGenerationConfig:
         default=10,
         metadata={"description": "Maximum number of column name queries to generate"}
     )
-    
+
 @dataclass
 class EngineConfig:
     """Configuration for a single engine"""
