@@ -4,21 +4,18 @@ import re
 import time
 from typing import Any, Literal
 from backend.indices.percentile_op import FainderIndex
-from backend.config import Metadata
-from fainder.execution.new_runner import run_approx, run_exact
+from backend.config import Metadata, FainderMode
 from numpy import uint32
 import pytest
 import numpy as np
 
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 
 REFERENCES = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000]
 COMPARISONS = ["le"]
 PERCENTILES = [0.1, 0.25, 0.5, 0.9]
-FAINDER_MODES = ["run_approx", "run_exact"]
-INDEX_MODES = ["precision", "recall"]
-FAINDER_INDEX = ["rebinning", "conversion"]
+FAINDER_MODES = [FainderMode.FULL_RECALL, FainderMode.EXACT]
 
 FILTER_SIZES_RIGHT = [
     100, 1000, 10000, 100000, 1000000, 10000000
@@ -44,18 +41,15 @@ def create_fainder_queries() -> list[dict[str, Any]]:
         for comparison in COMPARISONS:
             for percentile in PERCENTILES:
                 for fainder_mode in FAINDER_MODES:
-                    for index_mode in INDEX_MODES:
-                        for fainder_index in FAINDER_INDEX:
-                            fainder_queries.append(
-                                {
-                                    "percentile": percentile,
-                                    "comparison": comparison,
-                                    "reference": reference,
-                                    "fainder_mode": fainder_mode,
-                                    "index_mode": index_mode,
-                                    "fainder_index": fainder_index,
-                                }
-                            )
+                    fainder_queries.append(
+                        {
+                            "percentile": percentile,
+                            "comparison": comparison,
+                            "reference": reference,
+                            "fainder_mode": fainder_mode,
+
+                        }
+                    )
     return fainder_queries
 
 
@@ -68,12 +62,10 @@ def log_performance_csv(
     comparison: str,
     reference: int,
     fainder_mode: str,
-    index_mode: str,
-    fainder_index: str,
     additional_filter_size: float,
     execution_time: float,
     filter_size: int,
-    results: set[uint32],
+    results: NDArray[np.uint32],
 ):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     with csv_path.open("a", newline="") as csvfile:
@@ -85,12 +77,10 @@ def log_performance_csv(
                 comparison,
                 reference,
                 fainder_mode,
-                index_mode,
-                fainder_index,
                 execution_time,
                 additional_filter_size,
                 filter_size,
-                len(results),
+                results.size
             ]
         )
 
@@ -98,43 +88,20 @@ def log_performance_csv(
 def run(
     fainder: FainderIndex,
     query: dict[str, Any],
-    fainder_mode: str,
-    index_mode: Literal["precision", "recall"],
-    fainder_index: str,
+    fainder_mode: FainderMode,
     hist_filter: ArrayLike | None = None,
-) -> tuple[set[uint32], float]:
-    f_index = (
-        fainder.rebinning_index
-        if fainder_index == "rebinning"
-        else fainder.conversion_index
+) -> NDArray[np.uint32]:
+
+    if hist_filter is not None:
+        hist_filter = np.array(hist_filter)
+    return fainder.search(
+        query["percentile"],
+        query["comparison"],
+        query["reference"],
+        fainder_mode,
+        hist_filter
     )
 
-    if f_index is None:
-        raise ValueError(f"Invalid fainder index: {fainder_index}")
-
-    hists = fainder.hists
-
-    if hists is None:
-        raise ValueError("No histograms loaded")
-
-    # Convert filter to numpy array if it exists
-
-    if fainder_mode == "run_approx":
-        return run_approx(
-            f_index,
-            (query["percentile"], query["comparison"], query["reference"]),
-            index_mode,
-            hist_filter,
-        )
-    elif fainder_mode == "run_exact":
-        return run_exact(
-            f_index,
-            hists,
-            (query["percentile"], query["comparison"], query["reference"]),
-            hist_filter,
-        )
-    else:
-        raise ValueError(f"Invalid fainder mode: {fainder_mode}")
 
 
 @pytest.mark.parametrize(
@@ -150,11 +117,9 @@ def test_fainder_filter_performance(
         fainder,
         query,
         query["fainder_mode"],
-        query["index_mode"],
-        query["fainder_index"],
     )
     time_without_filtering = time.perf_counter() - start_time
-    num_of_hists = len(metadata.hist_to_col)
+    num_of_hists = metadata.num_hists
 
     log_performance_csv(
         csv_path,
@@ -162,8 +127,6 @@ def test_fainder_filter_performance(
         query["comparison"],
         query["reference"],
         query["fainder_mode"],
-        query["index_mode"],
-        query["fainder_index"],
         0,
         time_without_filtering,
         0,
@@ -191,8 +154,6 @@ def test_fainder_filter_performance(
                 fainder,
                 query,
                 query["fainder_mode"],
-                query["index_mode"],
-                query["fainder_index"],
                 np_filter,
             )
             time_with_filtering = time.perf_counter() - start_time
@@ -203,8 +164,6 @@ def test_fainder_filter_performance(
                 query["comparison"],
                 query["reference"],
                 query["fainder_mode"],
-                query["index_mode"],
-                query["fainder_index"],
                 filter_size_right,
                 time_with_filtering,
                 len(np_filter),
