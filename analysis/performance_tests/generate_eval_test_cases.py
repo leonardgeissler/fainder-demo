@@ -27,7 +27,8 @@ def generate_simple_keyword_queries(
     return {
         f"{prefix}_{i + 1}": {
             "query": f"kw('{field_prefix}{word}')",
-            "keyword_id": f"'{field_prefix}{word}'",
+            "ids": [f"'{field_prefix}{word}'"],
+            "num_terms": 1,
         }
         for i, word in enumerate(keywords)
     }
@@ -59,6 +60,7 @@ def generate_simple_keyword_queries_with_multiple_elements(
         queries[f"multi_element_query_{query_counter}"] = {
             "query": query,
             "ids": [{"keyword_id": word} for word in combination],
+            "num_terms": num_elements,
         }
 
     return queries
@@ -114,6 +116,8 @@ def generate_percentile_queries(
                 queries[f"percentile_{op}_{i}_{h}"] = {
                     "query": f"col(pp({percentile};{op};{threshold}))",
                     "percentile_id": f"pp({percentile};{op};{threshold})",
+                    "ids": [{"percentile_id": f"pp({percentile};{op};{threshold})"}],
+                    "num_terms": 1,
                 }
 
     return queries
@@ -170,6 +174,7 @@ def keyword_combinations(
                 queries[f"keyword_combination_{operator}_{query_counter}"] = {
                     "query": query,
                     "ids": [{"keyword_id": keywords[term]} for term in combination],
+                    "num_terms": num_terms,
                 }
                 query_counter += 1
                 if i > num_query_per_num_terms:
@@ -211,6 +216,7 @@ def percentile_term_combinations(
                 queries[f"percentile_combination_{operator}_{query_counter}"] = {
                     "query": query,
                     "ids": num_terms,
+                    "num_terms": num_terms,
                 }
                 query_counter += 1
                 i += 1
@@ -248,6 +254,7 @@ def expected_form(
                                 {"percentile_id": percentile},
                                 {"column_id": (column_name, k)},
                             ],
+                            "num_terms": 3,
                         }
                         query_counter += 1
                         if query_counter > max_terms:
@@ -295,6 +302,7 @@ def multiple_percentile_combinations(
                                 "num_terms_internal": num_terms_internal,
                                 "num_terms": num_terms_external * num_terms_internal,
                                 },
+                        "num_terms": num_terms_external * num_terms_internal,
                     }
                     query_counter += 1
                     if query_counter > num_query_per_num_terms:
@@ -345,6 +353,7 @@ def expected_form_extented(
                                 {"percentile_id": term2},
                                 {"column_id": (column_name, k)},
                             ],
+                            "num_terms": 3,
                         }
                         query_counter += 1
                         if query_counter > max_terms:
@@ -414,6 +423,7 @@ def double_expected_form(
                             {"column_id": (col3, k1)},
                             {"column_id": (col4, k2)},
                         ],
+                        "num_terms": 7,
                     }
                     query_counter += 1
                     if query_counter > max_terms:
@@ -517,6 +527,7 @@ def expected_form_not(
                             queries[f"mixed_combination_{operator}_{query_counter}_{not_ids_str}"] = {
                                 "query": query,
                                 "ids": not_ids_str,
+                                
                             }
                         query_counter += 1
                         if query_counter > max_terms:

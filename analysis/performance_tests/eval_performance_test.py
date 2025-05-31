@@ -178,6 +178,7 @@ def log_performance_csv(
     is_consistent: bool,
     fainder_mode: str,
     ids: list[dict[str, str]] | int ,
+    num_terms: int,
     id_str: str,
     write_groups_used: dict[int, int],
     write_groups_actually_used: dict[int, int],
@@ -193,11 +194,6 @@ def log_performance_csv(
     with csv_path.open("a", newline="") as csvfile:
         writer = csv.writer(csvfile)
         for scenario, execution_time in timings.items():
-            num_of_terms = 0
-            if isinstance(ids, list):
-                num_of_terms = len(ids)
-            elif isinstance(ids, int):
-                num_of_terms = ids
             writer.writerow(
                 [
                     timestamp,
@@ -210,7 +206,7 @@ def log_performance_csv(
                     fainder_mode,
                     len(results[scenario]),
                     ids,
-                    num_of_terms,
+                    num_terms,
                     id_str,
                     write_groups_used,
                     write_groups_actually_used,

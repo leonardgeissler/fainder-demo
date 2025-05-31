@@ -202,6 +202,7 @@ def run_test_case(
     """Run a single test case across all engines and modes"""
     query = test_case["query"]
     ids = test_case.get("ids", [])
+    num_terms = test_case.get("num_terms", 0)
     keyword_id = test_case.get("keyword_id")
     percentile_id = test_case.get("percentile_id")
     id_str = ""
@@ -253,6 +254,7 @@ def run_test_case(
                 is_consistent,
                 mode,
                 ids,
+                num_terms,
                 id_str,
                 write_groups_used,
                 write_groups_actually_used,
@@ -274,6 +276,7 @@ def run_test_case(
                     is_consistent,
                     mode,
                     ids,
+                    num_terms,
                     id_str,
                     write_groups_used,
                     write_groups_actually_used,
