@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List
 import os
+from fainder.execution.parallel_processing import FainderChunkLayout
 
 @dataclass
 class KeywordConfig:
@@ -65,9 +66,9 @@ class FainderConfig:
         default_factory=lambda: os.cpu_count() or 4,
         metadata={"description": "Number of threads for parallel execution"}
     )
-    fainder_contiguous_chunks: bool = field(
-        default=True,
-        metadata={"description": "Boolean to enable/disable contiguous chunks for Fainder indices"}
+    fainder_chunk_layout: FainderChunkLayout = field(
+        default=FainderChunkLayout.CONTIGUOUS,
+        metadata={"description": "Chunk layout strategy for Fainder indices"}
     )
     parallel: bool = field(
         default=True,

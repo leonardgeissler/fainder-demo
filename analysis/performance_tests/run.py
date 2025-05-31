@@ -59,7 +59,7 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
         histogram_path=settings.histogram_path,
         parallel=config.fainder.parallel,
         num_workers=config.fainder.max_workers,
-        contiguous=config.fainder.fainder_contiguous_chunks,
+        ch
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
     tantivy_index = TantivyIndex(index_path=str(settings.tantivy_path), recreate=False)
