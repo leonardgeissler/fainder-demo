@@ -259,7 +259,7 @@ def run_test_case(
                 write_groups_actually_used,
                 config.fainder.parallel,
                 config.fainder.max_workers,
-                config.fainder.fainder_contiguous_chunks,
+                config.fainder.chunk_layout,
                 config.optimizer.cost_sorting,
                 config.optimizer.keyword_merging,
             )
@@ -282,7 +282,7 @@ def run_test_case(
                     write_groups_actually_used,
                     config.fainder.parallel,
                     config.fainder.max_workers,
-                    config.fainder.fainder_contiguous_chunks,
+                    config.fainder.chunk_layout,
                     config.optimizer.cost_sorting,
                     config.optimizer.keyword_merging,
                 )

@@ -13,6 +13,8 @@ from backend.engine import Engine
 
 from pstats import SortKey
 
+from fainder.execution.parallel_processing import FainderChunkLayout
+
 
 def execute_with_profiling(
     evaluator: Engine, query: str, params: dict[str, Any], mode: str, disable_profiling: bool = True
@@ -184,7 +186,7 @@ def log_performance_csv(
     write_groups_actually_used: dict[int, int],
     fainder_parallel: bool = True,
     fainder_max_workers: int = 0,
-    fainder_contiguous_chunks: bool = True,
+    fainder_contiguous_chunks: FainderChunkLayout = FainderChunkLayout.CONTIGUOUS,
     optimizer_cost_sorting: bool = True,
     optimizer_keyword_merging: bool = True,
     optimizer_split_up_junctions: bool = True,
