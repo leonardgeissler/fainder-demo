@@ -723,27 +723,27 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         },
         "base_column_name_queries": {"queries": base_column_name_queries},
         "base_percentile_queries": {"queries": percentilequeries},
-        "percentile_combinations": {"queries": percentile_combinations_queries},
-        "mixed_combinations_with_fixed_structure": {
+        "Percentile Combinations": {"queries": percentile_combinations_queries},
+        "Multiple Percentile Combinations": {"queries": multiple_percentile_combinations_queries},
+        "Expected Form": {
             "queries": mixed_term_combinations_with_fixed_structure_queries
         },
-        "mixed_combinations_with_fixed_structure_extented": {
+        "Expected Form Extended": {
             "queries": mixed_term_combinations_with_fixed_structure_extented_queries
         },
-        "early_exit": {"queries": early_exit_queries},
-        "multiple_percentile_combinations": {"queries": multiple_percentile_combinations_queries},
-        "multiple_percentile_combinations_with_kw": {
+        "Multiple percentile combinations with Keyword": {
             "queries": multiple_percentile_combinations_queries_with_kw
         },
-        "expected_form_not_queries": {
-            "queries": expected_form_not_queries
-        },
-        "double_expected_form_queries": {
+        "Double expected Form": {
             "queries": double_expected_form_queries
         },
-        "middle_exit": {
+        "Early empty Results": {"queries": early_exit_queries},
+        "Middle empty Results": {
             "queries": middle_exit_queries
-        }
+        },
+        "NOT Combinations": {
+            "queries": expected_form_not_queries
+        },
     }
 
     # Filter test cases based on enabled_tests
