@@ -1,5 +1,5 @@
 scenarios:
-  - name: simple
+  - name: sequential
     executor_type: SIMPLE
     cache_size: 0
   
@@ -7,10 +7,10 @@ scenarios:
     executor_type: PREFILTERING
     cache_size: 0
   
-  - name: parrallel_engine
+  - name: threaded
     executor_type: THREADED
     cache_size: 0
   
-  - name: parallel_prefiltering_engine
+  - name: threaded_prefiltering
     executor_type: THREADED_PREFILTERING
     cache_size: 0
