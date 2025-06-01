@@ -60,6 +60,7 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
         histogram_path=settings.histogram_path,
         parallel=config.fainder.parallel,
         num_workers=config.fainder.max_workers,
+        num_chunks=config.fainder.max_workers,
         chunk_layout=config.fainder.chunk_layout,
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
