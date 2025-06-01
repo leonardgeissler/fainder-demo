@@ -572,7 +572,7 @@ def middle_exit(
             # Unpack the 10 terms
             term, term2, term3, term4, term5, term6, term7, term8, term9, term10 = terms_combination
 
-            query = f"kw('{keyword}') AND col({term} AND NOT {term2} AND NOT {term3} AND NOT {term4} AND NOT {term5} AND NOT {term6} AND NOT {term7} AND NOT {term8} AND NOT {term9} AND NOT {term10})"
+            query = f"kw('{keyword}') AND col({term} AND NOT {term}) AND col(NOT {term2} AND NOT {term3} AND NOT {term4} AND NOT {term5} AND NOT {term6} AND NOT {term7} AND NOT {term8} AND NOT {term9} AND NOT {term10})"
             queries[f"middle_exit_{query_counter}"] = {
                 "query": query,
                 "ids": [
