@@ -99,6 +99,8 @@ class Settings(BaseSettings):
     fainder_parallel: bool = True
     fainder_chunk_layout: FainderChunkLayout = FainderChunkLayout.CONTIGUOUS
     fainder_default: str = "default"
+    fainder_num_workers: int = (os.cpu_count() or 2) - 1
+    fainder_num_chunks: int = (os.cpu_count() or 2) - 1
 
     # Embedding/HNSW settings
     use_embeddings: bool = True

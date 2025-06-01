@@ -312,10 +312,9 @@ def save_histograms_parallel(
     chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
 ) -> None:
     """Save histograms in parallel chunks for Fainder."""
-    workers = n_chunks - 1
-    logger.info("Partitioning histogram IDs for parallel processing with {} workers", workers)
+    logger.info("Partitioning histogram IDs for parallel processing with {} workers", n_chunks)
     hist_id_chunks = partition_histogram_ids(
-        [int(id_) for id_, _ in hists], num_partitions=workers, chunk_layout=chunk_layout
+        [int(id_) for id_, _ in hists], num_partitions=n_chunks, chunk_layout=chunk_layout
     )
     logger.info(
         "Partitioned histogram IDs into {} chunks of length {}",
@@ -332,11 +331,11 @@ def save_histograms_parallel(
     split_dir.mkdir(exist_ok=True, parents=True)
     logger.info(f"Created directory for split histograms: {split_dir}")
 
-    for i in range(workers):
-        logger.info("Saving histograms for worker {}", i)
+    for i in range(n_chunks):
+        logger.info("Saving histograms for chunk {}", i)
         # split up the histograms into chunks for each worker
         chunk_hists = [(id_, hist) for id_, hist in hists if id_ in hist_id_chunks[i]]
-        logger.info("Worker {} will process {} histograms", i, len(chunk_hists))
+        logger.info("Chunk {} will process {} histograms", i, len(chunk_hists))
         save_output(
             split_dir / f"histograms_{i}.zst",
             chunk_hists,
@@ -425,6 +424,6 @@ if __name__ == "__main__":
         save_histograms_parallel(
             hists,
             output_path=settings.fainder_path,
-            n_chunks=settings.max_workers,
+            n_chunks=settings.fainder_num_chunks,
             chunk_layout=settings.fainder_chunk_layout,
         )

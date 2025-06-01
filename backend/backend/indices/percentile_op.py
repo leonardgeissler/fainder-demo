@@ -26,7 +26,8 @@ class FainderIndex:
         conversion_path: Path | None,
         histogram_path: Path | None,
         parallel: bool = True,
-        num_workers: int = os.cpu_count() or 1,
+        num_workers: int = (os.cpu_count() or 2) - 1,
+        num_chunks: int = (os.cpu_count() or 2) - 1,
         chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
     ) -> None:
         self.rebinning_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = None
@@ -44,6 +45,7 @@ class FainderIndex:
             histogram_path=histogram_path,
             parallel=parallel,
             num_workers=num_workers,
+            num_chunks=num_chunks,
             chunk_layout=chunk_layout,
         )
 
@@ -60,7 +62,8 @@ class FainderIndex:
         conversion_path: Path | None,
         histogram_path: Path | None,
         parallel: bool = True,
-        num_workers: int = os.cpu_count() or 1,
+        num_workers: int = (os.cpu_count() or 2) - 1,
+        num_chunks: int = (os.cpu_count() or 2) - 1,
         chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
     ) -> None:
         """Update the Fainder indices with new files."""
@@ -99,7 +102,7 @@ class FainderIndex:
             self.parallel_processor = ParallelHistogramProcessor(
                 histogram_path=histogram_path,
                 num_workers=num_workers,
-                num_chunks=num_workers - 1,
+                num_chunks=num_chunks,
                 chunk_layout=chunk_layout,
             )
         else:

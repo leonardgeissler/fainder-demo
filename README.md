@@ -57,6 +57,8 @@ FAINDER_CLUSTER_ALGORITHM=kmeans    # kmeans, hdbscan, or agglomerative
 FAINDER_DEFAULT=default             # Name of the default fainder configuration
 FAINDER_PARALLEL=True               # Boolean to enable/disable parallel Fainder index execution
 FAINDER_CHUNK_LAYOUT=round_robin    # Chunk layout for Fainder indices (round_robin, sequential)
+FAINDER_EXACT_NUM_WORKERS=os.cpu_count() - 1 # Number of threads for exact Fainder index execution
+FAINDER_NUM_CHUNKS= os.cpu_count() - 1 # Number of chunks for Fainder indices
 
 # Similarity Search / Embeddings
 USE_EMBEDDINGS=True                 # Boolean to enable/disable embeddings

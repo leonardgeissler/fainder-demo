@@ -205,8 +205,9 @@ class ApplicationState:
             conversion_path=conversion_path,
             histogram_path=settings.histogram_path,
             parallel=settings.fainder_parallel,
-            num_workers=settings.max_workers,
+            num_workers=settings.fainder_num_workers,
             chunk_layout=settings.fainder_chunk_layout,
+            num_chunks=settings.fainder_num_chunks,
         )
 
         logger.info("Initializing HNSW index")
@@ -228,6 +229,7 @@ class ApplicationState:
             min_usability_score=settings.min_usability_score,
             rank_by_usability=settings.rank_by_usability,
             executor_type=settings.executor_type,
+            max_workers=settings.max_workers,
         )
         return metadata, croissant_store, tantivy_index, fainder_index, hnsw_index, engine
 
@@ -305,7 +307,8 @@ class ApplicationState:
             conversion_path=conversion_path,
             histogram_path=settings.histogram_path,
             parallel=settings.fainder_parallel,
-            num_workers=settings.max_workers,
+            num_workers=settings.fainder_num_workers,
+            num_chunks=settings.fainder_num_chunks,
             chunk_layout=settings.fainder_chunk_layout,
         )
 
@@ -326,6 +329,7 @@ class ApplicationState:
             min_usability_score=settings.min_usability_score,
             rank_by_usability=settings.rank_by_usability,
             executor_type=settings.executor_type,
+            max_workers=settings.max_workers,
         )
 
         return metadata, croissant_store, tantivy_index, fainder_index, hnsw_index, engine
