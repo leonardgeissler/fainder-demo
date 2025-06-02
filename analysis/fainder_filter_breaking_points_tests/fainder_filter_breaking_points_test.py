@@ -3,19 +3,20 @@ from pathlib import Path
 import time
 from typing import Any
 from backend.engine.engine import Engine
-from backend.engine.conversion import col_to_hist_ids, doc_to_col_ids
-from backend.config import Metadata
+from backend.engine.conversion import col_to_doc_ids, col_to_hist_ids, doc_to_col_ids
+from backend.config import Metadata, Settings
+from backend.indices.percentile_op import FainderIndex
 import pytest
 
 
 
 
-REFERENCES = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000]
-COMPARISONS = ["le"]
+REFERENCES = [1, 100000, 10000000]
+COMPARISONS = ["le", "ge"]
 PERCENTILES = [0.1, 0.5, 0.9]
 FAINDER_MODES = ["full_recall", "exact"]
 
-KEYWORDS = ["age", "date", "name", "address", "city", "state", "zip", "phone", "email", "web", "germany", "the", "a", "test", "born", "by", "blood", "heart", "lung", "italy", "usa", "bank", "health", "money", "school", "work", "music", "family", "food", "water", "time", "company", "business", "house", "car", "country", "person", "book", "computer", "university", "student", "teacher", "doctor", "hospital", "patient", "science", "technology", "internet", "language", "culture", "data", "database", "dataset", "record", "field", "value", "column", "row", "table", "query", "statistic", "metric", "measure", "variable", "attribute", "parameter", "analysis", "analytics", "visualization", "dashboard", "report", "chart", "graph", "api", "json", "xml", "csv", "excel", "sql", "nosql", "index", "key", "schema", "metadata", "timestamp", "integer", "string", "boolean", "float", "array", "object", "null", "dataframe", "dataset", "processing", "pipeline", "etl"]
+KEYWORDS = ["age", "date", "name", "address", "city", "state", "zip", "phone", "email", "web", "germany", "the", "a", "test", "born", "by", "blood", "heart", "lung", "italy", "usa", "bank", "health", "money", "school", "work", "music", "family", "food", "water", "time", "company", "a*", "b*", "c*", "d*", "e*", "f*", "g*", "h*", "i*", "j*", "k*", "l*", "m*", "n*", "o*", "p*", "q*", "r*", "s*", "t*", "u*", "v*", "w*", "x*", "y*", "z*"]
 
 
 ALL = (
@@ -62,6 +63,7 @@ def log_performance_csv(
     filter_size_wrong_doc: int = 0,
     filter_size_right_doc: int = 0,
     filter_size_doc: int = 0,
+    num_workers: int = 1,
 ):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     with csv_path.open("a", newline="") as csvfile:
@@ -81,6 +83,7 @@ def log_performance_csv(
                 num_results_first,
                 num_results,
                 query,
+                num_workers,
             ]
         )
 
@@ -89,9 +92,9 @@ def log_performance_csv(
     FAINDER_QUERIES,
 )
 def test_breaking_point_fainder(
-    engines: tuple[Engine, Engine, Metadata], query: dict[str, Any]
+    engines: tuple[Engine, FainderIndex, Metadata, Settings], query: dict[str, Any]
 ):
-    simple_engine, prefiltering_engine, metadata = engines
+    simple_engine, fainder_index, metadata, settings = engines
     csv_path = Path(pytest.csv_log_path)  # type: ignore
     start_time = time.perf_counter()
     result_without_filtering, _ = simple_engine.execute(query["query"], fainder_mode=query["fainder_mode"])
@@ -111,6 +114,7 @@ def test_breaking_point_fainder(
         0,
         0,
         0,
+        num_workers=settings.fainder_num_workers,
     )
 
     keywords = []
@@ -128,7 +132,8 @@ def test_breaking_point_fainder(
         
         query_string = f"{keyword_query} AND {query['query']}"
         start_time = time.perf_counter()
-        result_keyword_filter, _ = prefiltering_engine.execute(query_string, fainder_mode=query["fainder_mode"])
+        result_keyword_filter_hists = fainder_index.search(query["percentile"], query["comparison"], query["reference"], query["fainder_mode"], result_keyword_hists)
+        result_keyword_filter = col_to_doc_ids(result_keyword_filter_hists, metadata.col_to_doc)
         time_with_keyword_filter = time.perf_counter() - start_time
         result_keyword_filter_hists = col_to_hist_ids(doc_to_col_ids(np.array(list(result_keyword_filter), dtype=np.uint32), metadata.doc_to_cols), metadata.num_hists)
 
@@ -157,6 +162,7 @@ def test_breaking_point_fainder(
             filter_size_wrong_doc,
             filter_size_right_doc,
             filter_size_doc,
+            num_workers=settings.fainder_num_workers,
         )
 
         if time_without_filtering < time_with_keyword_filter:

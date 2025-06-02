@@ -17,6 +17,21 @@ from loguru import logger
 from backend.config import ExecutorType, Metadata, Settings
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--num-workers",
+        action="store",
+        default=None,
+        type=int,
+        help="Number of workers for Fainder index",
+    )
+
+
+@pytest.fixture
+def num_workers(request):
+    return request.config.getoption("--num-workers")
+
+
 @pytest.fixture(autouse=True, scope="module")
 def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[reportUnusedFunction]
     """
@@ -57,9 +72,9 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
                 "num_results_first",
                 "num_results",
                 "query",
+                "num_workers",
             ]
         )
-
 
     # Remove default handler
     logger.remove()
@@ -84,36 +99,37 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
 
 
 @pytest.fixture(scope="module")
-def engines() -> tuple[Engine, Engine, Metadata]:
+def engines(request) -> tuple[Engine, FainderIndex, Metadata, Settings]:
     settings = Settings()  # type: ignore # uses the environment variables
     with settings.metadata_path.open() as file:
         metadata = Metadata(**json.load(file))
+
+    # Override num_workers if provided via command line
+    num_workers_arg = request.config.getoption("--num-workers")
+    if num_workers_arg is not None:
+        settings.fainder_num_workers = num_workers_arg
 
     fainder_index = FainderIndex(
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
         parallel=settings.fainder_parallel,
-        num_workers=settings.max_workers,
-        contiguous=settings.fainder_contiguous_chunks,
+        num_workers=settings.fainder_num_workers,
+        num_chunks=settings.fainder_num_workers,
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
-    return Engine(
-        tantivy_index=TantivyIndex(
-            index_path=str(settings.tantivy_path), recreate=False
+    return (
+        Engine(
+            tantivy_index=TantivyIndex(
+                index_path=str(settings.tantivy_path), recreate=False
+            ),
+            fainder_index=fainder_index,
+            hnsw_index=column_index,
+            metadata=metadata,
+            cache_size=0,
+            executor_type=ExecutorType.SIMPLE,
         ),
-        fainder_index=fainder_index,
-        hnsw_index=column_index,
-        metadata=metadata,
-        cache_size=0,
-        executor_type=ExecutorType.SIMPLE
-    ), Engine(
-        tantivy_index=TantivyIndex(
-            index_path=str(settings.tantivy_path), recreate=False
-        ),
-        fainder_index=fainder_index,
-        hnsw_index=column_index,
-        metadata=metadata,
-        cache_size=0,
-        executor_type=ExecutorType.PREFILTERING
-    ), metadata
+        fainder_index,
+        metadata,
+        settings,
+    )
