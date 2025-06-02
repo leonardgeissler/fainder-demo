@@ -200,7 +200,7 @@ def exceeds_filtering_limit(
     num_workers: int,
 ) -> bool:
     """Check if the number of IDs exceeds the filtering limit for the current mode."""
-    return len(ids) > get_filtering_stop_point(fainder_mode, num_workers, id_type)
+    return ids.size > get_filtering_stop_point(fainder_mode, num_workers, id_type)
 
 
 def is_doc_result(val: Sequence[Any]) -> TypeGuard[Sequence[DocResult]]:
