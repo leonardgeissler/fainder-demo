@@ -2,15 +2,15 @@ scenarios:
   - name: sequential
     executor_type: SIMPLE
     cache_size: 0
-  
+
   - name: perfiltering
     executor_type: PREFILTERING
     cache_size: 0
-  
+
   - name: threaded
     executor_type: THREADED
     cache_size: 0
-  
+
   - name: threaded_prefiltering
     executor_type: THREADED_PREFILTERING
     cache_size: 0

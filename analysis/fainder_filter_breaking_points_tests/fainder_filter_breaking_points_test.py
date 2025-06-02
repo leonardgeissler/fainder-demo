@@ -9,14 +9,71 @@ from backend.indices.percentile_op import FainderIndex
 import pytest
 
 
-
-
 REFERENCES = [1, 100000, 10000000]
 COMPARISONS = ["le", "ge"]
 PERCENTILES = [0.1, 0.5, 0.9]
 FAINDER_MODES = ["full_recall", "exact"]
 
-KEYWORDS = ["age", "date", "name", "address", "city", "state", "zip", "phone", "email", "web", "germany", "the", "a", "test", "born", "by", "blood", "heart", "lung", "italy", "usa", "bank", "health", "money", "school", "work", "music", "family", "food", "water", "time", "company", "a*", "b*", "c*", "d*", "e*", "f*", "g*", "h*", "i*", "j*", "k*", "l*", "m*", "n*", "o*", "p*", "q*", "r*", "s*", "t*", "u*", "v*", "w*", "x*", "y*", "z*"]
+KEYWORDS = [
+    "age",
+    "date",
+    "name",
+    "address",
+    "city",
+    "state",
+    "zip",
+    "phone",
+    "email",
+    "web",
+    "germany",
+    "the",
+    "a",
+    "test",
+    "born",
+    "by",
+    "blood",
+    "heart",
+    "lung",
+    "italy",
+    "usa",
+    "bank",
+    "health",
+    "money",
+    "school",
+    "work",
+    "music",
+    "family",
+    "food",
+    "water",
+    "time",
+    "company",
+    "a*",
+    "b*",
+    "c*",
+    "d*",
+    "e*",
+    "f*",
+    "g*",
+    "h*",
+    "i*",
+    "j*",
+    "k*",
+    "l*",
+    "m*",
+    "n*",
+    "o*",
+    "p*",
+    "q*",
+    "r*",
+    "s*",
+    "t*",
+    "u*",
+    "v*",
+    "w*",
+    "x*",
+    "y*",
+    "z*",
+]
 
 
 ALL = (
@@ -87,6 +144,7 @@ def log_performance_csv(
             ]
         )
 
+
 @pytest.mark.parametrize(
     "query",
     FAINDER_QUERIES,
@@ -97,7 +155,9 @@ def test_breaking_point_fainder(
     simple_engine, fainder_index, metadata, settings = engines
     csv_path = Path(pytest.csv_log_path)  # type: ignore
     start_time = time.perf_counter()
-    result_without_filtering, _ = simple_engine.execute(query["query"], fainder_mode=query["fainder_mode"])
+    result_without_filtering, _ = simple_engine.execute(
+        query["query"], fainder_mode=query["fainder_mode"]
+    )
     time_without_filtering = time.perf_counter() - start_time
 
     log_performance_csv(
@@ -128,14 +188,34 @@ def test_breaking_point_fainder(
         result_keyword, _ = simple_engine.execute(keyword_query)
         time_keyword = time.perf_counter() - start_time
         import numpy as np
-        result_keyword_hists = col_to_hist_ids(doc_to_col_ids(np.array(list(result_keyword), dtype=np.uint32), metadata.doc_to_cols), metadata.num_hists)
-        
+
+        result_keyword_hists = col_to_hist_ids(
+            doc_to_col_ids(
+                np.array(list(result_keyword), dtype=np.uint32), metadata.doc_to_cols
+            ),
+            metadata.num_hists,
+        )
+
         query_string = f"{keyword_query} AND {query['query']}"
         start_time = time.perf_counter()
-        result_keyword_filter_hists = fainder_index.search(query["percentile"], query["comparison"], query["reference"], query["fainder_mode"], result_keyword_hists)
-        result_keyword_filter = col_to_doc_ids(result_keyword_filter_hists, metadata.col_to_doc)
+        result_keyword_filter_hists = fainder_index.search(
+            query["percentile"],
+            query["comparison"],
+            query["reference"],
+            query["fainder_mode"],
+            result_keyword_hists,
+        )
+        result_keyword_filter = col_to_doc_ids(
+            result_keyword_filter_hists, metadata.col_to_doc
+        )
         time_with_keyword_filter = time.perf_counter() - start_time
-        result_keyword_filter_hists = col_to_hist_ids(doc_to_col_ids(np.array(list(result_keyword_filter), dtype=np.uint32), metadata.doc_to_cols), metadata.num_hists)
+        result_keyword_filter_hists = col_to_hist_ids(
+            doc_to_col_ids(
+                np.array(list(result_keyword_filter), dtype=np.uint32),
+                metadata.doc_to_cols,
+            ),
+            metadata.num_hists,
+        )
 
         # use result_keyword and result_without_filtering to calculate the filter size right and wrong
         filter_size_right = len(result_keyword_filter_hists)
@@ -146,7 +226,6 @@ def test_breaking_point_fainder(
         filter_size_right_doc = len(result_keyword_filter)
         filter_size_wrong_doc = len(result_keyword) - filter_size_right_doc
         filter_size_doc = len(result_keyword)
-
 
         log_performance_csv(
             csv_path,
@@ -167,5 +246,3 @@ def test_breaking_point_fainder(
 
         if time_without_filtering < time_with_keyword_filter:
             return
-
-

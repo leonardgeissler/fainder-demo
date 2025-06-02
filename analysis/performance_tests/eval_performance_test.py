@@ -17,7 +17,11 @@ from fainder.execution.parallel_processing import FainderChunkLayout
 
 
 def execute_with_profiling(
-    evaluator: Engine, query: str, params: dict[str, Any], mode: str, disable_profiling: bool = True
+    evaluator: Engine,
+    query: str,
+    params: dict[str, Any],
+    mode: str,
+    disable_profiling: bool = True,
 ) -> tuple[Any, float, io.StringIO]:
     """Execute a query with profiling and timing."""
     if disable_profiling:
@@ -25,7 +29,7 @@ def execute_with_profiling(
         result, _ = evaluator.execute(query, fainder_mode=mode)
         end_time = time.time()
         return result, end_time - start_time, io.StringIO()
-    
+
     pr = cProfile.Profile()
     pr.enable()
 
@@ -153,14 +157,22 @@ def run_evaluation_scenarios(
     for scenario_name, params in scenarios.items():
         evaluator = params["engine"]
         assert isinstance(evaluator, Engine)
-        result, execution_time, stats_io = execute_with_profiling(evaluator, query, params, mode, disable_profiling)
+        result, execution_time, stats_io = execute_with_profiling(
+            evaluator, query, params, mode, disable_profiling
+        )
         timings[scenario_name] = execution_time
         results[scenario_name] = result
 
         # Save profiling statistics
         if not disable_profiling:
             save_profiling_stats(
-                stats_io, profile_csv_path, category, test_name, query, scenario_name, mode
+                stats_io,
+                profile_csv_path,
+                category,
+                test_name,
+                query,
+                scenario_name,
+                mode,
             )
 
     # Check if all results are consistent
@@ -179,7 +191,7 @@ def log_performance_csv(
     results: dict[str, Any],
     is_consistent: bool,
     fainder_mode: str,
-    ids: list[dict[str, str]] | int ,
+    ids: list[dict[str, str]] | int,
     num_terms: int,
     id_str: str,
     write_groups_used: dict[int, int],
@@ -218,6 +230,6 @@ def log_performance_csv(
                     fainder_contiguous_chunks,
                     optimizer_cost_sorting,
                     optimizer_keyword_merging,
-                    optimizer_split_up_junctions
+                    optimizer_split_up_junctions,
                 ]
             )

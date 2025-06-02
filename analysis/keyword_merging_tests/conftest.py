@@ -16,6 +16,7 @@ from backend.indices.percentile_op import FainderIndex
 from backend.engine import Engine
 from backend.engine import Optimizer
 
+
 @pytest.fixture(autouse=True, scope="module")
 def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[reportUnusedFunction]
     """
@@ -34,8 +35,7 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
 
     # Create CSV performance log file and write headers
     csv_log_path = (
-        performance_log_dir
-        / f"keyword_merging_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+        performance_log_dir / f"keyword_merging_{time.strftime('%Y%m%d_%H%M%S')}.csv"
     )
     with csv_log_path.open("w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -88,25 +88,30 @@ def engine() -> tuple[Engine, Engine]:
         conversion_path=None,
         histogram_path=None,
     )
-    column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
-    engines = Engine(
-        tantivy_index=TantivyIndex(
-            index_path=str(settings.tantivy_path), recreate=False
+    column_index = ColumnIndex(
+        path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False
+    )
+    engines = (
+        Engine(
+            tantivy_index=TantivyIndex(
+                index_path=str(settings.tantivy_path), recreate=False
+            ),
+            fainder_index=fainder_index,
+            hnsw_index=column_index,
+            metadata=metadata,
+            cache_size=0,
+            executor_type=ExecutorType.SIMPLE,
         ),
-        fainder_index=fainder_index,
-        hnsw_index=column_index,
-        metadata=metadata,
-        cache_size=0,
-        executor_type=ExecutorType.SIMPLE
-    ), Engine(
-        tantivy_index=TantivyIndex(
-            index_path=str(settings.tantivy_path), recreate=False
+        Engine(
+            tantivy_index=TantivyIndex(
+                index_path=str(settings.tantivy_path), recreate=False
+            ),
+            fainder_index=fainder_index,
+            hnsw_index=column_index,
+            metadata=metadata,
+            cache_size=0,
+            executor_type=ExecutorType.SIMPLE,
         ),
-        fainder_index=fainder_index,
-        hnsw_index=column_index,
-        metadata=metadata,
-        cache_size=0,
-        executor_type=ExecutorType.SIMPLE
     )
     engines[0].optimizer = Optimizer(keyword_merging=True)
     engines[1].optimizer = Optimizer(keyword_merging=False)

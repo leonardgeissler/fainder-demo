@@ -64,6 +64,7 @@ def generate_simple_keyword_queries_with_multiple_elements(
 
     return queries
 
+
 def generate_simple_column_name_queries(
     column_names: list[str],
     ks: list[int],
@@ -85,6 +86,7 @@ def generate_simple_column_name_queries(
 
     return queries
 
+
 def generate_percentile_terms(
     percentile_values: list[float],
     thresholds: list[int],
@@ -103,7 +105,10 @@ def generate_percentile_terms(
     for op in operators:
         for threshold in thresholds:
             terms.extend(
-                [f"pp({percentile};{op};{threshold})" for percentile in percentile_values]
+                [
+                    f"pp({percentile};{op};{threshold})"
+                    for percentile in percentile_values
+                ]
             )
 
     return terms
@@ -286,8 +291,8 @@ def expected_form(
 def multiple_percentile_combinations(
     list_of_percentile_combinations: dict[int, dict[str, dict[str, Any]]],
     operators: list[str],
-    min_terms: int ,
-    max_terms: int ,
+    min_terms: int,
+    max_terms: int,
     num_query_per_num_terms: int,
 ) -> dict[str, dict[str, Any]]:
     """
@@ -304,11 +309,15 @@ def multiple_percentile_combinations(
     for operator in operators:
         for num_terms_external in range(min_terms, max_terms + 1):
             for num_terms_internal in range(min_terms_internal, max_terms_internal + 1):
-                internalterms = list_of_percentile_combinations.get(num_terms_internal, {})
+                internalterms = list_of_percentile_combinations.get(
+                    num_terms_internal, {}
+                )
                 if not internalterms:
                     continue
                 query_counter = 0
-                for combination in combinations(internalterms.keys(), num_terms_external):
+                for combination in combinations(
+                    internalterms.keys(), num_terms_external
+                ):
                     if len(combination) == 0:
                         continue
                     combination_terms = [
@@ -316,12 +325,15 @@ def multiple_percentile_combinations(
                     ]
                     query = f" {operator} ".join(combination_terms)
                     query = wrap_term(query)
-                    queries[f"multiple_percentile_combination_{operator}_{num_terms_external}_{query_counter}"] = {
+                    queries[
+                        f"multiple_percentile_combination_{operator}_{num_terms_external}_{query_counter}"
+                    ] = {
                         "query": query,
-                        "ids": {"num_terms_external": num_terms_external, 
-                                "num_terms_internal": num_terms_internal,
-                                "num_terms": num_terms_external * num_terms_internal,
-                                },
+                        "ids": {
+                            "num_terms_external": num_terms_external,
+                            "num_terms_internal": num_terms_internal,
+                            "num_terms": num_terms_external * num_terms_internal,
+                        },
                         "num_terms": num_terms_external * num_terms_internal,
                     }
                     query_counter += 1
@@ -359,7 +371,7 @@ def expected_form_extented(
                     for term2 in terms:
                         if term1 == term2:
                             continue
-                        
+
                         query = (
                             f"kw('{keyword}') AND "
                             f"col(name('{column_name}';{k}) AND "
@@ -381,7 +393,7 @@ def expected_form_extented(
     return queries
 
 
-def double_expected_form( 
+def double_expected_form(
     keywords: list[str],
     terms: list[str],
     column_names: list[str],
@@ -401,32 +413,35 @@ def double_expected_form(
     # query structure: (kw('test') AND col(name('age',1) AND pp(..) AND col(name('date',1) AND pp(..))) OR (kw('test2') AND col(name('age',1) AND pp(..) AND col(name('date',1) AND pp(..))))
     queries: dict[str, dict[str, Any]] = {}
     query_counter = 1
+
     # get 2 keywords (different)
     # get 4 column names (different)
     # get 4 ks (can be the same)
     def get_unique_pairs(items):
-        return [(a, b) for i, a in enumerate(items) for b in items[i+1:]]
+        return [(a, b) for i, a in enumerate(items) for b in items[i + 1 :]]
 
     # Get unique pairs of keywords, column names
     for kw1, kw2 in get_unique_pairs(keywords):
         # Get two pairs of unique column names
-        for (col1, col2), (col3, col4) in zip(get_unique_pairs(column_names), get_unique_pairs(column_names)):
-            # Get unique k values 
+        for (col1, col2), (col3, col4) in zip(
+            get_unique_pairs(column_names), get_unique_pairs(column_names)
+        ):
+            # Get unique k values
             for k1, k2 in get_unique_pairs(ks):
                 # Get unique term combinations
                 for term1, term2, term3, term4 in [
-                    (t1,t2,t3,t4) 
-                    for i,t1 in enumerate(terms)
-                    for j,t2 in enumerate(terms[i+1:], i+1) 
-                    for k,t3 in enumerate(terms[j+1:], j+1)
-                    for t4 in terms[k+1:]
+                    (t1, t2, t3, t4)
+                    for i, t1 in enumerate(terms)
+                    for j, t2 in enumerate(terms[i + 1 :], i + 1)
+                    for k, t3 in enumerate(terms[j + 1 :], j + 1)
+                    for t4 in terms[k + 1 :]
                 ]:
                     query = (
                         f"(kw('{kw1}') AND "
                         f"col(name('{col1}';{k1}) AND {term1}) AND "
                         f"col(name('{col2}';{k2}) AND {term2})) OR "
                         f"(kw('{kw2}') AND "
-                        f"col(name('{col3}';{k1}) AND {term3}) AND " 
+                        f"col(name('{col3}';{k1}) AND {term3}) AND "
                         f"col(name('{col4}';{k2}) AND {term4}))"
                     )
 
@@ -434,12 +449,12 @@ def double_expected_form(
                         "query": query,
                         "ids": [
                             {"keyword_id": kw1},
-                            {"percentile_id": term1}, 
+                            {"percentile_id": term1},
                             {"percentile_id": term2},
                             {"column_id": (col1, k1)},
                             {"keyword_id": kw2},
                             {"percentile_id": term3},
-                            {"percentile_id": term4}, 
+                            {"percentile_id": term4},
                             {"column_id": (col3, k1)},
                             {"column_id": (col4, k2)},
                         ],
@@ -451,6 +466,7 @@ def double_expected_form(
 
     return queries
 
+
 def early_exit(
     queries: dict[str, dict[str, Any]],
     form: str = "expected_form",
@@ -461,9 +477,8 @@ def early_exit(
 
     new_queries: dict[str, dict[str, Any]] = {}
     for query_name, query in queries.items():
-
         new_queries["early_exit_" + form + "_" + query_name] = {
-            "query": "kw('agjkehkejhgkjehgsjkhg') AND "+ query["query"],
+            "query": "kw('agjkehkejhgkjehgsjkhg') AND " + query["query"],
             "ids": query["ids"],
         }
 
@@ -486,6 +501,7 @@ def multiple_percentile_combinations_with_kw(
             }
     return queries
 
+
 def expected_form_not(
     keywords: list[str],
     terms: list[str],
@@ -494,7 +510,6 @@ def expected_form_not(
     operators: list[str],
     max_terms: int,
 ) -> dict[str, dict[str, Any]]:
-
     # expected form: kw('test') AND col(name('age',1) AND pp(0.5;le;2000))
     # with NOT operator added to all possible combinations
     queries: dict[str, dict[str, Any]] = {}
@@ -520,22 +535,21 @@ def expected_form_not(
                                 continue
                             query = ""
 
-                            
                             if 0 in comb:
                                 query += f"NOT kw('{keyword}') {operator} "
                             else:
                                 query += f"kw('{keyword}') {operator} "
 
                             if 1 in comb:
-                                query += f"NOT col("
+                                query += "NOT col("
                             else:
-                                query += f"col("
-                            
+                                query += "col("
+
                             if 2 in comb:
                                 query += f"NOT name('{column_name}';{k}) {operator} "
                             else:
                                 query += f"name('{column_name}';{k}) {operator} "
-                            
+
                             if 3 in comb:
                                 query += f"NOT {percentile})"
                             else:
@@ -544,16 +558,17 @@ def expected_form_not(
                             not_ids: list[str] = [str(term) for term in comb]
                             not_ids_str = "-".join(not_ids)
 
-                            queries[f"mixed_combination_{operator}_{query_counter}_{not_ids_str}"] = {
+                            queries[
+                                f"mixed_combination_{operator}_{query_counter}_{not_ids_str}"
+                            ] = {
                                 "query": query,
                                 "ids": not_ids_str,
-
                             }
                         query_counter += 1
                         if query_counter > max_terms:
                             return queries
     return queries
-                        
+
 
 def middle_exit(
     keywords: list[str],
@@ -561,23 +576,27 @@ def middle_exit(
     max_terms: int,
 ) -> dict[str, dict[str, Any]]:
     """
-    Ads an in the middle of a long query 
+    Ads an in the middle of a long query
     """
     queries: dict[str, dict[str, Any]] = {}
     query_counter = 1
-    
+
     # For each keyword, generate combinations of 10 unique terms
     for keyword in keywords:
         for terms_combination in combinations(terms, 10):
             # Unpack the 10 terms
-            term, term2, term3, term4, term5, term6, term7, term8, term9, term10 = terms_combination
+            term, term2, term3, term4, term5, term6, term7, term8, term9, term10 = (
+                terms_combination
+            )
 
             query = f"kw('{keyword}') AND col({term} AND NOT {term}) AND col(NOT {term2} AND NOT {term3} AND NOT {term4} AND NOT {term5} AND NOT {term6} AND NOT {term7} AND NOT {term8} AND NOT {term9} AND NOT {term10})"
             queries[f"middle_exit_{query_counter}"] = {
                 "query": query,
                 "ids": [
                     {"keyword_id": keyword},
-                    {"percentile_id": f"{term}-{term2}-{term3}-{term4}-{term5}-{term6}-{term7}-{term8}-{term9}-{term10}"},
+                    {
+                        "percentile_id": f"{term}-{term2}-{term3}-{term4}-{term5}-{term6}-{term7}-{term8}-{term9}-{term10}"
+                    },
                 ],
             }
             query_counter += 1
@@ -589,7 +608,7 @@ def middle_exit(
 def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     """
     Generate all test cases, optionally using a configuration.
-    
+
     Args:
         config: Optional config object (pydantic model or dict)
     """
@@ -597,10 +616,12 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     # Generate test cases with the config values
     keywordsqueries = generate_simple_keyword_queries(config.keywords.default_keywords)
 
-    keywordsqueries_with_multiple_elements = generate_simple_keyword_queries_with_multiple_elements(
-        keywords=config.keywords.default_keywords,
-        num_elements=config.query_generation.num_elements_keywordsqueries,
-        max_num_queries=config.query_generation.max_num_keywordsqueries,
+    keywordsqueries_with_multiple_elements = (
+        generate_simple_keyword_queries_with_multiple_elements(
+            keywords=config.keywords.default_keywords,
+            num_elements=config.query_generation.num_elements_keywordsqueries,
+            max_num_queries=config.query_generation.max_num_keywordsqueries,
+        )
     )
 
     base_column_name_queries = generate_simple_column_name_queries(
@@ -618,7 +639,7 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         percentile_values=config.percentiles.default_percentiles,
         thresholds=config.percentiles.default_thresholds,
         operators=config.percentiles.default_operators,
-        max_terms=config.query_generation.max_num_terms_percentilequeries
+        max_terms=config.query_generation.max_num_terms_percentilequeries,
     )
 
     percentile_combinations_queries = percentile_term_combinations(
@@ -641,26 +662,21 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
             num_query_per_num_terms=config.query_generation.max_num_query_per_term_count_percentile_combinations,
         )
 
-    mixed_term_combinations_with_fixed_structure_queries = (
-        expected_form(
-            keywords=config.keywords.default_keywords,
-            terms=percentile_terms_list,
-            column_names=config.keywords.default_col_names,
-            ks=config.keywords.default_ks,
-            operators=config.keywords.logical_operators,
-            max_terms=config.query_generation.max_num_mixed_terms_with_fixed_structure,
-        )
+    mixed_term_combinations_with_fixed_structure_queries = expected_form(
+        keywords=config.keywords.default_keywords,
+        terms=percentile_terms_list,
+        column_names=config.keywords.default_col_names,
+        ks=config.keywords.default_ks,
+        operators=config.keywords.logical_operators,
+        max_terms=config.query_generation.max_num_mixed_terms_with_fixed_structure,
     )
 
-    mixed_term_combinations_with_fixed_structure_extented_queries = (
-        expected_form_extented(
-            keywords=config.keywords.default_keywords,
-            terms=percentile_terms_list,
-            column_names=config.keywords.default_col_names,
-            ks=config.keywords.default_ks,
-            max_terms=config.query_generation.max_num_mixed_terms_extended_with_fixed_structure,
-
-        )
+    mixed_term_combinations_with_fixed_structure_extented_queries = expected_form_extented(
+        keywords=config.keywords.default_keywords,
+        terms=percentile_terms_list,
+        column_names=config.keywords.default_col_names,
+        ks=config.keywords.default_ks,
+        max_terms=config.query_generation.max_num_mixed_terms_extended_with_fixed_structure,
     )
 
     early_exit_queries = early_exit(
@@ -675,7 +691,7 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         max_terms=config.query_generation.max_num_terms_multiple_percentile_combinations,
         num_query_per_num_terms=config.query_generation.max_num_query_per_term_count_multiple_percentile_combinations,
     )
-    
+
     multiple_percentile_combinations_queries_or = multiple_percentile_combinations(
         list_of_percentile_combinations=list_of_percentile_combinations,
         operators=["OR"],
@@ -684,12 +700,10 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         num_query_per_num_terms=config.query_generation.max_num_query_per_term_count_multiple_percentile_combinations,
     )
 
-    multiple_percentile_combinations_queries_with_kw = (
-        multiple_percentile_combinations_with_kw(
-            keywords=config.keywords.default_keywords,
-            multiple_percentile_combinations=multiple_percentile_combinations_queries_or,
-            num_kws=config.query_generation.num_of_ḱws_for_multiple_pp_combinations,
-        )
+    multiple_percentile_combinations_queries_with_kw = multiple_percentile_combinations_with_kw(
+        keywords=config.keywords.default_keywords,
+        multiple_percentile_combinations=multiple_percentile_combinations_queries_or,
+        num_kws=config.query_generation.num_of_ḱws_for_multiple_pp_combinations,
     )
 
     expected_form_not_queries = expected_form_not(
@@ -712,9 +726,8 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     middle_exit_queries = middle_exit(
         keywords=config.keywords.default_keywords,
         terms=percentile_terms_list,
-        max_terms=config.query_generation.max_num_middle_exit,  
+        max_terms=config.query_generation.max_num_middle_exit,
     )
-
 
     test_cases = {
         "base_keyword_queries": {"queries": keywordsqueries},
@@ -724,7 +737,9 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         "base_column_name_queries": {"queries": base_column_name_queries},
         "base_percentile_queries": {"queries": percentilequeries},
         "Percentile_Combinations": {"queries": percentile_combinations_queries},
-        "Multiple_Percentile_Combinations": {"queries": multiple_percentile_combinations_queries},
+        "Multiple_Percentile_Combinations": {
+            "queries": multiple_percentile_combinations_queries
+        },
         "Expected_Form": {
             "queries": mixed_term_combinations_with_fixed_structure_queries
         },
@@ -734,20 +749,18 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         "Multiple_percentile_combinations_with_Keyword": {
             "queries": multiple_percentile_combinations_queries_with_kw
         },
-        "Double_expected_Form": {
-            "queries": double_expected_form_queries
-        },
+        "Double_expected_Form": {"queries": double_expected_form_queries},
         "Early_exit_Results": {"queries": early_exit_queries},
-        "Middle_exit_Results": {
-            "queries": middle_exit_queries
-        },
-        "NOT_Combinations": {
-            "queries": expected_form_not_queries
-        },
+        "Middle_exit_Results": {"queries": middle_exit_queries},
+        "NOT_Combinations": {"queries": expected_form_not_queries},
     }
 
     # Filter test cases based on enabled_tests
-    test_cases = {name: data for name, data in test_cases.items() if name in config.experiment.enabled_tests}
+    test_cases = {
+        name: data
+        for name, data in test_cases.items()
+        if name in config.experiment.enabled_tests
+    }
 
     output = Path("test_cases/performance_test_cases.json")
     output.parent.mkdir(exist_ok=True)

@@ -7,7 +7,6 @@ import time
 from typing import Any
 
 from backend.indices.name_op import HnswIndex
-from backend.indices.percentile_op import FainderIndex
 
 import pytest
 from loguru import logger
@@ -81,11 +80,5 @@ def hnsw() -> tuple[HnswIndex, Metadata]:
     with settings.metadata_path.open() as file:
         metadata = Metadata(**json.load(file))
 
-    hnsw = HnswIndex(
-        path=settings.hnsw_index_path, metadata=metadata
-    )
+    hnsw = HnswIndex(path=settings.hnsw_index_path, metadata=metadata)
     return hnsw, metadata
-
-
-
-

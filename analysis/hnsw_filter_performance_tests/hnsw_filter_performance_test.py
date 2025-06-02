@@ -10,14 +10,9 @@ import pytest
 NAMES = ["age", "date"]
 K = 2
 
-FILTER_SIZES_RIGHT = [
-    100, 1000, 10000, 100000, 1000000, 10000000
-] 
+FILTER_SIZES_RIGHT = [100, 1000, 10000, 100000, 1000000, 10000000]
 
-FILTER_SIZES_WRONG = [
-    0, 100, 1000, 10000, 100000, 1000000, 10000000
-]
-
+FILTER_SIZES_WRONG = [0, 100, 1000, 10000, 100000, 1000000, 10000000]
 
 
 def log_performance_csv(
@@ -63,15 +58,17 @@ def test_hnsw_filter_performance(hnsw: tuple[HnswIndex, Metadata], name: str):
 
     for filter_size_right in FILTER_SIZES_RIGHT:
         for filter_size_wrong in FILTER_SIZES_WRONG:
-            
             filter_size_right = min(filter_size_right, len(result_without_filtering))
             filter_size_wrong = min(filter_size_wrong, num_col_ids - filter_size_right)
 
             # create a filter of the desired size by selecting indices out of the results without filtering (not random)
             col_ids = list(result_without_filtering)[:filter_size_right]
 
-            # add some indices that are not in the results without filtering 
-            filter_wrong = list({uint32(x) for x in range(num_col_ids)} - {x for x in result_without_filtering})
+            # add some indices that are not in the results without filtering
+            filter_wrong = list(
+                {uint32(x) for x in range(num_col_ids)}
+                - {x for x in result_without_filtering}
+            )
             filter_wrong = filter_wrong[:filter_size_wrong]
             col_ids.extend(filter_wrong)
 

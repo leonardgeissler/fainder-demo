@@ -50,7 +50,7 @@ TERMS = [
     "evaluation",
     "experiment",
     "theory",
-    "concept"
+    "concept",
 ]
 
 LENGTH_TERMS = 10
@@ -58,7 +58,7 @@ LENGTH_TERMS = 10
 
 def generate_keyword_test_cases() -> list[tuple[str, str, str]]:
     """Generate test cases for comparing merged and unmerged keyword queries.
-    
+
     Returns:
         List of tuples (test_name, merged_query, unmerged_query)
     """

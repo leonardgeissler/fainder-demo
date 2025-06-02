@@ -55,7 +55,6 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
             ]
         )
 
-
     # Remove default handler
     logger.remove()
 
