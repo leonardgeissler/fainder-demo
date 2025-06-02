@@ -105,19 +105,16 @@ class QuoteRemover(Visitor[Token], OptimizationRule):
 
 
 class SplitUpJunctions(Visitor[Token], OptimizationRule):
-    """
-    This vistor splits up conjunctions and disjunctions with more
-    than two terms into Rules with two terms.
-    """
+    """This vistor splits up junctions with more than two terms into Rules with two terms."""
 
-    def __default__(self, tree: ParseTree) -> ParseTree:
+    def __default__(self, tree: ParseTree) -> ParseTree:  # noqa: PLW3201
         return tree
 
     def apply(self, tree: ParseTree) -> None:
         self.visit(tree)
 
     def disjunction(self, tree: ParseTree) -> ParseTree:
-        if len(tree.children) > 2:
+        if len(tree.children) > 2:  # noqa: PLR2004
             # Split the disjunction into multiple rules
             new_children: list[Token | Tree[Token]] = []
             for i in range(0, len(tree.children), 2):
@@ -133,7 +130,7 @@ class SplitUpJunctions(Visitor[Token], OptimizationRule):
         return tree
 
     def conjunction(self, tree: ParseTree) -> ParseTree:
-        if len(tree.children) > 2:
+        if len(tree.children) > 2:  # noqa: PLR2004
             # Split the conjunction into multiple rules
             new_children: list[Token | Tree[Token]] = []
             for i in range(0, len(tree.children), 2):

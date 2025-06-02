@@ -479,7 +479,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         column = items[0]
         k = int(items[1])
 
-        # Submit task to thread pool and store the future with a unique ID
+        # Submit task to thread pool
         future = self._thread_pool.submit(_name_task, column, k)
         write_group = self._get_write_group(items[0])
         self.intermediate_results.add_future_col_result(write_group, future)
@@ -517,91 +517,132 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
 
         logger.trace("Evaluating percentile term: {}", items)
 
-        # Submit task to thread pool and store the future with a unique ID
+        # Submit task to thread pool
         return self._thread_pool.submit(_percentile_task, items)
 
     def col_op(
         self, items: list[tuple[ColResult, int] | Future[tuple[ColResult, int]]]
-    ) -> tuple[DocResult, int]:
-        logger.trace("Evaluating column term")
+    ) -> Future[tuple[DocResult, int]]:
+        def _col_task(
+            items: list[tuple[ColResult, int] | Future[tuple[ColResult, int]]],
+        ) -> tuple[DocResult, int]:
+            """Task function for column search to be run in a thread."""
+            logger.trace("Evaluating column term")
 
-        if len(items) != 1:
-            raise ValueError("Column term must have exactly one item")
-        if isinstance(items[0], Future):
-            col_ids, write_group = items[0].result()
-        else:
-            col_ids = items[0][0]
-            write_group = items[0][1]
+            if len(items) != 1:
+                raise ValueError("Column term must have exactly one item")
+            if isinstance(items[0], Future):
+                col_ids, write_group = items[0].result()
+            else:
+                col_ids = items[0][0]
+                write_group = items[0][1]
 
-        doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
-        self.intermediate_results.add_doc_ids(write_group, doc_ids, self.metadata.col_to_doc)
-        parent_write_group = self._get_parent_write_group(write_group)
-        if self.enable_highlighting:
-            return (doc_ids, ({}, col_ids)), parent_write_group
+            doc_ids = col_to_doc_ids(col_ids, self.metadata.col_to_doc)
+            self.intermediate_results.add_doc_ids(write_group, doc_ids, self.metadata.col_to_doc)
+            parent_write_group = self._get_parent_write_group(write_group)
+            if self.enable_highlighting:
+                return (doc_ids, ({}, col_ids)), parent_write_group
 
-        return ((doc_ids, ({}, np.array([], dtype=np.uint32))), parent_write_group)
+            return ((doc_ids, ({}, np.array([], dtype=np.uint32))), parent_write_group)
+
+        logger.trace("Evaluating column term with {} items", len(items))
+        # Submit task to thread pool
+        return self._thread_pool.submit(_col_task, items)
 
     def conjunction(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
-    ) -> tuple[TResult, int]:
+    ) -> Future[tuple[TResult, int]]:
+        def _conjunction_task(
+            items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]],
+        ) -> tuple[TResult, int]:
+            logger.trace("Evaluating conjunction with number of items: {}", len(items))
+
+            clean_items, write_group = self._resolve_items(items)
+            result = junction(
+                clean_items, "and", self.enable_highlighting, self.metadata.doc_to_cols
+            )
+
+            if isinstance(result, tuple):
+                self.intermediate_results.add_doc_ids(
+                    write_group, result[0], self.metadata.col_to_doc
+                )
+            else:
+                self.intermediate_results.add_col_ids(
+                    write_group, result, self.metadata.doc_to_cols
+                )
+
+            return result, self._get_parent_write_group(write_group)
+
         logger.trace("Evaluating conjunction with number of items: {}", len(items))
 
-        clean_items, write_group = self._resolve_items(items)
-        result = junction(clean_items, "and", self.enable_highlighting, self.metadata.doc_to_cols)
-
-        if isinstance(result, tuple):
-            self.intermediate_results.add_doc_ids(write_group, result[0], self.metadata.col_to_doc)
-        else:
-            self.intermediate_results.add_col_ids(write_group, result, self.metadata.doc_to_cols)
-
-        parent_write_group = self._get_parent_write_group(write_group)
-
-        return result, parent_write_group
+        return self._thread_pool.submit(_conjunction_task, items)
 
     def disjunction(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
-    ) -> tuple[TResult, int]:
+    ) -> Future[tuple[TResult, int]]:
+        def _disjunction_task(
+            items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]],
+        ) -> tuple[TResult, int]:
+            logger.trace("Evaluating disjunction with number of items: {}", len(items))
+
+            clean_items, write_group = self._resolve_items(items)
+            result = junction(
+                clean_items, "or", self.enable_highlighting, self.metadata.doc_to_cols
+            )
+
+            if isinstance(result, tuple):
+                self.intermediate_results.add_doc_ids(
+                    write_group, result[0], self.metadata.col_to_doc
+                )
+            else:
+                self.intermediate_results.add_col_ids(
+                    write_group, result, self.metadata.doc_to_cols
+                )
+
+            parent_write_group = self._get_parent_write_group(write_group)
+            return result, parent_write_group
+
         logger.trace("Evaluating disjunction with number of items: {}", len(items))
-
-        clean_items, write_group = self._resolve_items(items)
-        result = junction(clean_items, "or", self.enable_highlighting, self.metadata.doc_to_cols)
-
-        if isinstance(result, tuple):
-            self.intermediate_results.add_doc_ids(write_group, result[0], self.metadata.col_to_doc)
-        else:
-            self.intermediate_results.add_col_ids(write_group, result, self.metadata.doc_to_cols)
-
-        parent_write_group = self._get_parent_write_group(write_group)
-        return result, parent_write_group
+        # Submit task to thread pool
+        return self._thread_pool.submit(_disjunction_task, items)
 
     def negation(
         self, items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]]
-    ) -> tuple[TResult, int]:
-        logger.trace("Evaluating negation with {} items", len(items))
+    ) -> Future[tuple[TResult, int]]:
+        def negate_task(
+            items: Sequence[tuple[TResult, int] | Future[tuple[TResult, int]]],
+        ) -> tuple[TResult, int]:
+            logger.trace("Evaluating negation with {} items", len(items))
 
-        if len(items) != 1:
-            raise ValueError("Negation term must have exactly one item")
-        # Resolve the item if it's a future
-        item, write_group = self._resolve_item(items[0])
+            if len(items) != 1:
+                raise ValueError("Negation term must have exactly one item")
+            # Resolve the item if it's a future
+            item, write_group = self._resolve_item(items[0])
 
-        if isinstance(item, tuple):
-            to_negate, _ = item
+            if isinstance(item, tuple):
+                to_negate, _ = item
 
-            doc_highlights: DocumentHighlights = {}
-            col_highlights: ColumnHighlights = np.array([], dtype=np.uint32)
-            doc_result = negate_array(to_negate, len(self.metadata.doc_to_cols))
-            result = (doc_result, (doc_highlights, col_highlights))
-            self.intermediate_results.add_doc_ids(
-                write_group, doc_result, self.metadata.col_to_doc
+                doc_highlights: DocumentHighlights = {}
+                col_highlights: ColumnHighlights = np.array([], dtype=np.uint32)
+                doc_result = negate_array(to_negate, len(self.metadata.doc_to_cols))
+                result = (doc_result, (doc_highlights, col_highlights))
+                self.intermediate_results.add_doc_ids(
+                    write_group, doc_result, self.metadata.col_to_doc
+                )
+                return result, self._get_parent_write_group(write_group)  # type: ignore[return-value]
+
+            to_negate_cols: ColResult = item
+
+            negated_cols = negate_array(to_negate_cols, len(self.metadata.col_to_doc))
+            self.intermediate_results.add_col_ids(
+                write_group, negated_cols, self.metadata.doc_to_cols
             )
-            return result, self._get_parent_write_group(write_group)
 
-        to_negate_cols: ColResult = item
+            return negated_cols, self._get_parent_write_group(write_group)  # type: ignore[return-value]
 
-        negated_cols = negate_array(to_negate_cols, len(self.metadata.col_to_doc))
-        self.intermediate_results.add_col_ids(write_group, negated_cols, self.metadata.doc_to_cols)
-
-        return negated_cols, self._get_parent_write_group(write_group)
+        logger.trace("Evaluating negation with {} items", len(items))
+        # Submit task to thread pool
+        return self._thread_pool.submit(negate_task, items)
 
     def query(
         self, items: list[tuple[DocResult, int] | Future[tuple[DocResult, int]]]
