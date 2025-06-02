@@ -58,6 +58,11 @@ def visualize_trees():
         # save the tree to a file
         tree.pydot__tree_to_png(
             delete_leaf_nodes.transform(parsered_tree),
+            f"{folder}/parse_tree_{query_name}_without_leaves.png",
+            rankdir="TB",
+        )
+        tree.pydot__tree_to_png(
+            parsered_tree,
             f"{folder}/parse_tree_{query_name}.png",
             rankdir="TB",
         )
@@ -66,6 +71,11 @@ def visualize_trees():
         # save the optimized tree to a file
         tree.pydot__tree_to_png(
             delete_leaf_nodes.transform(optimized_tree),
+            f"{folder}/optimized_parse_tree_{query_name}_without_leaves.png",
+            rankdir="TB",
+        )
+        tree.pydot__tree_to_png(
+            optimized_tree,
             f"{folder}/optimized_parse_tree_{query_name}.png",
             rankdir="TB",
         )
