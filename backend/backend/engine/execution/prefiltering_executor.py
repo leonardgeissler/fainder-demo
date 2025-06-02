@@ -37,8 +37,10 @@ class IntermediateResult:
         fainder_mode: FainderMode,
         doc_ids: DocumentArray | None = None,
         col_ids: ColumnArray | None = None,
+        num_workers: int = 1,
     ) -> None:
         self.fainder_mode = fainder_mode
+        self.num_workers = num_workers
         if doc_ids is None and col_ids is None:
             raise ValueError("doc_ids and col_ids cannot both be None")
         if doc_ids is not None and col_ids is not None:
@@ -47,13 +49,13 @@ class IntermediateResult:
         self._doc_ids: DocumentArray | None = (
             None
             if doc_ids is not None
-            and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode)
+            and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode, num_workers)
             else doc_ids
         )
         self._col_ids: ColumnArray | None = (
             None
             if col_ids is not None
-            and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode)
+            and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode, num_workers)
             else col_ids
         )
 
@@ -78,11 +80,15 @@ class IntermediateResult:
     def build_hist_filter(self, metadata: Metadata) -> ColumnArray | None:
         """Build a histogram filter from the intermediate results."""
         if self._col_ids is not None:
-            if exceeds_filtering_limit(self._col_ids, "num_col_ids", self.fainder_mode):
+            if exceeds_filtering_limit(
+                self._col_ids, "num_col_ids", self.fainder_mode, self.num_workers
+            ):
                 return None
             return self._col_ids
         if self._doc_ids is not None:
-            if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", self.fainder_mode):
+            if exceeds_filtering_limit(
+                self._doc_ids, "num_doc_ids", self.fainder_mode, self.num_workers
+            ):
                 return None
             return doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
         return None
@@ -99,11 +105,14 @@ class IntermediateResult:
 class IntermediateResultStore:
     """Store intermediate results for prefiltering per group."""
 
-    def __init__(self, fainder_mode: FainderMode, write_groups_used: dict[int, int]) -> None:
+    def __init__(
+        self, fainder_mode: FainderMode, write_groups_used: dict[int, int], num_workers: int
+    ) -> None:
         self.results: dict[int, IntermediateResult] = {}
         self.fainder_mode = fainder_mode
         self.write_groups_used = write_groups_used
         self.write_groups_actually_used: dict[int, int] = {}
+        self.num_workers = num_workers
 
     def add_col_id_results(
         self, write_group: int, col_ids: ColumnArray, doc_to_cols: list[NDArray[np.uint32]]
@@ -118,7 +127,7 @@ class IntermediateResultStore:
             logger.trace("Write group {} is not used, skipping adding column IDs", write_group)
             return
 
-        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
+        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode, self.num_workers):
             logger.trace("Column IDs exceed filtering limit, skipping adding column IDs")
             return
 
@@ -127,7 +136,7 @@ class IntermediateResultStore:
             self.results[write_group].add_col_ids(col_ids=col_ids, doc_to_cols=doc_to_cols)
         else:
             self.results[write_group] = IntermediateResult(
-                col_ids=col_ids, fainder_mode=self.fainder_mode
+                col_ids=col_ids, fainder_mode=self.fainder_mode, num_workers=self.num_workers
             )
 
     def add_doc_id_results(
@@ -145,7 +154,7 @@ class IntermediateResultStore:
             logger.trace("Write group {} is not used, skipping adding document IDs", write_group)
             return
 
-        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode, self.num_workers):
             logger.trace("Document IDs exceed filtering limit, skipping adding document IDs")
             return
 
@@ -154,7 +163,7 @@ class IntermediateResultStore:
             self.results[write_group].add_doc_ids(doc_ids=doc_ids, col_to_doc=col_to_doc)
         else:
             self.results[write_group] = IntermediateResult(
-                doc_ids=doc_ids, fainder_mode=self.fainder_mode
+                doc_ids=doc_ids, fainder_mode=self.fainder_mode, num_workers=self.num_workers
             )
 
     def build_hist_filter(self, read_groups: list[int], metadata: Metadata) -> ColumnArray | None:
@@ -228,7 +237,9 @@ class PrefilteringExecutor(Transformer_NonRecursive[Token, DocResult], Executor)
         self.scores: dict[int, float] = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
-        self.intermediate_results = IntermediateResultStore(fainder_mode, {})
+        self.intermediate_results = IntermediateResultStore(
+            fainder_mode, {}, self.fainder_index.num_workers
+        )
         self.write_groups: dict[int, int] = {}
         self.read_groups: dict[int, list[int]] = {}
         self.parent_write_group: dict[int, int] = {}

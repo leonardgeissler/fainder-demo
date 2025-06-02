@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 
 import numpy as np
-from lark import ParseTree, Token, Transformer_NonRecursive
+from lark import ParseTree, Token, Transformer
 from loguru import logger
 from numpy.typing import NDArray
 
@@ -39,6 +39,7 @@ class IntermediateResultFuture:
         self,
         write_group: int,
         fainder_mode: FainderMode,
+        num_workers: int,
         doc_ids: DocumentArray | None = None,
         col_ids: ColumnArray | None = None,
     ) -> None:
@@ -46,18 +47,19 @@ class IntermediateResultFuture:
         self.write_group = write_group
         self.kw_result_futures: list[Future[tuple[DocResult, int]]] = []
         self.col_result_futures: list[Future[tuple[ColResult, int]]] = []
+        self.num_workers = num_workers
 
         # Store resolved results only one of these should be set
         self._doc_ids: DocumentArray | None = (
             None
             if doc_ids is not None
-            and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode)
+            and exceeds_filtering_limit(doc_ids, "num_doc_ids", fainder_mode, num_workers)
             else doc_ids
         )
         self._col_ids: ColumnArray | None = (
             None
             if col_ids is not None
-            and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode)
+            and exceeds_filtering_limit(col_ids, "num_col_ids", fainder_mode, num_workers)
             else col_ids
         )
 
@@ -91,11 +93,15 @@ class IntermediateResultFuture:
 
     def _build_hist_filter_resolved(self, metadata: Metadata) -> ColResult | None:
         if self._doc_ids is not None:
-            if exceeds_filtering_limit(self._doc_ids, "num_doc_ids", self.fainder_mode):
+            if exceeds_filtering_limit(
+                self._doc_ids, "num_doc_ids", self.fainder_mode, self.num_workers
+            ):
                 return None
             return doc_to_col_ids(self._doc_ids, metadata.doc_to_cols)
         if self._col_ids is not None:
-            if exceeds_filtering_limit(self._col_ids, "num_col_ids", self.fainder_mode):
+            if exceeds_filtering_limit(
+                self._col_ids, "num_col_ids", self.fainder_mode, self.num_workers
+            ):
                 return None
             return self._col_ids
         return None
@@ -105,7 +111,9 @@ class IntermediateResultFuture:
         first = True
         for kw_future in self.kw_result_futures:
             doc_ids, _ = kw_future.result()
-            if exceeds_filtering_limit(doc_ids[0], "num_doc_ids", self.fainder_mode):
+            if exceeds_filtering_limit(
+                doc_ids[0], "num_doc_ids", self.fainder_mode, self.num_workers
+            ):
                 continue
             col_ids = doc_to_col_ids(doc_ids[0], metadata.doc_to_cols)
             new_hist_ids = col_to_hist_ids(col_ids, metadata.num_hists)
@@ -117,7 +125,9 @@ class IntermediateResultFuture:
 
         for col_future in self.col_result_futures:
             col_ids, _ = col_future.result()
-            if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
+            if exceeds_filtering_limit(
+                col_ids, "num_col_ids", self.fainder_mode, self.num_workers
+            ):
                 continue
             new_hist_ids = col_to_hist_ids(col_ids, metadata.num_hists)
             if first:
@@ -131,7 +141,9 @@ class IntermediateResultFuture:
         if first:
             return None
         filter_result = reduce_arrays(hist_ids, "and")
-        if exceeds_filtering_limit(filter_result, "num_col_ids", self.fainder_mode):
+        if exceeds_filtering_limit(
+            filter_result, "num_col_ids", self.fainder_mode, self.num_workers
+        ):
             return None
         return filter_result
 
@@ -165,11 +177,14 @@ class IntermediateResultFuture:
 class IntermediateResultStoreFuture:
     """Stores futures and results for intermediate results during parallel execution."""
 
-    def __init__(self, fainder_mode: FainderMode, write_groups_used: dict[int, int]) -> None:
+    def __init__(
+        self, fainder_mode: FainderMode, write_groups_used: dict[int, int], num_workers: int
+    ) -> None:
         self.results: dict[int, IntermediateResultFuture] = {}
         self.fainder_mode = fainder_mode
         self.write_groups_used = write_groups_used
         self.write_groups_actually_used: dict[int, int] = {}
+        self.num_workers = num_workers
 
     def add_future_kw_result(
         self, write_group: int, future: Future[tuple[DocResult, int]]
@@ -184,7 +199,7 @@ class IntermediateResultStoreFuture:
 
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
-                write_group, fainder_mode=self.fainder_mode
+                write_group, fainder_mode=self.fainder_mode, num_workers=self.num_workers
             )
         self.results[write_group].add_doc_future(future)
 
@@ -201,7 +216,7 @@ class IntermediateResultStoreFuture:
 
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
-                write_group, fainder_mode=self.fainder_mode
+                write_group, fainder_mode=self.fainder_mode, num_workers=self.num_workers
             )
         self.results[write_group].add_col_future(future)
 
@@ -216,14 +231,17 @@ class IntermediateResultStoreFuture:
             logger.trace("Write group {} is not used, skipping adding column IDs", write_group)
             return
 
-        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode):
+        if exceeds_filtering_limit(col_ids, "num_col_ids", self.fainder_mode, self.num_workers):
             logger.trace("Column IDs exceed filtering limit: {}", len(col_ids))
             return
 
         logger.trace("Write group {} is used, adding column IDs", write_group)
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
-                write_group, col_ids=col_ids, fainder_mode=self.fainder_mode
+                write_group,
+                col_ids=col_ids,
+                fainder_mode=self.fainder_mode,
+                num_workers=self.num_workers,
             )
         else:
             self.results[write_group].add_col_ids(col_ids, doc_to_cols)
@@ -240,14 +258,17 @@ class IntermediateResultStoreFuture:
             logger.trace("Write group {} is not used, skipping adding document IDs", write_group)
             return
 
-        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode):
+        if exceeds_filtering_limit(doc_ids, "num_doc_ids", self.fainder_mode, self.num_workers):
             logger.trace("Document IDs exceed filtering limit: {}", len(doc_ids))
             return
 
         logger.trace("Write group {} is used, adding document IDs", write_group)
         if write_group not in self.results:
             self.results[write_group] = IntermediateResultFuture(
-                write_group, doc_ids=doc_ids, fainder_mode=self.fainder_mode
+                write_group,
+                doc_ids=doc_ids,
+                fainder_mode=self.fainder_mode,
+                num_workers=self.num_workers,
             )
         else:
             self.results[write_group].add_doc_ids(doc_ids, col_to_doc)
@@ -294,7 +315,7 @@ class IntermediateResultStoreFuture:
         return hist_filter
 
 
-class ThreadedPrefilteringExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
+class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     """This transformer evaluates a parse tree bottom-up and computes results in parallel threads.
 
     It also uses prefiltering to reduce the number of documents before executing the query for
@@ -338,7 +359,9 @@ class ThreadedPrefilteringExecutor(Transformer_NonRecursive[Token, DocResult], E
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
         self.intermediate_results = IntermediateResultStoreFuture(
-            fainder_mode=fainder_mode, write_groups_used={}
+            fainder_mode=fainder_mode,
+            write_groups_used={},
+            num_workers=self.fainder_index.num_workers,
         )
 
     def execute(self, tree: ParseTree) -> DocResult:
@@ -360,7 +383,7 @@ class ThreadedPrefilteringExecutor(Transformer_NonRecursive[Token, DocResult], E
         # create intermediate results for all write groups
         for write_group in self.write_groups.values():
             self.intermediate_results.results[write_group] = IntermediateResultFuture(
-                write_group, self.fainder_mode
+                write_group, self.fainder_mode, self.fainder_index.num_workers
             )
 
         result = self.transform(tree)
