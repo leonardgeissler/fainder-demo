@@ -61,3 +61,4 @@ logs/
 /analysis/fainder_results_size/figures
 /analysis/visualize_trees/trees
 /analysis/fainder_filter_breaking_points_tests/figures
+/multirun

@@ -1,8 +1,4 @@
 enabled_tests:
-  - base_keyword_queries
-  - base_keyword_queries_with_multiple_elements
-  - base_column_name_queries
-  - base_percentile_queries
   - Percentile_Combinations
   - Multiple_Percentile_Combinations
   - Expected_Form
