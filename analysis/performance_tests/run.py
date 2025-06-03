@@ -80,6 +80,7 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
             metadata=metadata,
             cache_size=scenario.cache_size,
             executor_type=executor,
+            max_workers=28,
         )
 
         # Configure optimizer based on config settings
@@ -302,10 +303,10 @@ def run_test_case(
                 if hasattr(engine.executor, "write_groups_actually_used") and hasattr(
                     engine.executor, "write_groups_used"
                 ):
-                    write_groups_actually_used: dict[int, int] = getattr(
+                    write_groups_actually_used= getattr(
                         engine.executor, "write_groups_actually_used", {}
                     )
-                    write_groups_used: dict[int, int] = getattr(
+                    write_groups_used = getattr(
                         engine.executor, "write_groups_used", {}
                     )
 
