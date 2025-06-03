@@ -129,7 +129,7 @@
                         "thirdQuartile": 38.0,
                         "max": 52.0
                     },
-                    "id": 10
+                    "id": 6
                 },
                 {
                     "dataType": [
@@ -150,7 +150,7 @@
                     "minDate": "2015-01-04T00:00:00",
                     "maxDate": "2018-03-25T00:00:00",
                     "uniqueDates": 169,
-                    "id": 11
+                    "id": 27
                 },
                 {
                     "dataType": [
@@ -206,7 +206,7 @@
                         "thirdQuartile": 1.66,
                         "max": 3.25
                     },
-                    "id": 12
+                    "id": 7
                 },
                 {
                     "dataType": [
@@ -262,7 +262,7 @@
                         "thirdQuartile": 432962.29,
                         "max": 62505646.52
                     },
-                    "id": 13
+                    "id": 8
                 },
                 {
                     "dataType": [
@@ -318,7 +318,7 @@
                         "thirdQuartile": 111020.2,
                         "max": 22743616.17
                     },
-                    "id": 14
+                    "id": 9
                 },
                 {
                     "dataType": [
@@ -374,7 +374,7 @@
                         "thirdQuartile": 150206.86,
                         "max": 20470572.61
                     },
-                    "id": 15
+                    "id": 10
                 },
                 {
                     "dataType": [
@@ -430,7 +430,7 @@
                         "thirdQuartile": 6243.42,
                         "max": 2546439.11
                     },
-                    "id": 16
+                    "id": 11
                 },
                 {
                     "dataType": [
@@ -486,7 +486,7 @@
                         "thirdQuartile": 110783.37,
                         "max": 19373134.37
                     },
-                    "id": 17
+                    "id": 12
                 },
                 {
                     "dataType": [
@@ -542,7 +542,7 @@
                         "thirdQuartile": 83337.67,
                         "max": 13384586.8
                     },
-                    "id": 18
+                    "id": 13
                 },
                 {
                     "dataType": [
@@ -598,7 +598,7 @@
                         "thirdQuartile": 22029.25,
                         "max": 5719096.61
                     },
-                    "id": 19
+                    "id": 14
                 },
                 {
                     "dataType": [
@@ -653,7 +653,7 @@
                         "thirdQuartile": 132.5,
                         "max": 551693.65
                     },
-                    "id": 20
+                    "id": 15
                 },
                 {
                     "dataType": [
@@ -675,7 +675,7 @@
                         "conventional": 9126,
                         "organic": 9123
                     },
-                    "id": 21
+                    "id": 28
                 },
                 {
                     "dataType": [
@@ -730,7 +730,7 @@
                         "thirdQuartile": 2017.0,
                         "max": 2018.0
                     },
-                    "id": 22
+                    "id": 16
                 },
                 {
                     "dataType": [
@@ -760,7 +760,7 @@
                         "Chicago": 338,
                         "CincinnatiDayton": 338
                     },
-                    "id": 23
+                    "id": 29
                 }
             ],
             "@id": "Avocado.csv",

@@ -106,7 +106,7 @@
                         "Leipzig": 108,
                         "Hanover": 108
                     },
-                    "id": 0
+                    "id": 23
                 },
                 {
                     "dataType": [
@@ -137,7 +137,7 @@
                         "51.3397": 108,
                         "52.3759": 108
                     },
-                    "id": 1
+                    "id": 24
                 },
                 {
                     "dataType": [
@@ -168,7 +168,7 @@
                         "12.3731": 108,
                         "9.732": 108
                     },
-                    "id": 2
+                    "id": 25
                 },
                 {
                     "dataType": [
@@ -224,7 +224,7 @@
                         "thirdQuartile": 9.25,
                         "max": 12.0
                     },
-                    "id": 3
+                    "id": 0
                 },
                 {
                     "dataType": [
@@ -280,7 +280,7 @@
                         "thirdQuartile": 2021.0,
                         "max": 2023.0
                     },
-                    "id": 4
+                    "id": 1
                 },
                 {
                     "dataType": [
@@ -336,7 +336,7 @@
                         "thirdQuartile": 149.5275,
                         "max": 199.91
                     },
-                    "id": 5
+                    "id": 2
                 },
                 {
                     "dataType": [
@@ -392,7 +392,7 @@
                         "thirdQuartile": 113.0,
                         "max": 519.0
                     },
-                    "id": 6
+                    "id": 3
                 },
                 {
                     "dataType": [
@@ -415,7 +415,7 @@
                         "Oceanic": 648,
                         "Continental": 432
                     },
-                    "id": 7
+                    "id": 26
                 },
                 {
                     "dataType": [
@@ -471,7 +471,7 @@
                         "thirdQuartile": 24.3,
                         "max": 34.9
                     },
-                    "id": 8
+                    "id": 4
                 },
                 {
                     "dataType": [
@@ -527,7 +527,7 @@
                         "thirdQuartile": 83.0,
                         "max": 99.0
                     },
-                    "id": 9
+                    "id": 5
                 }
             ],
             "@id": "Rainfall_Data_Germany_Complete.csv",
