@@ -39,6 +39,9 @@ class FainderIndex:
 
         atexit.register(self._cleanup_parallel_processor)
 
+        self.num_workers = num_workers
+        self.num_chunks = num_chunks
+
         self.update(
             rebinning_path=rebinning_path,
             conversion_path=conversion_path,
@@ -87,6 +90,9 @@ class FainderIndex:
             logger.warning(f"Histogram path {histogram_path} does not exist")
 
         self.parallel = parallel
+
+        self.num_workers = num_workers
+        self.num_chunks = num_chunks
 
         # Clean up existing parallel processor if it exists
         if hasattr(self, "parallel_processor") and self.parallel_processor is not None:
@@ -154,7 +160,7 @@ class FainderIndex:
                     id_filter=hist_filter,
                 )
             case FainderMode.EXACT:
-                if hist_filter is not None or not self.parallel:
+                if not self.parallel:
                     if self.conversion_index is None or self.hists is None:
                         raise FainderError(
                             "Conversion index and histograms must be loaded for exact mode."
@@ -182,6 +188,7 @@ class FainderIndex:
                         fainder_index=self.conversion_index,
                         query=query,
                         parallel_processor=self.parallel_processor,
+                        id_filter=hist_filter,
                     )
 
         logger.info(
