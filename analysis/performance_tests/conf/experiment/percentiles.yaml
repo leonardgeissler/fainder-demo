@@ -1,7 +1,7 @@
 enabled_tests:
-  - percentile_combinations
-  - multiple_percentile_combinations
-  - multiple_percentile_combinations_with_kw
+  - Percentile_Combinations
+  - Multiple_Percentile_Combinations
+  - Multiple_percentile_combinations_with_Keyword
 
 fainder_modes:
   - full_precision

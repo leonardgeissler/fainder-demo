@@ -9,6 +9,8 @@ thresholds = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 100
 
 percentiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
+comaprisons = ["le", "lt", "ge", "gt"]
+
 fainder_modes: list[FainderMode] = [FainderMode.FULL_RECALL, FainderMode.EXACT]
 
 
@@ -32,7 +34,7 @@ def run():
     with log_file.open("w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(
-            ["timestamp", "fainder_mode", "threshold", "percentile", "result_size"]
+            ["timestamp", "fainder_mode", "threshold", "comparison", "percentile", "result_size"]
         )
     settings = Settings()  # type: ignore # uses the environment variables
     fainder_index = FainderIndex(
@@ -40,31 +42,32 @@ def run():
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
         parallel=settings.fainder_parallel,
-        num_workers=settings.max_workers,
-        contiguous=settings.fainder_contiguous_chunks,
+        num_workers=settings.max_workers - 1,
     )
 
     for threshold in thresholds:
         for percentile in percentiles:
             for fainder_mode in fainder_modes:
-                result_size = len(
-                    fainder_index.search(
+                for comparison in comaprisons:
+                    
+                    result_size = len(
+                        fainder_index.search(
+                            percentile=percentile,
+                            comparison=comparison,
+                            reference=threshold,
+                            fainder_mode=fainder_mode,
+                        )
+                    )
+                    log_performance_csv(
+                        csv_path=log_file,
+                        threshold=threshold,
                         percentile=percentile,
-                        comparison="le",
-                        reference=threshold,
+                        result_size=result_size,
                         fainder_mode=fainder_mode,
                     )
-                )
-                log_performance_csv(
-                    csv_path=log_file,
-                    threshold=threshold,
-                    percentile=percentile,
-                    result_size=result_size,
-                    fainder_mode=fainder_mode,
-                )
-                print(
-                    f"Threshold: {threshold}, Percentile: {percentile}, Fainder Mode: {fainder_mode}, Result Size: {result_size}"
-                )
+                    print(
+                        f"Threshold: {threshold}, Percentile: {percentile}, Fainder Mode: {fainder_mode}, Result Size: {result_size}"
+                    )
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ from typing import Any
 from loguru import logger
 
 from .config_models import PerformanceConfig
+import random
 
 
 def generate_simple_keyword_queries(
@@ -635,11 +636,14 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
         max_num_queries=config.query_generation.max_num_column_name_queries,
     )
 
+    random.seed(42)  # Fixed seed for reproducibility
     percentile_terms_list = generate_percentile_terms(
         percentile_values=config.percentiles.default_percentiles,
         thresholds=config.percentiles.default_thresholds,
         operators=config.percentiles.default_operators,
     )
+    random.shuffle(percentile_terms_list)
+
     percentilequeries = generate_percentile_queries(
         percentile_values=config.percentiles.default_percentiles,
         thresholds=config.percentiles.default_thresholds,
