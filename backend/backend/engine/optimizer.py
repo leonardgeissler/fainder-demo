@@ -179,9 +179,15 @@ class CostSorter(Visitor[Token], OptimizationRule):
         if tree.data in LEAF_COSTS:
             # If the node is a leaf node, set its cost and return
             if tree.data == "percentile_op":
-                threshold = float(tree.children[2].value)  # type: ignore[attr-defined]
-                percentile = float(tree.children[0].value)  # type: ignore[attr-defined]
-                comparison = tree.children[1].value  # type: ignore[attr-defined]
+                if (
+                    not isinstance(tree.children[2], Token)
+                    or not isinstance(tree.children[0], Token)
+                    or not isinstance(tree.children[1], Token)
+                ):
+                    raise ValueError("Expected Token children for percentile_op")
+                threshold = float(tree.children[2].value)
+                percentile = float(tree.children[0].value)
+                comparison = tree.children[1].value
                 tree.cost = self.estimate_result_size_for_pp(threshold, percentile, comparison)  # type: ignore[attr-defined]
             tree.cost = LEAF_COSTS[tree.data]  # type: ignore[attr-defined]
             return tree
