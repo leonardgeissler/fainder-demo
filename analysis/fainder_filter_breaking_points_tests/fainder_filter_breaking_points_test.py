@@ -159,12 +159,12 @@ def test_breaking_point_fainder(
         )
 
         # use result_keyword and result_without_filtering to calculate the filter size right and wrong
-        filter_size_right = len(result_keyword_filter_hists)
-        filter_size_wrong = len(result_keyword_hists) - filter_size_right
-        filter_size = len(result_keyword_hists)
+        filter_size_right = result_keyword_filter_hists.size
+        filter_size_wrong = result_keyword_hists.size - filter_size_right
+        filter_size = result_keyword_hists.size
 
         # calculate the filter size on document level
-        filter_size_right_doc = len(result_keyword_filter)
+        filter_size_right_doc = result_keyword_filter.size
         filter_size_wrong_doc = len(result_keyword) - filter_size_right_doc
         filter_size_doc = len(result_keyword)
 
@@ -178,7 +178,7 @@ def test_breaking_point_fainder(
             time_with_keyword_filter,
             time_keyword,
             len(result_keyword),
-            len(result_keyword_filter),
+            result_keyword_filter.size,
             filter_size_wrong_doc,
             filter_size_right_doc,
             filter_size_doc,
