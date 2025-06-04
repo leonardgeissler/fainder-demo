@@ -18,6 +18,8 @@ max_num_terms_percentilequeries: 10
 
 max_num_middle_exit: 10
 
+max_num_early_exit: 10
+
 num_elements_keywordsqueries: 5
 
 max_num_keywordsqueries: 10

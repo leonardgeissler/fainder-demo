@@ -145,6 +145,9 @@ class QueryGenerationConfig:
     max_num_middle_exit: int = field(
         default=20, metadata={"description": "Maximum number of middle exit terms"}
     )
+    max_num_early_exit: int = field(
+        default=20, metadata={"description": "Maximum number of early exit terms"}
+    )
     num_elements_keywordsqueries: int = field(
         default=5, metadata={"description": "Number of elements for keywords queries"}
     )

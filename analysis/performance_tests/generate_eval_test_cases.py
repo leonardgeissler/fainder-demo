@@ -470,17 +470,22 @@ def double_expected_form(
 def early_exit(
     queries: dict[str, dict[str, Any]],
     form: str = "expected_form",
+    max_terms: int = 10,
 ) -> dict[str, dict[str, Any]]:
     """
     Ads an early 0 results to each query
     """
 
+    i = 0
     new_queries: dict[str, dict[str, Any]] = {}
     for query_name, query in queries.items():
         new_queries["early_exit_" + form + "_" + query_name] = {
             "query": "kw('agjkehkejhgkjehgsjkhg') AND " + query["query"],
             "ids": query["ids"],
         }
+        i += 1
+        if i >= max_terms:
+            break
 
     return new_queries
 
@@ -682,6 +687,7 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     early_exit_queries = early_exit(
         mixed_term_combinations_with_fixed_structure_extented_queries,
         form="expected_form",
+        max_terms=config.query_generation.max_num_early_exit,
     )
 
     multiple_percentile_combinations_queries = multiple_percentile_combinations(
