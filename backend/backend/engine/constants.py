@@ -45,19 +45,19 @@ FILTERING_STOP_POINTS: dict[FainderMode, dict[int, FilteringStopPointsConfig]] =
             "num_hist_ids": 900000,
         },
         5: {
-            "num_doc_ids": 10000,
-            "num_col_ids": 300000,
-            "num_hist_ids": 300000,
+            "num_doc_ids": 75000,
+            "num_col_ids": 3000000,
+            "num_hist_ids": 3000000,
         },
         11: {
-            "num_doc_ids": 7500,
-            "num_col_ids": 225000,
-            "num_hist_ids": 225000,
+            "num_doc_ids": 75000,
+            "num_col_ids": 3000000,
+            "num_hist_ids": 3000000,
         },
         27: {
-            "num_doc_ids": 5000,
-            "num_col_ids": 150000,
-            "num_hist_ids": 150000,
+            "num_doc_ids": 75000,
+            "num_col_ids": 3000000,
+            "num_hist_ids": 3000000,
         },
     },
 }
