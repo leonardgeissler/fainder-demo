@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+import numpy as np
 from lark import ParseTree, Token, Tree, Visitor
 from loguru import logger
 
 from backend.config import ExecutorType
+from backend.engine.constants import COEF_LOG_THRESHOLD, COEF_PERCENTILE, INTERCEPT
 
 if TYPE_CHECKING:
     from lark.tree import Branch
@@ -13,8 +15,15 @@ if TYPE_CHECKING:
 Costs for each operator in the query tree. Currently, we define operator costs as a hand-picked
 magic number. In the future, we may want to use a more sophisticated cost model.
 """
-LEAF_COSTS = {"keyword_op": -1, "percentile_op": 2, "name_op": 1}
-NODE_COSTS = {"col_op": 1, "negation": 2}
+LEAF_COSTS = {
+    "keyword_op": -1,
+    "percentile_op": 2,
+    "name_op": 1,
+}
+NODE_COSTS = {
+    "col_op": 1,
+    "negation": 2,
+}
 
 
 class OptimizationRule(ABC):
@@ -169,6 +178,11 @@ class CostSorter(Visitor[Token], OptimizationRule):
     def __default__(self, tree: ParseTree) -> ParseTree:  # noqa: PLW3201
         if tree.data in LEAF_COSTS:
             # If the node is a leaf node, set its cost and return
+            if tree.data == "percentile_op":
+                threshold = float(tree.children[2].value)  # type: ignore[attr-defined]
+                percentile = float(tree.children[0].value)  # type: ignore[attr-defined]
+                comparison = tree.children[1].value  # type: ignore[attr-defined]
+                tree.cost = self.estimate_result_size_for_pp(threshold, percentile, comparison)  # type: ignore[attr-defined]
             tree.cost = LEAF_COSTS[tree.data]  # type: ignore[attr-defined]
             return tree
 
@@ -188,6 +202,33 @@ class CostSorter(Visitor[Token], OptimizationRule):
 
     def apply(self, tree: ParseTree) -> None:
         self.visit(tree)
+
+    def estimate_result_size_for_pp(
+        self, threshold: float, percentile: float, comparison: str
+    ) -> float:
+        """Estimate the number of results using a regression model.
+
+        Parameters:
+        - threshold (float): the threshold value (must be > 0)
+        - percentile (float): the predicate percentile, between 0 and 1
+        - comparison (str): the comparison operator, "le", "lt", "ge", "gt"
+
+        Returns:
+        - Estimated result size (float)
+        """
+        if comparison not in {"le", "lt", "ge", "gt"}:
+            raise ValueError("Comparison must be one of 'le', 'lt', 'ge', 'gt'.")
+        if comparison in {"gt", "ge"}:
+            percentile = 1 - percentile  # Invert percentile for gt/ge comparisons
+
+        # Formular for the regression model for le
+        if threshold <= 0:
+            raise ValueError("Threshold must be positive.")
+        if not (0 <= percentile <= 1):
+            raise ValueError("Percentile must be between 0 and 1.")
+
+        log_thresh = np.log10(threshold)
+        return INTERCEPT + COEF_LOG_THRESHOLD * log_thresh + COEF_PERCENTILE * percentile
 
 
 class MergeKeywords(Visitor[Token], OptimizationRule):

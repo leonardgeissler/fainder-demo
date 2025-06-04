@@ -11,6 +11,11 @@ class FilteringStopPointsConfig(TypedDict):
     num_hist_ids: int
 
 
+# coefficients from linear model for pp result size
+INTERCEPT = 5.776e6
+COEF_LOG_THRESHOLD = 3.575e5
+COEF_PERCENTILE = -9.344e5
+
 FILTERING_STOP_POINTS: dict[FainderMode, dict[int, FilteringStopPointsConfig]] = {
     FainderMode.LOW_MEMORY: {
         0: {
