@@ -1,3 +1,4 @@
+import atexit
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -16,7 +17,6 @@ if TYPE_CHECKING:
     from fainder.typing import PercentileIndex as PctlIndex
     from fainder.typing import PercentileQuery as PctlQuery
     from numpy.typing import NDArray
-import atexit
 
 
 class FainderIndex:
@@ -25,16 +25,17 @@ class FainderIndex:
         rebinning_path: Path | None,
         conversion_path: Path | None,
         histogram_path: Path | None,
-        parallel: bool = True,
-        num_workers: int = (os.cpu_count() or 2) - 1,
-        num_chunks: int = (os.cpu_count() or 2) - 1,
+        num_workers: int = (os.cpu_count() or 1) - 1,
+        num_chunks: int = (os.cpu_count() or 1) - 1,
         chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
     ) -> None:
         self.rebinning_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = None
         self.conversion_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = None
         self.histogram_path: Path | None = histogram_path
         self.hists: list[tuple[np.uint32, Histogram]] | None = None
-        self.parallel = parallel
+
+        self.parallel = num_workers > 1
+
         self.parallel_processor: ParallelHistogramProcessor | None = None
 
         atexit.register(self._cleanup_parallel_processor)
@@ -46,7 +47,6 @@ class FainderIndex:
             rebinning_path=rebinning_path,
             conversion_path=conversion_path,
             histogram_path=histogram_path,
-            parallel=parallel,
             num_workers=num_workers,
             num_chunks=num_chunks,
             chunk_layout=chunk_layout,
@@ -54,7 +54,7 @@ class FainderIndex:
 
     def _cleanup_parallel_processor(self) -> None:
         """Clean up parallel processor when the program exits."""
-        if hasattr(self, "parallel_processor") and self.parallel_processor is not None:
+        if self.parallel_processor is not None:
             logger.info("Shutting down parallel processor on exit")
             self.parallel_processor.shutdown()
             self.parallel_processor = None
@@ -64,9 +64,8 @@ class FainderIndex:
         rebinning_path: Path | None,
         conversion_path: Path | None,
         histogram_path: Path | None,
-        parallel: bool = True,
-        num_workers: int = (os.cpu_count() or 2) - 1,
-        num_chunks: int = (os.cpu_count() or 2) - 1,
+        num_workers: int = (os.cpu_count() or 1) - 1,
+        num_chunks: int = (os.cpu_count() or 1) - 1,
         chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
     ) -> None:
         """Update the Fainder indices with new files."""
@@ -89,18 +88,18 @@ class FainderIndex:
         elif histogram_path:
             logger.warning(f"Histogram path {histogram_path} does not exist")
 
-        self.parallel = parallel
+        self.parallel = num_workers > 1
 
         self.num_workers = num_workers
         self.num_chunks = num_chunks
 
         # Clean up existing parallel processor if it exists
-        if hasattr(self, "parallel_processor") and self.parallel_processor is not None:
+        if self.parallel_processor is not None:
             logger.info("Shutting down existing parallel processor")
             self.parallel_processor.shutdown()
             self.parallel_processor = None
 
-        if parallel and histogram_path is not None and num_workers > 1:
+        if self.parallel and histogram_path is not None:
             # If parallel processing is enabled and histogram path is available,
             logger.info(
                 f"Initializing parallel processor with histograms from: {self.histogram_path}"
@@ -111,8 +110,6 @@ class FainderIndex:
                 num_chunks=num_chunks,
                 chunk_layout=chunk_layout,
             )
-        else:
-            self.parallel = False
 
     def search(  # noqa: C901
         self,

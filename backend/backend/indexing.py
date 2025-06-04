@@ -312,7 +312,7 @@ def save_histograms_parallel(
     chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
 ) -> None:
     """Save histograms in parallel chunks for Fainder."""
-    logger.info("Partitioning histogram IDs for parallel processing with {} workers", n_chunks)
+    logger.info("Partitioning histogram IDs for parallel processing with {} chunks", n_chunks)
     hist_id_chunks = partition_histogram_ids(
         [int(id_) for id_, _ in hists], num_partitions=n_chunks, chunk_layout=chunk_layout
     )

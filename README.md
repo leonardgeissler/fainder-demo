@@ -49,16 +49,15 @@ EXECUTOR_TYPE=simple                # Query executor implementation (simple, pre
 MAX_WORKERS=os.cpu_count()          # Number of threads for parallel execution
 
 # Fainder
-FAINDER_N_CLUSTERS=50               # Number of index clusters
-FAINDER_BIN_BUDGET=1000             # Bin/storage budget
-FAINDER_ALPHA=1.0                   # Float value for additive smoothing
-FAINDER_TRANSFORM=None              # None, standard, robust, quantile, or power
-FAINDER_CLUSTER_ALGORITHM=kmeans    # kmeans, hdbscan, or agglomerative
-FAINDER_DEFAULT=default             # Name of the default fainder configuration
-FAINDER_PARALLEL=True               # Boolean to enable/disable parallel Fainder index execution
-FAINDER_CHUNK_LAYOUT=round_robin    # Chunk layout for Fainder indices (round_robin, sequential)
-FAINDER_EXACT_NUM_WORKERS=os.cpu_count() - 1 # Number of threads for exact Fainder index execution
-FAINDER_NUM_CHUNKS= os.cpu_count() - 1 # Number of chunks for Fainder indices
+FAINDER_N_CLUSTERS=50                       # Number of index clusters
+FAINDER_BIN_BUDGET=1000                     # Bin/storage budget
+FAINDER_ALPHA=1.0                           # Float value for additive smoothing
+FAINDER_TRANSFORM=None                      # None, standard, robust, quantile, or power
+FAINDER_CLUSTER_ALGORITHM=kmeans            # kmeans, hdbscan, or agglomerative
+FAINDER_DEFAULT=default                     # Name of the default fainder configuration
+FAINDER_CHUNK_LAYOUT=round_robin            # Chunk layout for Fainder indices (round_robin, sequential)
+FAINDER_NUM_WORKERS=os.cpu_count() - 1      # Number of threads for exact Fainder index execution
+FAINDER_NUM_CHUNKS=os.cpu_count() - 1       # Number of chunks for Fainder indices
 
 # Similarity Search / Embeddings
 USE_EMBEDDINGS=True                 # Boolean to enable/disable embeddings
