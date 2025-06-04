@@ -7,10 +7,10 @@ min_num_terms_multiple_percentile_combinations: 2
 max_num_terms_multiple_percentile_combinations: 4
 max_num_query_per_term_count_multiple_percentile_combinations: 5
 # Mixed terms configuration
-max_num_mixed_terms_with_fixed_structure: 30
+max_num_mixed_terms_with_fixed_structure: 20
 max_num_mixed_terms_extended_with_fixed_structure: 20
 
-max_num_mixed_terms_with_fixed_structure_not: 1
+max_num_mixed_terms_with_fixed_structure_not: 5
 
 max_num_terms_double_expected_form: 20
 
@@ -22,4 +22,4 @@ num_elements_keywordsqueries: 5
 
 max_num_keywordsqueries: 10
 
-num_of_ḱws_for_multiple_pp_combinations: 1
+num_of_ḱws_for_multiple_pp_combinations: 4

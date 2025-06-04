@@ -11,16 +11,16 @@ max_num_query_per_term_count_multiple_percentile_combinations: 3
 max_num_mixed_terms_with_fixed_structure: 10
 max_num_mixed_terms_extended_with_fixed_structure: 10
 
-max_num_mixed_terms_with_fixed_structure_not: 1
+max_num_mixed_terms_with_fixed_structure_not: 2
 
 max_num_terms_double_expected_form: 10
 
-max_num_terms_percentilequeries: 5
+max_num_terms_percentilequeries: 10
 
-max_num_middle_exit: 5
+max_num_middle_exit: 10
 
 num_elements_keywordsqueries: 5
 
 max_num_keywordsqueries: 10
 
-num_of_ḱws_for_multiple_pp_combinations: 5
+num_of_ḱws_for_multiple_pp_combinations: 2
