@@ -9,7 +9,7 @@ thresholds = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 100
 
 percentiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
-comaprisons = ["le", "lt", "ge", "gt"]
+comparisons = ["le"]
 
 fainder_modes: list[FainderMode] = [FainderMode.FULL_RECALL, FainderMode.EXACT]
 
@@ -48,8 +48,8 @@ def run():
     for threshold in thresholds:
         for percentile in percentiles:
             for fainder_mode in fainder_modes:
-                for comparison in comaprisons:
-                    
+                for comparison in comparisons:
+
                     result_size = len(
                         fainder_index.search(
                             percentile=percentile,
