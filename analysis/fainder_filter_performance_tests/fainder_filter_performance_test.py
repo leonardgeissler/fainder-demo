@@ -11,14 +11,15 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 
-REFERENCES = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000]
+
+REFERENCES = [1, 100, 10000, 1000000, 10000000]
 COMPARISONS = ["le"]
-PERCENTILES = [0.1, 0.25, 0.5, 0.9]
+PERCENTILES = [0.1, 0.5, 0.9]
 FAINDER_MODES = [FainderMode.FULL_RECALL, FainderMode.EXACT]
 
-FILTER_SIZES_RIGHT = [100, 1000, 10000, 100000, 1000000, 10000000]
+FILTER_SIZES_RIGHT = [100, 10000, 100000, 1000000, 10000000, 30000000, 50000000]
 
-FILTER_SIZES_WRONG = [0, 100, 1000, 10000, 100000, 1000000, 10000000]
+FILTER_SIZES_WRONG = [0, 1000, 10000, 100000, 1000000, 10000000, 30000000, 50000000]
 
 
 ALL = (
@@ -56,10 +57,13 @@ def log_performance_csv(
     comparison: str,
     reference: int,
     fainder_mode: str,
-    additional_filter_size: float,
+    filter_size_right: int,
+    filter_size_wrong: int,
     execution_time: float,
     filter_size: int,
     results: NDArray[np.uint32],
+    results_size_without_filtering: int,
+    num_workers: int
 ):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     with csv_path.open("a", newline="") as csvfile:
@@ -72,9 +76,13 @@ def log_performance_csv(
                 reference,
                 fainder_mode,
                 execution_time,
-                additional_filter_size,
+                filter_size_right,
+                filter_size_wrong,
                 filter_size,
                 results.size,
+                results_size_without_filtering,
+                f"pp({percentile};{comparison};{reference})",
+                num_workers,
             ]
         )
 
@@ -105,7 +113,7 @@ def test_fainder_filter_performance(
 ):
     csv_path = Path(pytest.csv_log_path)  # type: ignore
     start_time = time.perf_counter()
-    result_without_filtering, _ = run(
+    result_without_filtering = run(
         fainder,
         query,
         query["fainder_mode"],
@@ -120,9 +128,12 @@ def test_fainder_filter_performance(
         query["reference"],
         query["fainder_mode"],
         0,
+        0,
         time_without_filtering,
         0,
         result_without_filtering,
+        result_without_filtering.size,
+        fainder.num_workers,
     )
 
     for filter_size_right in FILTER_SIZES_RIGHT:
@@ -144,7 +155,7 @@ def test_fainder_filter_performance(
             np_filter = np.array(list(hist_filter))
 
             start_time = time.perf_counter()
-            result_with_filtering, _ = run(
+            result_with_filtering = run(
                 fainder,
                 query,
                 query["fainder_mode"],
@@ -159,10 +170,16 @@ def test_fainder_filter_performance(
                 query["reference"],
                 query["fainder_mode"],
                 filter_size_right,
+                filter_size_wrong,
                 time_with_filtering,
-                len(np_filter),
+                np_filter.size,
                 result_with_filtering,
+                result_without_filtering.size,
+                fainder.num_workers,
             )
+
+            if time_with_filtering > time_without_filtering:
+                return
 
             # check result with filtering is a subset of result without filtering
             # assert len(result_with_filtering) == filter_size_right

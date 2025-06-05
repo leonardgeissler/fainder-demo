@@ -46,12 +46,14 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
                 "comparison",
                 "reference",
                 "fainder_mode",
-                "index_mode",
-                "fainder_index",
                 "execution_time",
-                "additional_filter_size",
+                "filter_size_right",
+                "filter_size_wrong",
                 "filter_size",
                 "num_results",
+                "num_results_without_filter",
+                "query",
+                "num_workers",
             ]
         )
 
@@ -85,9 +87,9 @@ def fainder() -> FainderIndex:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
-        parallel=settings.fainder_parallel,
-        num_workers=settings.max_workers,
-        contiguous=settings.fainder_contiguous_chunks,
+        chunk_layout=settings.fainder_chunk_layout,
+        num_workers=settings.max_workers - 1,
+        num_chunks=settings.max_workers - 1,
     )
     return fainder_index
 
