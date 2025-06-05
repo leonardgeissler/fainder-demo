@@ -577,7 +577,6 @@ def expected_form_not(
 
 
 def middle_exit(
-    keywords: list[str],
     terms: list[str],
     max_terms: int,
 ) -> dict[str, dict[str, Any]]:
@@ -587,27 +586,25 @@ def middle_exit(
     queries: dict[str, dict[str, Any]] = {}
     query_counter = 1
 
-    # For each keyword, generate combinations of 10 unique terms
-    for keyword in keywords:
-        for terms_combination in combinations(terms, 10):
-            # Unpack the 10 terms
-            term, term2, term3, term4, term5, term6, term7, term8, term9, term10 = (
-                terms_combination
-            )
+    for terms_combination in combinations(terms, 10):
+        # Unpack the 10 terms
+        term, term2, term3, term4, term5, term6, term7, term8, term9, term10 = (
+            terms_combination
+        )
 
-            query = f"kw('{keyword}') AND col({term} AND NOT {term}) AND col(NOT {term2} AND NOT {term3} AND NOT {term4} AND NOT {term5} AND NOT {term6} AND NOT {term7} AND NOT {term8} AND NOT {term9} AND NOT {term10})"
-            queries[f"middle_exit_{query_counter}"] = {
-                "query": query,
-                "ids": [
-                    {"keyword_id": keyword},
-                    {
-                        "percentile_id": f"{term}-{term2}-{term3}-{term4}-{term5}-{term6}-{term7}-{term8}-{term9}-{term10}"
-                    },
-                ],
-            }
-            query_counter += 1
-            if query_counter > max_terms:
-                return queries
+        query = f"kw('agjkehkejhgkjehgsjkhg') AND col(NOT {term} AND NOT {term2} AND NOT {term3} AND NOT {term4} AND NOT {term5} AND NOT {term6} AND NOT {term7} AND NOT {term8} AND NOT {term9} AND NOT {term10})"
+        queries[f"middle_exit_{query_counter}"] = {
+            "query": query,
+            "ids": [
+                {
+                    "percentile_id": f"{term}-{term2}-{term3}-{term4}-{term5}-{term6}-{term7}-{term8}-{term9}-{term10}"
+                },
+            ],
+        }
+        query_counter += 1
+        if query_counter > max_terms:
+            return queries
+        
     return queries
 
 
@@ -734,7 +731,6 @@ def generate_all_test_cases(config: PerformanceConfig) -> dict[str, Any]:
     )
 
     middle_exit_queries = middle_exit(
-        keywords=config.keywords.default_keywords,
         terms=percentile_terms_list,
         max_terms=config.query_generation.max_num_middle_exit,
     )

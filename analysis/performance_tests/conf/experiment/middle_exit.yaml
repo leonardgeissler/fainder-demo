@@ -1,5 +1,5 @@
 enabled_tests:
-  - middle_exit
+  - Middle_exit_Results
 
 fainder_modes:
   - full_precision
