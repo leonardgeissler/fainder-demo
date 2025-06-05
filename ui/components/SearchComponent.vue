@@ -40,7 +40,7 @@ words # The search page will contain multiple search bars
             elevation="0"
             density="compact"
             class="ml-2"
-            @click="showSettings = true"
+            @click="openSettings"
           />
         </v-col>
       </v-row>
@@ -212,17 +212,64 @@ words # The search page will contain multiple search bars
         <v-card-title class="text-h5 mt-2"> Search Settings </v-card-title>
 
         <v-card-text>
-          <v-select
-            v-model="tempFainderMode"
-            :items="fainderModes"
-            label="Fainder Mode"
-            variant="outlined"
-          />
-          <v-switch
-            v-model="tempResultHighlighting"
-            label="Enable Result Highlighting"
-            color="primary"
-          />
+          <v-row>
+            <v-col cols="12">
+              <v-select
+                v-model="tempFainderConfig"
+                :items="availableConfigs"
+                :loading="configsLoading"
+                label="Fainder Configuration"
+                variant="outlined"
+                :hint="`Current: ${currentConfig}`"
+                persistent-hint
+              />
+            </v-col>
+          </v-row>
+
+          <v-row>
+            <v-col cols="12">
+              <v-select
+                v-model="tempFainderMode"
+                :items="fainderModes"
+                label="Fainder Mode"
+                variant="outlined"
+              />
+            </v-col>
+          </v-row>
+
+          <v-row>
+            <v-col cols="12">
+              <v-switch
+                v-model="tempResultHighlighting"
+                label="Enable Result Highlighting"
+                color="primary"
+              />
+            </v-col>
+          </v-row>
+
+          <!-- Config change progress -->
+          <v-row v-if="configChangeLoading">
+            <v-col cols="12">
+              <v-progress-linear indeterminate color="primary" class="mb-2" />
+              <div class="text-caption text-center">
+                Switching to {{ tempFainderConfig }}...
+              </div>
+            </v-col>
+          </v-row>
+
+          <!-- Error message -->
+          <v-row v-if="configError">
+            <v-col cols="12">
+              <v-alert
+                type="error"
+                variant="tonal"
+                closable
+                @click:close="configError = ''"
+              >
+                {{ configError }}
+              </v-alert>
+            </v-col>
+          </v-row>
         </v-card-text>
 
         <v-card-actions>
@@ -231,12 +278,14 @@ words # The search page will contain multiple search bars
             color="error"
             variant="text"
             icon="mdi-close"
+            :disabled="configChangeLoading"
             @click="cancelSettings"
           />
           <v-btn
             color="success"
             variant="text"
             icon="mdi-check"
+            :loading="configChangeLoading"
             @click="saveSettings"
           />
         </v-card-actions>
@@ -409,6 +458,14 @@ const fainderModes = [
   { title: "Exact Results", value: "exact" },
 ];
 
+// Fainder config state
+const availableConfigs = ref<string[]>([]);
+const currentConfig = ref<string>("");
+const tempFainderConfig = ref<string>("");
+const configsLoading = ref(false);
+const configChangeLoading = ref(false);
+const configError = ref("");
+
 // Simple query builder state
 const showSimpleBuilder = ref(false);
 
@@ -424,6 +481,60 @@ const percentileFilter = ref({
 });
 
 registerTemplate();
+
+const config = useRuntimeConfig();
+
+// Fetch available fainder configurations
+const fetchFainderConfigs = async () => {
+  configsLoading.value = true;
+  try {
+    const response = await $fetch<{ configs: string[]; current: string }>(
+      "/fainder_configs",
+      {
+        baseURL: config.public.apiBase,
+      },
+    );
+    availableConfigs.value = response.configs;
+    currentConfig.value = response.current;
+    tempFainderConfig.value = response.current;
+  } catch (error) {
+    console.error("Error fetching fainder configs:", error);
+    // Fallback
+    availableConfigs.value = ["default"];
+    currentConfig.value = "default";
+    tempFainderConfig.value = "default";
+  } finally {
+    configsLoading.value = false;
+  }
+};
+
+// Change fainder configuration
+const changeFainderConfig = async (configName: string): Promise<boolean> => {
+  if (configName === currentConfig.value) {
+    return true;
+  }
+
+  try {
+    await $fetch("/change_fainder", {
+      method: "POST",
+      baseURL: config.public.apiBase,
+      body: { config_name: configName },
+    });
+
+    currentConfig.value = configName;
+    return true;
+  } catch (error: unknown) {
+    console.error("Error changing fainder config:", error);
+    return false;
+  }
+};
+
+// Open settings and fetch configs
+const openSettings = async () => {
+  showSettings.value = true;
+  configError.value = ""; // Reset temporary state
+  await fetchFainderConfigs();
+};
 
 // on change of syntax_highlighting value, update isValid
 watch(syntaxHighlighting, (value) => {
@@ -717,24 +828,47 @@ const hasActiveFilters = computed(() => {
 
 function cancelSettings() {
   showSettings.value = false;
+  // Reset temp values
+  tempFainderConfig.value = currentConfig.value;
 }
 
-function saveSettings() {
-  showSettings.value = false;
-  fainderMode.value = String(tempFainderMode.value);
-  resultHighlighting.value = tempResultHighlighting.value;
-  console.log("New fainderMode:", fainderMode.value);
-  console.log("New result highlighting state:", resultHighlighting.value);
-  // update route
-  const route = useRoute();
-  navigateTo({
-    path: route.path,
-    query: {
-      ...route.query,
-      fainderMode: tempFainderMode.value,
-      resultHighlighting: String(tempResultHighlighting.value),
-    },
-  });
+async function saveSettings() {
+  configChangeLoading.value = true;
+  configError.value = ""; // Clear any previous error
+
+  try {
+    // Handle config change if needed
+    if (tempFainderConfig.value !== currentConfig.value) {
+      const success = await changeFainderConfig(tempFainderConfig.value);
+      if (!success) {
+        configError.value =
+          "Failed to update Fainder configuration. Please try again.";
+        return; // Keep dialog open to show error
+      }
+    }
+
+    // Save other settings
+    fainderMode.value = String(tempFainderMode.value);
+    resultHighlighting.value = tempResultHighlighting.value;
+
+    // Update route
+    const route = useRoute();
+    await navigateTo({
+      path: route.path,
+      query: {
+        ...route.query,
+        fainderMode: tempFainderMode.value,
+        resultHighlighting: String(tempResultHighlighting.value),
+      },
+    });
+
+    // Close dialog after short delay to show success message
+    setTimeout(() => {
+      showSettings.value = false;
+    }, 1000);
+  } finally {
+    configChangeLoading.value = false;
+  }
 }
 </script>
 

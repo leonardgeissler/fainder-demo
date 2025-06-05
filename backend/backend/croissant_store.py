@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from backend.config import CroissantError, CroissantStoreType
-from backend.util import dump_json, load_json
+from backend.utils import dump_json, load_json
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -64,7 +64,7 @@ class CroissantStore(ABC):
 
         if file_path.exists():
             if self.overwrite_docs:
-                logger.warning(f"Overwriting document with dataset slug {ref}")
+                logger.warning("Overwriting document with dataset slug {}", ref)
             else:
                 raise CroissantError(f"Document with dataset slug {ref} already exists")
 
@@ -109,7 +109,7 @@ class DictCroissantStore(CroissantStore):
         try:
             return self.documents[doc_id]
         except KeyError:
-            logger.error(f"Document with id {doc_id} not found")
+            logger.error("Document with id {} not found", doc_id)
             return {}
 
     def add_document(self, doc: Document) -> None:
@@ -149,10 +149,10 @@ class FileCroissantStore(CroissantStore):
         try:
             return load_json(self.doc_to_path[doc_id])
         except KeyError:
-            logger.error(f"Document with id {doc_id} not found")
+            logger.error("Document with id {} not found", doc_id)
             return {}
         except (FileNotFoundError, ValueError) as e:
-            logger.error(f"Error loading document with id {doc_id}: {e}")
+            logger.error("Error loading document with id {}: {}", doc_id, e)
             return {}
 
     def replace_documents(self, doc_to_path: list[str]) -> None:
@@ -183,4 +183,9 @@ def get_croissant_store(
                 dataset_slug=dataset_slug,
                 cache_size=cache_size,
                 overwrite_docs=overwrite_docs,
+            )
+        case _:
+            raise TypeError(
+                f"Unsupported Croissant store type: {store_type}. "
+                "Supported types are: 'dict', 'file'."
             )

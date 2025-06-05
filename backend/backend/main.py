@@ -15,6 +15,8 @@ from backend.config import (
     ColumnHighlights,
     ColumnSearchError,
     DocumentHighlights,
+    FainderConfigRequest,
+    FainderConfigsResponse,
     FainderError,
     IndexingError,
     MessageResponse,
@@ -22,6 +24,7 @@ from backend.config import (
     QueryResponse,
 )
 from backend.croissant_store import Document
+from backend.utils import load_json
 
 logger.info("Starting backend")
 app_state = ApplicationState()
@@ -42,7 +45,6 @@ def _apply_field_highlighting(doc: Document, field: str, highlighted: str) -> No
     """Apply highlighting to a specific field in the document."""
     field_split = field.split("_")
     helper = doc
-    logger.trace(f"Processing field: {field} and highlighting: {highlighted}")
     for i in range(len(field_split)):
         if i == len(field_split) - 1:
             helper[field_split[i]] = highlighted
@@ -86,7 +88,7 @@ def _apply_highlighting(
 @app.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
     """Execute a query and return the results."""
-    logger.info(f"Received query: {request}")
+    logger.info("Received query: {}", request)
 
     try:
         start_time = time.perf_counter()
@@ -111,8 +113,11 @@ async def query(request: QueryRequest) -> QueryResponse:
 
         search_time = time.perf_counter() - start_time
         logger.info(
-            f"Query '{request.query}' returned {len(doc_ids)} results and {len(docs)} paginated "
-            f"documents in {search_time:.4f} seconds."
+            "Query '{}' returned {} results and {} paginated documents in {:.4f} seconds.",
+            request.query,
+            len(doc_ids),
+            len(docs),
+            search_time,
         )
         return QueryResponse(
             query=request.query,
@@ -124,23 +129,25 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
     except UnexpectedInput as e:
         logger.info(
-            f"Bad user query:\n{e.get_context(request.query).strip()}\n"
-            f"(line {e.line}, column {e.column})"
+            "Bad user query:\n{}\n(line {}, column {})",
+            e.get_context(request.query).strip(),
+            e.line,
+            e.column,
         )
         raise HTTPException(
             status_code=400, detail=f"Invalid query: {e.get_context(request.query)}"
         ) from e
     except FainderError as e:
-        logger.info(f"Error executing percentile predicate: {e}")
+        logger.info("Error executing percentile predicate: {}", e)
         raise HTTPException(
             status_code=400, detail=f"Error executing percentile predicate: {e}"
         ) from e
     except ColumnSearchError as e:
-        logger.info(f"Column search error: {e}")
+        logger.info("Column search error: {}", e)
         raise HTTPException(status_code=400, detail=f"Column search error: {e}") from e
     # TODO: Add other known errors for specific error handling
     except Exception as e:
-        logger.error(f"Unknown query execution error: {e}")
+        logger.error("Unknown query execution error: {}", e)
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Internal server error") from e
 
@@ -149,7 +156,7 @@ async def query(request: QueryRequest) -> QueryResponse:
 async def upload_files(files: list[UploadFile]) -> MessageResponse:
     """Add new JSON documents to the Croissant store."""
     for file in files:
-        if not file.filename:
+        if file.filename is None:
             raise HTTPException(status_code=400, detail="No file uploaded")
         if not file.filename.endswith(".json"):
             raise HTTPException(status_code=400, detail="Only .json files are accepted")
@@ -158,13 +165,13 @@ async def upload_files(files: list[UploadFile]) -> MessageResponse:
         for file in files:
             content = await file.read()
             app_state.croissant_store.add_document(orjson.loads(content))
-            logger.debug(f"Uploaded file: {file.filename}")
+            logger.debug("Uploaded file: {}", file.filename)
 
-        logger.info(f"{len(files)} files uploaded successfully")
+        logger.info("{} files uploaded successfully", len(files))
         return MessageResponse(message=f"{len(files)} files uploaded successfully")
     except Exception as e:
-        logger.error(f"Upload error: {e}")
-        logger.debug(f"Upload error traceback: {e.__traceback__}")
+        logger.error("Upload error: {}", e)
+        logger.debug("Upload error traceback: {}", e.__traceback__)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -175,14 +182,61 @@ async def update_indices() -> MessageResponse:
         # NOTE: Our approach increases memory usage since we load the new indices without deleting
         # the old ones, we should consider optimizing this in the future
 
+        # Get the current configuration name for logging
+        current_config = app_state.current_fainder_config
+        logger.info(f"Updating indices with configuration '{current_config}'")
+
+        # This now uses the current configuration internally
         app_state.update_indices()
-        logger.info("Indices updated successfully")
-        return MessageResponse(message="Indices updated successfully")
+        logger.info(f"Indices updated successfully with configuration '{current_config}'")
+        return MessageResponse(
+            message=f"Indices updated successfully with configuration '{current_config}'"
+        )
     except IndexingError as e:
-        logger.error(f"Indexing error: {e}")
+        logger.error("Indexing error: {}", e)
         raise HTTPException(status_code=500, detail="Indexing error") from e
     except Exception as e:
-        logger.error(f"Unknown indexing error: {e}, {e.args}")
+        logger.error("Unknown indexing error: {}, {}", e, e.args)
+        raise HTTPException(status_code=500, detail="Internal server error") from e
+
+
+@app.post("/change_fainder")
+async def change_fainder_config(request: FainderConfigRequest) -> MessageResponse:
+    """Change the Fainder configuration to use a different index."""
+    try:
+        # Check if it's the same as the current config
+        if request.config_name == app_state.current_fainder_config:
+            return MessageResponse(
+                message=f"Already using Fainder configuration '{request.config_name}'"
+            )
+
+        app_state.update_fainder_index(request.config_name)
+        logger.info(f"Fainder configuration changed to '{request.config_name}' successfully")
+        return MessageResponse(
+            message=f"Fainder configuration changed to '{request.config_name}' successfully"
+        )
+    except FileNotFoundError as e:
+        logger.error(f"Fainder configuration error: {e}")
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Unknown error changing Fainder configuration: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
+
+
+@app.get("/fainder_configs")
+async def get_fainder_configs() -> FainderConfigsResponse:
+    """Get the list of available Fainder configurations and the current active one."""
+    try:
+        config_path = app_state.settings.fainder_config_path
+        current_config = app_state.current_fainder_config
+
+        if not config_path.exists():
+            return FainderConfigsResponse(configs=["default"], current=current_config)
+
+        configs = load_json(config_path)
+        return FainderConfigsResponse(configs=list(configs.keys()), current=current_config)
+    except Exception as e:
+        logger.error(f"Error getting Fainder configurations: {e}")
         raise HTTPException(status_code=500, detail="Internal server error") from e
 
 

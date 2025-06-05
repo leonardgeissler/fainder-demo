@@ -1,16 +1,15 @@
 from collections import defaultdict
 from collections.abc import Sequence
-from operator import and_, or_
 
+import numpy as np
 from lark import ParseTree, Token, Transformer
 from loguru import logger
-from numpy import uint32
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
 from backend.engine.conversion import col_to_doc_ids
 from backend.indices import FainderIndex, HnswIndex, TantivyIndex
 
-from .common import ColResult, DocResult, TResult, junction
+from .common import ColResult, DocResult, TResult, junction, negate_array
 from .executor import Executor
 
 
@@ -50,20 +49,25 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         """Start processing the parse tree."""
         return self.transform(tree)
 
-    ### Operator implementations ###
+    ##########################
+    # Operator implementations
+    ##########################
 
     def keyword_op(self, items: list[Token]) -> DocResult:
-        logger.trace(f"Evaluating keyword term: {items}")
+        logger.trace("Evaluating keyword term: {}", items)
 
         result_docs, scores, highlights = self.tantivy_index.search(
             items[0], self.enable_highlighting, self.min_usability_score, self.rank_by_usability
         )
         self.updates_scores(result_docs, scores)
 
-        return set(result_docs), (highlights, set())  # Return empty set for column highlights
+        return result_docs, (
+            highlights,
+            np.array([], dtype=np.uint32),
+        )  # Return empty array for column highlights
 
     def col_op(self, items: list[ColResult]) -> DocResult:
-        logger.trace(f"Evaluating column term: {items}")
+        logger.trace("Evaluating column term with items of length: {}", len(items))
 
         if len(items) != 1:
             raise ValueError("Column term must have exactly one item")
@@ -72,10 +76,10 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         if self.enable_highlighting:
             return doc_ids, ({}, col_ids)
 
-        return doc_ids, ({}, set())
+        return doc_ids, ({}, np.array([], dtype=np.uint32))
 
     def name_op(self, items: list[Token]) -> ColResult:
-        logger.trace(f"Evaluating column term: {items}")
+        logger.trace("Evaluating column term: {}", items)
 
         column = items[0]
         k = int(items[1])
@@ -83,7 +87,7 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         return self.hnsw_index.search(column, k, None)
 
     def percentile_op(self, items: list[Token]) -> ColResult:
-        logger.trace(f"Evaluating percentile term: {items}")
+        logger.trace("Evaluating percentile term: {}", items)
 
         percentile = float(items[0])
         comparison: str = items[1]
@@ -92,35 +96,33 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         return self.fainder_index.search(percentile, comparison, reference, self.fainder_mode)
 
     def conjunction(self, items: Sequence[TResult]) -> TResult:
-        logger.trace(f"Evaluating conjunction with items: {items}")
+        logger.trace("Evaluating conjunction with items of length: {}", len(items))
 
-        return junction(items, and_, self.enable_highlighting, self.metadata.doc_to_cols)
+        return junction(items, "and", self.enable_highlighting, self.metadata.doc_to_cols)
 
     def disjunction(self, items: Sequence[TResult]) -> TResult:
-        logger.trace(f"Evaluating disjunction with items: {items}")
+        logger.trace("Evaluating disjunction with items of length: {}", len(items))
 
-        return junction(items, or_, self.enable_highlighting, self.metadata.doc_to_cols)
+        return junction(items, "or", self.enable_highlighting, self.metadata.doc_to_cols)
 
     def negation(self, items: Sequence[TResult]) -> TResult:
-        logger.trace(f"Evaluating negation with {len(items)} items")
+        logger.trace("Evaluating negation with items of length: {}", len(items))
 
         if len(items) != 1:
             raise ValueError("Negation term must have exactly one item")
         if isinstance(items[0], tuple):
             to_negate, _ = items[0]
-            all_docs = set(self.metadata.doc_to_cols.keys())
+            doc_result = negate_array(to_negate, len(self.metadata.doc_to_cols))
             # Result highlights are reset for negated results
             doc_highlights: DocumentHighlights = {}
-            col_highlights: ColumnHighlights = set()
-            return all_docs - to_negate, (doc_highlights, col_highlights)
+            col_highlights: ColumnHighlights = np.array([], dtype=np.uint32)
+            return doc_result, (doc_highlights, col_highlights)
 
         to_negate_cols = items[0]
-        # For column expressions, we negate using the set of all column IDs
-        all_columns = {uint32(col_id) for col_id in range(len(self.metadata.col_to_doc))}
-        return all_columns - to_negate_cols
+        return negate_array(to_negate_cols, len(self.metadata.col_to_doc))
 
     def query(self, items: Sequence[DocResult]) -> DocResult:
-        logger.trace(f"Evaluating query with {len(items)} items")
+        logger.trace("Evaluating query with {} items", len(items))
 
         if len(items) != 1:
             raise ValueError("Query must have exactly one item")

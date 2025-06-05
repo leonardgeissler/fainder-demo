@@ -18,7 +18,7 @@ from sentence_transformers import SentenceTransformer
 
 from backend.config import Settings
 from backend.indices import TantivyIndex, get_tantivy_schema
-from backend.util import dump_json, load_json
+from backend.utils import dump_json, load_json
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -58,7 +58,7 @@ def generate_metadata(
     """
     # Initialize mappings
     # NOTE: We need the vector_id intermediate step because hnswlib requires int IDs for vectors
-    doc_to_cols: dict[int, set[int]] = defaultdict(set)
+    doc_to_cols: list[list[int]] = []
     doc_to_path: list[str] = []
     name_to_vector: dict[str, int] = {}
     vector_to_cols: dict[int, set[int]] = defaultdict(set)
@@ -73,12 +73,13 @@ def generate_metadata(
     num_cols = 0
     for path in croissant_path.iterdir():
         json_doc = load_json(path)
+        doc_to_cols.append([])
         for record_set in json_doc.get("recordSet", []):
             fields = record_set.get("field", [])
             num_hists += sum(1 for col in fields if "histogram" in col)
             num_cols += len(fields)
 
-    logger.info(f"Found {num_hists} histograms and {num_cols} columns")
+    logger.info("Found {} histograms and {} columns", num_hists, num_cols)
 
     # We need to pre-allocate the column ID mapping since we insert at different indices
     col_to_doc: list[int] = [-1] * num_cols
@@ -113,7 +114,7 @@ def generate_metadata(
                         col_id_no_hist += 1
 
                     col["id"] = col_id
-                    doc_to_cols[doc_id].add(col_id)
+                    doc_to_cols[doc_id].append(col_id)
                     col_to_doc[col_id] = doc_id
 
                     col_name = col["name"]
@@ -122,7 +123,7 @@ def generate_metadata(
                         vector_id += 1
                     vector_to_cols[name_to_vector[col_name]].add(col_id)
         except KeyError as e:
-            logger.error(f"KeyError {e} reading file {path}")
+            logger.error("KeyError {} reading file {}", e, path)
 
         # Store the document path for file-based Croissant stores
         doc_to_path.append(path.name)
@@ -135,8 +136,10 @@ def generate_metadata(
         tantivy_docs.append(tantivy.Document.from_dict(json_doc, tantivy_schema))  # pyright: ignore[reportUnknownMemberType]
 
     logger.info(
-        f"Found {len(doc_to_cols)} documents with {len(col_to_doc)} columns and "
-        f"{num_hists} histograms."
+        "Found {} documents with {} columns and {} histograms.",
+        len(doc_to_cols),
+        len(col_to_doc),
+        num_hists,
     )
 
     # Index the documents in Tantivy (we index all documents at once to increase performance)
@@ -148,7 +151,7 @@ def generate_metadata(
     logger.info("Saving metadata")
     dump_json(
         {
-            "doc_to_cols": {str(k): list(v) for k, v in doc_to_cols.items()},
+            "doc_to_cols": doc_to_cols,
             "doc_to_path": doc_to_path,
             "col_to_doc": col_to_doc,
             "num_hists": num_hists,
@@ -164,6 +167,7 @@ def generate_metadata(
 def generate_fainder_indices(
     hists: Sequence[tuple[int | np.integer[Any], Histogram]],
     output_path: Path,
+    config_name: str = "default",
     n_clusters: int = 27,
     bin_budget: int = 270,
     alpha: float = 1,
@@ -172,9 +176,9 @@ def generate_fainder_indices(
     seed: int = 42,
     workers: int | None = os.cpu_count(),
 ) -> None:
-    logger.info("Starting Fainder index generation")
+    logger.info(f"Starting Fainder index generation with config '{config_name}'")
 
-    logger.info(f"Clustering {len(hists)} histograms")
+    logger.info("Clustering {} histograms", len(hists))
     clustered_hists, cluster_bins, _ = cluster_histograms(
         hists=hists,
         transform=transform,
@@ -204,12 +208,51 @@ def generate_fainder_indices(
         workers=workers,
     )
 
+    # Save indices with config name in the filename
+    rebinning_file = f"{config_name}_rebinning.zst"
+    conversion_file = f"{config_name}_conversion.zst"
+
     save_output(
-        output_path / "rebinning.zst", (rebinning_index, cluster_bins), name="rebinning index"
+        output_path / rebinning_file,
+        (rebinning_index, cluster_bins),
+        name=f"rebinning index ({config_name})",
     )
     save_output(
-        output_path / "conversion.zst", (conversion_index, cluster_bins), name="conversion index"
+        output_path / conversion_file,
+        (conversion_index, cluster_bins),
+        name=f"conversion index ({config_name})",
     )
+
+    # Save or update the config information in a JSON file
+    config_file = output_path / "configs.json"
+    configs = {}
+    if config_file.exists():
+        configs = load_json(config_file)
+
+    # Add or update the config
+    configs[config_name] = {
+        "n_clusters": n_clusters,
+        "bin_budget": bin_budget,
+        "alpha": alpha,
+        "transform": transform,
+        "algorithm": algorithm,
+        "rebinning_file": rebinning_file,
+        "conversion_file": conversion_file,
+    }
+
+    dump_json(configs, config_file)
+
+    # For the default config, also save with the default filenames for backward compatibility
+    if config_name == "default":
+        save_output(
+            output_path / "rebinning.zst", (rebinning_index, cluster_bins), name="rebinning index"
+        )
+        save_output(
+            output_path / "conversion.zst",
+            (conversion_index, cluster_bins),
+            name="conversion index",
+        )
+
     save_output(output_path / "histograms.zst", hists, name="histograms")
 
 
@@ -237,8 +280,8 @@ def generate_embedding_index(
         # model_kwargs={"file_name": "onnx/model_O2.onnx"},
     )
     # Maybe remove the module compilation if it does not help with performance
-    embedder.compile()  # type: ignore
-    embeddings: NDArray[np.float32] = embedder.encode(  # pyright: ignore
+    embedder.compile()  # type: ignore[no-untyped-call]
+    embeddings: NDArray[np.float32] = embedder.encode(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         sentences=strings,
         batch_size=batch_size,
         show_progress_bar=show_progress_bar,
@@ -278,6 +321,12 @@ def parse_args() -> argparse.Namespace:
         choices=["DEBUG", "INFO", "WARNING"],
         help="Set the logging level",
     )
+    parser.add_argument(
+        "--config-name",
+        default="default",
+        type=str,
+        help="Configuration name for the Fainder indices",
+    )
 
     return parser.parse_args()
 
@@ -286,14 +335,14 @@ if __name__ == "__main__":
     args = parse_args()
 
     try:
-        settings = Settings()  # type: ignore
+        settings = Settings()  # type: ignore[call-arg]
         if args.log_level is None:
             configure_run(settings.log_level)
         else:
             configure_run(args.log_level)
         logger.debug(settings.model_dump())
-    except Exception as e:
-        logger.error(f"Error loading settings: {e}")
+    except Exception as e:  # noqa: BLE001
+        logger.error("Error loading settings: {}", e)
         sys.exit(1)
 
     hists, name_to_vector, _, _ = generate_metadata(  # type: ignore[assignment]
@@ -307,6 +356,7 @@ if __name__ == "__main__":
         generate_fainder_indices(
             hists=hists,
             output_path=settings.fainder_path,
+            config_name=args.config_name,
             n_clusters=settings.fainder_n_clusters,
             bin_budget=settings.fainder_bin_budget,
             alpha=settings.fainder_alpha,
