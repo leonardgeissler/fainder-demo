@@ -93,8 +93,8 @@
                     "@type": "cr:Field",
                     "name": "City",
                     "description": "name",
-                    "n_unique": 10,
-                    "most_common": {
+                    "nUnique": 10,
+                    "mostCommon": {
                         "Berlin": 108,
                         "Munich": 108,
                         "Hamburg": 108,
@@ -124,8 +124,8 @@
                     "@type": "cr:Field",
                     "name": "Latitude",
                     "description": "",
-                    "n_unique": 10,
-                    "most_common": {
+                    "nUnique": 10,
+                    "mostCommon": {
                         "52.52": 108,
                         "48.1351": 108,
                         "53.5511": 108,
@@ -155,8 +155,8 @@
                     "@type": "cr:Field",
                     "name": "Longitude",
                     "description": "",
-                    "n_unique": 10,
-                    "most_common": {
+                    "nUnique": 10,
+                    "mostCommon": {
                         "13.405": 108,
                         "11.582": 108,
                         "9.9937": 108,
@@ -219,9 +219,9 @@
                         "mean": 6.5,
                         "std": 3.453651812701086,
                         "min": 1.0,
-                        "25%": 3.75,
-                        "50%": 6.5,
-                        "75%": 9.25,
+                        "firstQuartile": 3.75,
+                        "secondQuartile": 6.5,
+                        "thirdQuartile": 9.25,
                         "max": 12.0
                     },
                     "id": 0
@@ -275,9 +275,9 @@
                         "mean": 2019.0,
                         "std": 2.5831850934577054,
                         "min": 2015.0,
-                        "25%": 2017.0,
-                        "50%": 2019.0,
-                        "75%": 2021.0,
+                        "firstQuartile": 2017.0,
+                        "secondQuartile": 2019.0,
+                        "thirdQuartile": 2021.0,
                         "max": 2023.0
                     },
                     "id": 1
@@ -331,9 +331,9 @@
                         "mean": 99.21178703703703,
                         "std": 57.560449162073006,
                         "min": 0.0,
-                        "25%": 49.5,
-                        "50%": 99.42500000000001,
-                        "75%": 149.5275,
+                        "firstQuartile": 49.5,
+                        "secondQuartile": 99.42500000000001,
+                        "thirdQuartile": 149.5275,
                         "max": 199.91
                     },
                     "id": 2
@@ -387,9 +387,9 @@
                         "mean": 127.2,
                         "std": 145.90981001930697,
                         "min": 6.0,
-                        "25%": 37.0,
-                        "50%": 83.5,
-                        "75%": 113.0,
+                        "firstQuartile": 37.0,
+                        "secondQuartile": 83.5,
+                        "thirdQuartile": 113.0,
                         "max": 519.0
                     },
                     "id": 3
@@ -410,8 +410,8 @@
                     "@type": "cr:Field",
                     "name": "Climate_Type",
                     "description": "",
-                    "n_unique": 2,
-                    "most_common": {
+                    "nUnique": 2,
+                    "mostCommon": {
                         "Oceanic": 648,
                         "Continental": 432
                     },
@@ -466,9 +466,9 @@
                         "mean": 14.72425925925926,
                         "std": 11.433379761007405,
                         "min": -5.0,
-                        "25%": 4.975,
-                        "50%": 14.850000000000001,
-                        "75%": 24.3,
+                        "firstQuartile": 4.975,
+                        "secondQuartile": 14.850000000000001,
+                        "thirdQuartile": 24.3,
                         "max": 34.9
                     },
                     "id": 4
@@ -522,9 +522,9 @@
                         "mean": 65.1537037037037,
                         "std": 20.303774700420504,
                         "min": 30.0,
-                        "25%": 47.0,
-                        "50%": 66.0,
-                        "75%": 83.0,
+                        "firstQuartile": 47.0,
+                        "secondQuartile": 66.0,
+                        "thirdQuartile": 83.0,
                         "max": 99.0
                     },
                     "id": 5

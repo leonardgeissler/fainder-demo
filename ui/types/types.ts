@@ -8,9 +8,9 @@ export interface Result {
   keywords?: string;
   license?: { name: string };
   creator?: { name: string };
-  "creator-name"?: string;
+  creatorName?: string;
   publisher?: { name: string };
-  "publisher-name"?: string;
+  publisherName?: string;
   datePublished?: string;
   dateModified?: string;
   recordSet?: RecordSetFile[];
@@ -23,15 +23,15 @@ export interface RecordSetFile {
 export interface Field {
   id: string;
   name: string;
-  marked_name?: string;
+  markedName?: string; // where does this come from?
   dataType: string[];
   histogram?: Histogram;
   counts?: { Yes?: number; No?: number };
-  min_date?: string;
-  max_date?: string;
-  unique_dates?: number;
-  n_unique?: number;
-  most_common?: Record<string, number>;
+  minDate?: string;
+  maxDate?: string;
+  uniqueDates?: number;
+  nUnique?: number;
+  mostCommon?: Record<string, number>;
   statistics?: Statistics;
 }
 
@@ -45,9 +45,9 @@ export interface Statistics {
   mean: number;
   std: number;
   min: number;
-  "25%": number;
-  "50%": number;
-  "75%": number;
+  firstQuartile: number;
+  secondQuartile: number;
+  thirdQuartile: number;
   max: number;
 }
 
