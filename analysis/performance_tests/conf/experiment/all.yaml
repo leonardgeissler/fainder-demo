@@ -1,0 +1,21 @@
+enabled_tests:
+  - base_keyword_queries
+  - base_percentile_queries
+  - percentile_combinations
+  - mixed_combinations_with_fixed_structure
+  - mixed_combinations_with_fixed_structure_extented
+  - early_exit
+  - multiple_percentile_combinations
+  - multiple_percentile_combinations_with_kw
+  - expected_form_not_queries
+  - double_expected_form_queries
+  - middle_exit
+
+fainder_modes:
+  - low_memory
+  - full_precision
+  - full_recall
+  - exact
+
+# Number of times to run each query for more reliable timing measurements
+num_runs: 3
