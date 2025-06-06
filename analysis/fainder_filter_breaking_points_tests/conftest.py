@@ -113,7 +113,6 @@ def engines(request) -> tuple[Engine, FainderIndex, Metadata, Settings]:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
-        parallel=settings.fainder_parallel,
         num_workers=settings.fainder_num_workers,
         num_chunks=settings.fainder_num_workers,
     )
