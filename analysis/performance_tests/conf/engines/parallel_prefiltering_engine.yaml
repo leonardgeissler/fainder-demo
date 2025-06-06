@@ -1,0 +1,4 @@
+scenarios:
+  - name: parallel_prefiltering_engine
+    executor_type: THREADED_PREFILTERING
+    cache_size: 0

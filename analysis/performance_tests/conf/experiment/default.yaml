@@ -1,0 +1,21 @@
+enabled_tests:
+  - base_keyword_queries
+  - base_keyword_queries_with_multiple_elements
+  - base_column_name_queries
+  - base_percentile_queries
+  - Percentile_Combinations
+  - Multiple_Percentile_Combinations
+  - Expected_Form
+  - Expected_Form_Extended
+  - Multiple_percentile_combinations_with_Keyword
+  - Double_expected_Form
+  - Early_exit_Results
+  - Middle_exit_Results
+  - NOT_Combinations
+
+fainder_modes:
+  - full_precision
+  - exact
+
+# Number of times to run each query for more reliable timing measurements
+num_runs: 3
