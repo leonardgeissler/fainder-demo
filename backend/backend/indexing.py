@@ -313,6 +313,8 @@ def save_histograms_parallel(
 ) -> None:
     """Save histograms in parallel chunks for Fainder."""
     logger.info("Partitioning histogram IDs for parallel processing with {} chunks", n_chunks)
+    if n_chunks <= 0:
+        raise ValueError("Number of chunks must be greater than 0")
     hist_id_chunks = partition_histogram_ids(
         [int(id_) for id_, _ in hists], num_partitions=n_chunks, chunk_layout=chunk_layout
     )
