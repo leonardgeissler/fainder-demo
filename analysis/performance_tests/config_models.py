@@ -79,6 +79,13 @@ class FainderConfig:
             "description": "Boolean to enable/disable parallel execution in Fainder"
         },
     )
+    config_name: str = field(
+        default="default",
+        metadata={
+            "description": "Name of the Fainder configuration"
+        }
+    )
+
 
 
 @dataclass
