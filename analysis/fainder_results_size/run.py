@@ -41,7 +41,6 @@ def run():
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
-        parallel=settings.fainder_parallel,
         num_workers=settings.max_workers - 1,
     )
 
