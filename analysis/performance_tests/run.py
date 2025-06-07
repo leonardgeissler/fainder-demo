@@ -60,7 +60,7 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
         rebinning_path=settings.fainder_rebinning_path_for_config(config.fainder.config_name),
         conversion_path=settings.fainder_conversion_path_for_config(config.fainder.config_name),
         histogram_path=settings.histogram_path,
-        num_workers=config.fainder.max_workers,
+        num_workers=config.fainder.max_workers - 1,
         num_chunks=config.fainder.max_workers - 1,
         chunk_layout=config.fainder.chunk_layout,
     )
