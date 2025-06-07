@@ -97,7 +97,6 @@ def setup_engine() -> Engine:
         rebinning_path=None,
         conversion_path=None,
         histogram_path=None,
-        parallel=False,
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
     return Engine(
