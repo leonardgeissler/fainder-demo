@@ -189,6 +189,7 @@ class CostSorter(Visitor[Token], OptimizationRule):
                 percentile = float(tree.children[0].value)
                 comparison = tree.children[1].value
                 tree.cost = self.estimate_result_size_for_pp(threshold, percentile, comparison)  # type: ignore[attr-defined]
+                return tree
             tree.cost = LEAF_COSTS[tree.data]  # type: ignore[attr-defined]
             return tree
 
