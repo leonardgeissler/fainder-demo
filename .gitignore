@@ -56,3 +56,9 @@ logs/
 # tantivy lock
 *.lock
 /analysis/fainder_results_size/figures
+/outputs
+/test_cases
+/multirun
+/analysis/performance_tests/figures
+/analysis/visualize_trees/trees
+/analysis/fainder_filter_breaking_points_tests/excecution
