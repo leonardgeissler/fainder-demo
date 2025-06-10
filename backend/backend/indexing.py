@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import hnswlib
 import numpy as np
 import tantivy
+from fainder.execution.parallel_processing import partition_histogram_ids
 from fainder.preprocessing.clustering import cluster_histograms
 from fainder.preprocessing.percentile_index import create_index
 from fainder.typing import Histogram
@@ -16,7 +17,7 @@ from fainder.utils import configure_run, save_output
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 
-from backend.config import Settings
+from backend.config import FainderChunkLayout, Settings
 from backend.indices import TantivyIndex, get_tantivy_schema
 from backend.utils import dump_json, load_json
 
@@ -304,6 +305,49 @@ def generate_embedding_index(
     index.save_index((output_path / "index.bin").as_posix())
 
 
+def save_histograms_parallel(
+    hists: Sequence[tuple[int | np.integer[Any], Histogram]],
+    output_path: Path,
+    n_chunks: int,
+    chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
+) -> None:
+    """Save histograms in parallel chunks for Fainder."""
+    logger.info("Partitioning histogram IDs for parallel processing with {} chunks", n_chunks)
+    if n_chunks <= 0:
+        raise ValueError("Number of chunks must be greater than 0")
+    hist_id_chunks = partition_histogram_ids(
+        [int(id_) for id_, _ in hists], num_partitions=n_chunks, chunk_layout=chunk_layout
+    )
+    logger.info(
+        "Partitioned histogram IDs into {} chunks of length {}",
+        len(hist_id_chunks),
+        len(hist_id_chunks[0]) if hist_id_chunks else 0,
+    )
+
+    # Create directory for split histograms
+    if chunk_layout == FainderChunkLayout.CONTIGUOUS:
+        split_dir = output_path / f"histograms_split_contiguous_{n_chunks}"
+    else:
+        split_dir = output_path / f"histograms_split_round_robin_{n_chunks}"
+
+    split_dir.mkdir(exist_ok=True, parents=True)
+    logger.info(f"Created directory for split histograms: {split_dir}")
+
+    for i in range(n_chunks):
+        logger.info("Saving histograms for chunk {}", i)
+        # split up the histograms into chunks for each worker
+        chunk_hists = [(id_, hist) for id_, hist in hists if id_ in hist_id_chunks[i]]
+        logger.info("Chunk {} will process {} histograms", i, len(chunk_hists))
+        save_output(
+            split_dir / f"histograms_{i}.zst",
+            chunk_hists,
+            name="histograms",
+        )
+        logger.info(
+            "Saved {} histograms to file: {}", len(chunk_hists), split_dir / f"histograms_{i}.zst"
+        )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate metadata and indices for a collection of dataset profiles"
@@ -313,6 +357,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--no-embeddings", action="store_true", help="Skip generating embedding index"
+    )
+    parser.add_argument(
+        "--no-hists-parallel",
+        action="store_true",
+        help="Do not save histograms in parallel chunks for Fainder",
     )
     parser.add_argument(
         "--log-level",
@@ -372,4 +421,11 @@ if __name__ == "__main__":
             batch_size=settings.embedding_batch_size,
             ef_construction=settings.hnsw_ef_construction,
             n_bidirectional_links=settings.hnsw_n_bidirectional_links,
+        )
+    if not args.no_hists_parallel:
+        save_histograms_parallel(
+            hists,
+            output_path=settings.fainder_path,
+            n_chunks=settings.fainder_num_chunks,
+            chunk_layout=settings.fainder_chunk_layout,
         )

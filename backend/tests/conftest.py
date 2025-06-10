@@ -59,6 +59,7 @@ def default_engine() -> Engine:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
+        num_workers=0,  # Use 0 to disable parallel processing in tests
     )
     hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
     return Engine(
@@ -94,6 +95,7 @@ def small_fainder_engine() -> Engine:
         rebinning_path=rebinning_path,
         conversion_path=conversion_path,
         histogram_path=settings.histogram_path,
+        num_workers=0,  # Set number of workers to 0 for testing
     )
     hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
     return Engine(
@@ -127,6 +129,7 @@ def prefiltering_engine() -> Engine:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
+        num_workers=0,
     )
     hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
     return Engine(
@@ -160,6 +163,7 @@ def parallel_engine() -> Engine:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
+        num_workers=0,
     )
     hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
     return Engine(
@@ -193,6 +197,7 @@ def parallel_prefiltering_engine() -> Engine:
         rebinning_path=settings.rebinning_index_path,
         conversion_path=settings.conversion_index_path,
         histogram_path=settings.histogram_path,
+        num_workers=0,
     )
     hnsw_index = HnswIndex(path=settings.hnsw_index_path, metadata=metadata, use_embeddings=False)
     return Engine(

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import numpy as np
+from fainder.execution.parallel_processing import FainderChunkLayout
 from loguru import logger
 from numpy.typing import NDArray
 from pydantic import (
@@ -95,7 +96,10 @@ class Settings(BaseSettings):
     fainder_alpha: float = 1.0
     fainder_transform: Literal["standard", "robust", "quantile", "power"] | None = None
     fainder_cluster_algorithm: Literal["agglomerative", "hdbscan", "kmeans"] = "kmeans"
+    fainder_chunk_layout: FainderChunkLayout = FainderChunkLayout.CONTIGUOUS
     fainder_default: str = "default"
+    fainder_num_workers: int = (os.cpu_count() or 1) - 1
+    fainder_num_chunks: int = (os.cpu_count() or 1) - 1
 
     # Embedding/HNSW settings
     use_embeddings: bool = True
