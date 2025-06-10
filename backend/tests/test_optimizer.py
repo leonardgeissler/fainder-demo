@@ -14,7 +14,8 @@ def test_cost_sorting(test_name: str, test_case: OptimizerCase) -> None:
     optimizer = Optimizer(cost_sorting=True, keyword_merging=False, split_up_junctions=False)
     plan = deepcopy(test_case["input_tree"])
 
-    assert test_case["cost_sorting"] == optimizer.optimize(plan)
+    optimized_plan = optimizer.optimize(plan)
+    assert test_case["cost_sorting"] == optimized_plan
 
 
 @pytest.mark.parametrize(
