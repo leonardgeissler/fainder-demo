@@ -592,7 +592,7 @@ def middle_exit(
             terms_combination
         )
 
-        query = f"col({term} AND NOT {term}) AND col({term2} AND {term2}) AND col({term3} AND {term4} AND {term5} AND {term6} AND {term7} AND {term8} AND {term9} AND {term10})"
+        query = f"col({term} AND NOT {term}) AND col({term2} AND {term3} AND {term4} AND {term5} AND {term6} AND {term7} AND {term8} AND {term9} AND {term10})"
         queries[f"middle_exit_{query_counter}"] = {
             "query": query,
             "ids": [
