@@ -69,6 +69,8 @@ folder = "analysis/visualize_trees/trees"
 if not os.path.exists(folder):
     os.makedirs(folder)
 
+folder2 = "analysis/visualize_trees/trees_editable"
+
 
 def visualize_trees():
     """
@@ -93,6 +95,16 @@ def visualize_trees():
             f"{folder}/parse_tree_{query_name}_with_leaves.png",
             rankdir="TB",
         )
+        tree.pydot__tree_to_dot(
+            delete_leaf_nodes.transform(parsered_tree),
+            f"{folder2}/parse_tree_{query_name}.dot",
+            rankdir="TB",
+        )
+        tree.pydot__tree_to_dot(
+            merge_tokens.transform(parsered_tree),
+            f"{folder2}/parse_tree_{query_name}_with_leaves.dot",
+            rankdir="TB",
+        )
         optimized_tree = optimizer.optimize(parsered_tree)
         print(f"Optimized parse tree for query: {query_name}")
         # save the optimized tree to a file
@@ -104,6 +116,16 @@ def visualize_trees():
         tree.pydot__tree_to_png(
             merge_tokens.transform(optimized_tree),
             f"{folder}/optimized_parse_tree_{query_name}_with_leaves.png",
+            rankdir="TB",
+        )
+        tree.pydot__tree_to_dot(
+            delete_leaf_nodes.transform(optimized_tree),
+            f"{folder2}/optimized_parse_tree_{query_name}.dot",
+            rankdir="TB",
+        )
+        tree.pydot__tree_to_dot(
+            merge_tokens.transform(optimized_tree),
+            f"{folder2}/optimized_parse_tree_{query_name}_with_leaves.dot",
             rankdir="TB",
         )
 
