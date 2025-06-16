@@ -70,6 +70,8 @@ if not os.path.exists(folder):
     os.makedirs(folder)
 
 folder2 = "analysis/visualize_trees/trees_editable"
+if not os.path.exists(folder2):
+    os.makedirs(folder2)
 
 
 def visualize_trees():
