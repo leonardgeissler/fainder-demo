@@ -21,6 +21,8 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from backend.utils import load_json
+
 if TYPE_CHECKING:
     from types import FrameType
 
@@ -68,6 +70,20 @@ class Metadata(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
+class FainderConfig(BaseModel):
+    n_clusters: int
+    bin_budget: int
+    alpha: float
+    transform: Literal["standard", "robust", "quantile", "power"] | None = None
+    algorithm: Literal["agglomerative", "hdbscan", "kmeans"] = "kmeans"
+    rebinning_file: Path
+    conversion_file: Path
+
+
+class FainderConfigs(BaseModel):
+    configs: dict[str, FainderConfig]
+
+
 class Settings(BaseSettings):
     # Path settings
     data_dir: DirectoryPath
@@ -97,7 +113,6 @@ class Settings(BaseSettings):
     fainder_transform: Literal["standard", "robust", "quantile", "power"] | None = None
     fainder_cluster_algorithm: Literal["agglomerative", "hdbscan", "kmeans"] = "kmeans"
     fainder_chunk_layout: FainderChunkLayout = FainderChunkLayout.CONTIGUOUS
-    fainder_default: str = "default"
     fainder_num_workers: int = (os.cpu_count() or 1) - 1
     fainder_num_chunks: int = (os.cpu_count() or 1) - 1
 
@@ -112,6 +127,8 @@ class Settings(BaseSettings):
     # Misc
     log_level: Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    _fainder_configs: FainderConfigs | None = None
 
     @classmethod
     @field_validator("metadata_file", mode="after")
@@ -170,11 +187,26 @@ class Settings(BaseSettings):
     def fainder_config_path(self) -> Path:
         return self.fainder_path / "configs.json"
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def fainder_configs(self) -> FainderConfigs:
+        """Load Fainder configurations from the JSON file with caching."""
+        if self._fainder_configs is None:
+            config_data = load_json(self.fainder_config_path)
+            self._fainder_configs = FainderConfigs(configs=config_data)
+        return self._fainder_configs
+
     def fainder_rebinning_path_for_config(self, config_name: str) -> Path:
-        return self.fainder_path / f"{config_name}_rebinning.zst"
+        config = self.fainder_configs.configs.get(config_name)
+        if not config:
+            raise ValueError(f"Configuration '{config_name}' not found in Fainder configs.")
+        return self.fainder_path / config.rebinning_file
 
     def fainder_conversion_path_for_config(self, config_name: str) -> Path:
-        return self.fainder_path / f"{config_name}_conversion.zst"
+        config = self.fainder_configs.configs.get(config_name)
+        if not config:
+            raise ValueError(f"Configuration '{config_name}' not found in Fainder configs.")
+        return self.fainder_path / config.conversion_file
 
 
 class QueryRequest(BaseModel):
@@ -183,6 +215,7 @@ class QueryRequest(BaseModel):
     per_page: int = 10
     fainder_mode: FainderMode = FainderMode.LOW_MEMORY
     result_highlighting: bool = False
+    fainder_index_name: str = "default"
 
 
 class QueryResponse(BaseModel):
@@ -227,7 +260,6 @@ class FainderConfigRequest(BaseModel):
 
 class FainderConfigsResponse(BaseModel):
     configs: list[str]
-    current: str
 
 
 class InterceptHandler(logging.Handler):
