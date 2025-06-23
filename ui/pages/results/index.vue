@@ -353,8 +353,8 @@
                         <!-- Boolean Data -->
                         <div
                           v-else-if="
-                            field.counts?.Yes !== undefined &&
-                            field.counts?.No !== undefined
+                            field.counts &&
+                            Object.keys(field.counts).length === 2
                           "
                           class="field-content boolean"
                         >
@@ -903,19 +903,30 @@ const getChartData = (field: Types.Field, index: number) => {
 };
 
 const getBooleanChartData = (field: Types.Field) => {
+  if (!field.counts || Object.keys(field.counts).length !== 2) {
+    return {
+      labels: [],
+      datasets: [],
+    };
+  }
+
+  const countEntries = Object.entries(field.counts);
+  const labels = countEntries.map(([key, _]) => key);
+  const values = countEntries.map(([_, value]) => value);
+
   return {
-    labels: ["True", "False"],
+    labels: labels,
     datasets: [
       {
         label: field.name,
         backgroundColor: [
           "rgba(77, 182, 172, 0.6)",
           "rgba(248, 121, 121, 0.6)",
-        ], // Teal for true, Red for false
+        ],
         borderColor: "rgba(0, 0, 0, 0.1)",
         borderWidth: 1,
         borderRadius: 0,
-        data: [field.counts?.Yes ?? 0, field.counts?.No ?? 0],
+        data: values,
       },
     ],
   };
