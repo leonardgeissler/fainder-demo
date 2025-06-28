@@ -26,12 +26,9 @@ python -m analysis.performance_tests.run experiment=custom_experiment
 
 # Run with multiple configuration overrides
 python -m analysis.performance_tests.run experiment=custom_experiment keywords=custom_keywords
-```
 
-Alternatively, you can use the provided bash script:
-
-```bash
-./analysis/performance_tests/run_experiment.sh -c custom_experiment
+# Run with multiple configurations after each other
+python -m analysis.performance_tests.run -m experiment=custom_experiment,other_experiment
 ```
 
 ## Configuration
@@ -41,7 +38,7 @@ The configuration is managed using Hydra and dataclasses. The main configuration
 To generate the JSON schema for the configuration models:
 
 ```bash
-python -m analysis.performance_tests.generate_schema
+uv run analysis.performance_tests.generate_schema
 ```
 
 ## Adding New Test Cases
@@ -58,3 +55,46 @@ Test results are stored in:
 - `logs/performance/git_heads/{git_hash}/all/`: All performance results
 - `logs/performance/git_heads/{git_hash}/{test_name}/`: Test-specific results
 - `logs/profiling/`: Profiling results (if enabled)
+
+## Analysis
+
+The framework includes several Jupyter notebooks for analyzing performance test results:
+
+### Core Analysis Notebooks
+
+#### `analysis.ipynb`
+Main analysis notebook for exploring performance test results:
+- Loads the latest performance test data from CSV files
+- Provides visualization of execution times across different scenarios
+- Compares performance between different Fainder modes
+- Analyzes query complexity vs execution time relationships
+- Generates performance summary statistics
+
+#### `regression_analysis.ipynb`
+Dedicated notebook for regression testing and performance comparison:
+- Compares performance between two different commits/versions
+- Identifies performance regressions and improvements
+- Provides statistical analysis of performance changes
+- Generates before/after comparison charts
+- Helps validate that optimizations don't introduce performance regressions
+
+#### `analysis_with_num_workers.ipynb`
+Specialized analysis focusing on multi-threading performance:
+- Analyzes performance scaling with different numbers of worker threads
+- Compares single-threaded vs multi-threaded execution
+- Identifies optimal worker count configurations
+- Measures parallelization efficiency
+
+#### `comparions_analysis_multiple_sources.ipynb` & `regression_analysis_multiple_sources.ipynb`
+Advanced notebooks for comparing performance across multiple data sources:
+- Cross-dataset performance analysis
+- Multi-source regression testing
+- Comparative performance benchmarking
+
+### Generated Outputs
+
+Analysis results are saved in:
+- `figures/`: Generated plots and visualizations
+- Performance summary reports
+- Statistical analysis results
+- Comparison charts between different configurations
