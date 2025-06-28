@@ -19,6 +19,7 @@ export const useSearchOperations = () => {
     page = 1,
     fainderMode?: string,
     resultHighlighting?: boolean,
+    fainderIndexName?: string,
   ) => {
     isLoading.value = true;
     error.value = { message: "", details: null };
@@ -40,9 +41,10 @@ export const useSearchOperations = () => {
         body: JSON.stringify({
           query: queryStr,
           page: page,
-          perPage: perPage.value,
-          fainderMode: fainderMode || "low_memory",
-          resultHighlighting: resultHighlighting,
+          per_page: perPage.value,
+          fainder_mode: fainderMode || "low_memory",
+          result_highlighting: resultHighlighting,
+          fainder_index_name: fainderIndexName || "default",
         }),
       });
 

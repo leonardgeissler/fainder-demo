@@ -22,35 +22,66 @@ if TYPE_CHECKING:
 class FainderIndex:
     def __init__(
         self,
-        rebinning_path: Path | None,
-        conversion_path: Path | None,
+        rebinning_paths: dict[str, Path] | None,
+        conversion_paths: dict[str, Path] | None,
         histogram_path: Path | None,
         num_workers: int = (os.cpu_count() or 1) - 1,
         num_chunks: int = (os.cpu_count() or 1) - 1,
         chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
     ) -> None:
-        self.rebinning_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = None
-        self.conversion_index: tuple[list[PctlIndex], list[NDArray[np.float64]]] | None = None
-        self.histogram_path: Path | None = histogram_path
+        self.rebinning_indexes: (
+            dict[str, tuple[list[PctlIndex], list[NDArray[np.float64]]]] | None
+        ) = None
+        self.conversion_indexes: (
+            dict[str, tuple[list[PctlIndex], list[NDArray[np.float64]]]] | None
+        ) = None
         self.hists: list[tuple[np.uint32, Histogram]] | None = None
+
+        if histogram_path is not None and histogram_path.exists():
+            logger.info(f"Loading histograms from {histogram_path}")
+            self.hists = load_input(histogram_path, "histograms")
+
+        # load rebinning indexes
+        if rebinning_paths:
+            self.rebinning_indexes = {}
+            for key, path in rebinning_paths.items():
+                if path.exists():
+                    logger.info(f"Loading rebinning index from {path}")
+                    self.rebinning_indexes[key] = load_input(path, "rebinning index")
+                else:
+                    logger.warning(f"Rebinning index path {path} does not exist")
+        else:
+            logger.warning("No rebinning paths provided, rebinning index will not be loaded")
+            self.rebinning_indexes = None
+
+        # load conversion indexes
+        if conversion_paths:
+            self.conversion_indexes = {}
+            for key, path in conversion_paths.items():
+                if path.exists():
+                    logger.info(f"Loading conversion index from {path}")
+                    self.conversion_indexes[key] = load_input(path, "conversion index")
+                else:
+                    logger.warning(f"Conversion index path {path} does not exist")
+        else:
+            logger.warning("No conversion paths provided, conversion index will not be loaded")
+            self.conversion_indexes = None
 
         self.parallel = num_workers > 1
 
         self.parallel_processor: ParallelHistogramProcessor | None = None
 
+        if self.parallel and histogram_path is not None:
+            # If parallel processing is enabled and histogram path is available,
+            logger.info(f"Initializing parallel processor with histograms from: {histogram_path}")
+            self.parallel_processor = ParallelHistogramProcessor(
+                histogram_path=histogram_path,
+                num_workers=num_workers,
+                num_chunks=num_chunks,
+                chunk_layout=chunk_layout,
+            )
+
         atexit.register(self._cleanup_parallel_processor)
-
-        self.num_workers = num_workers
-        self.num_chunks = num_chunks
-
-        self.update(
-            rebinning_path=rebinning_path,
-            conversion_path=conversion_path,
-            histogram_path=histogram_path,
-            num_workers=num_workers,
-            num_chunks=num_chunks,
-            chunk_layout=chunk_layout,
-        )
 
     def _cleanup_parallel_processor(self) -> None:
         """Clean up parallel processor when the program exits."""
@@ -59,64 +90,13 @@ class FainderIndex:
             self.parallel_processor.shutdown()
             self.parallel_processor = None
 
-    def update(
-        self,
-        rebinning_path: Path | None,
-        conversion_path: Path | None,
-        histogram_path: Path | None,
-        num_workers: int = (os.cpu_count() or 1) - 1,
-        num_chunks: int = (os.cpu_count() or 1) - 1,
-        chunk_layout: FainderChunkLayout = FainderChunkLayout.ROUND_ROBIN,
-    ) -> None:
-        """Update the Fainder indices with new files."""
-        if rebinning_path and rebinning_path.exists():
-            logger.info(f"Loading rebinning index from {rebinning_path}")
-            self.rebinning_index = load_input(rebinning_path, "rebinning index")
-        elif rebinning_path:
-            logger.warning(f"Rebinning index path {rebinning_path} does not exist")
-
-        if conversion_path and conversion_path.exists():
-            logger.info(f"Loading conversion index from {conversion_path}")
-            self.conversion_index = load_input(conversion_path, "conversion index")
-        elif conversion_path:
-            logger.warning(f"Conversion index path {conversion_path} does not exist")
-
-        if histogram_path and histogram_path.exists():
-            logger.info(f"Loading histograms from {histogram_path}")
-            self.histogram_path = histogram_path
-            self.hists = load_input(histogram_path, "histograms")
-        elif histogram_path:
-            logger.warning(f"Histogram path {histogram_path} does not exist")
-
-        self.parallel = num_workers > 1
-
-        self.num_workers = num_workers
-        self.num_chunks = num_chunks
-
-        # Clean up existing parallel processor if it exists
-        if self.parallel_processor is not None:
-            logger.info("Shutting down existing parallel processor")
-            self.parallel_processor.shutdown()
-            self.parallel_processor = None
-
-        if self.parallel and histogram_path is not None:
-            # If parallel processing is enabled and histogram path is available,
-            logger.info(
-                f"Initializing parallel processor with histograms from: {self.histogram_path}"
-            )
-            self.parallel_processor = ParallelHistogramProcessor(
-                histogram_path=histogram_path,
-                num_workers=num_workers,
-                num_chunks=num_chunks,
-                chunk_layout=chunk_layout,
-            )
-
     def search(  # noqa: C901
         self,
         percentile: float,
         comparison: str,
         reference: float,
         fainder_mode: FainderMode,
+        index_name: str,
         hist_filter: ColumnArray | None = None,
     ) -> ColumnArray:
         # Data validation
@@ -130,49 +110,73 @@ class FainderIndex:
         query: PctlQuery = (percentile, comparison, reference)  # type: ignore[assignment]
         match fainder_mode:
             case FainderMode.LOW_MEMORY:
-                if self.rebinning_index is None:
+                if self.rebinning_indexes is None:
                     raise FainderError("Rebinning index must be loaded for low_memory mode.")
+
+                rebinning_index = self.rebinning_indexes.get(index_name)
+                if rebinning_index is None:
+                    raise FainderError(f"Index '{index_name}' not found in rebinning indexes.")
+
                 result, runtime = run_approx(
-                    fainder_index=self.rebinning_index,
+                    fainder_index=rebinning_index,
                     query=query,
                     index_mode="recall",
                     id_filter=hist_filter,
                 )
             case FainderMode.FULL_PRECISION:
-                if self.conversion_index is None:
+                if self.conversion_indexes is None:
                     raise FainderError("Conversion index must be loaded for full_precision mode.")
+
+                conversion_index = self.conversion_indexes.get(index_name)
+                if conversion_index is None:
+                    raise FainderError(f"Index '{index_name}' not found in conversion indexes.")
+
                 result, runtime = run_approx(
-                    fainder_index=self.conversion_index,
+                    fainder_index=conversion_index,
                     query=query,
                     index_mode="precision",
                     id_filter=hist_filter,
                 )
             case FainderMode.FULL_RECALL:
-                if self.conversion_index is None:
+                if self.conversion_indexes is None:
                     raise FainderError("Conversion index must be loaded for full_recall mode.")
+
+                conversion_index = self.conversion_indexes.get(index_name)
+                if conversion_index is None:
+                    raise FainderError(f"Index '{index_name}' not found in conversion indexes.")
+
                 result, runtime = run_approx(
-                    fainder_index=self.conversion_index,
+                    fainder_index=conversion_index,
                     query=query,
                     index_mode="recall",
                     id_filter=hist_filter,
                 )
             case FainderMode.EXACT:
                 if not self.parallel:
-                    if self.conversion_index is None or self.hists is None:
+                    if self.conversion_indexes is None or self.hists is None:
                         raise FainderError(
                             "Conversion index and histograms must be loaded for exact mode."
                         )
+                    conversion_index = self.conversion_indexes.get(index_name)
+                    if conversion_index is None:
+                        raise FainderError(
+                            f"Index '{index_name}' not found in conversion indexes."
+                        )
 
                     result, runtime = run_exact(
-                        fainder_index=self.conversion_index,
+                        fainder_index=conversion_index,
                         hists=self.hists,
                         query=query,
                         id_filter=hist_filter,
                     )
                 else:
-                    if self.conversion_index is None or self.histogram_path is None:
+                    if self.conversion_indexes is None:
+                        raise FainderError("Conversion index must be loaded for exact mode.")
+
+                    conversion_index = self.conversion_indexes.get(index_name)
+                    if conversion_index is None:
                         raise FainderError(
-                            "Conversion index and histogram path must be loaded for exact mode."
+                            f"Index '{index_name}' not found in conversion indexes."
                         )
 
                     if self.parallel_processor is None:
@@ -182,7 +186,7 @@ class FainderIndex:
                         )
 
                     result, runtime = run_exact_parallel(
-                        fainder_index=self.conversion_index,
+                        fainder_index=conversion_index,
                         query=query,
                         parallel_processor=self.parallel_processor,
                         id_filter=hist_filter,
