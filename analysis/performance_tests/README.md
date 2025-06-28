@@ -85,7 +85,7 @@ Specialized analysis focusing on multi-threading performance:
 - Identifies optimal worker count configurations
 - Measures parallelization efficiency
 
-#### `comparions_analysis_multiple_sources.ipynb` & `regression_analysis_multiple_sources.ipynb`
+#### `comparions_analysis_multiple_sources.ipynb`
 Advanced notebooks for comparing performance across multiple data sources:
 - Cross-dataset performance analysis
 - Multi-source regression testing
