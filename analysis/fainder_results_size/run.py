@@ -38,9 +38,9 @@ def run():
         )
     settings = Settings()  # type: ignore # uses the environment variables
     fainder_index = FainderIndex(
-        rebinning_path=settings.rebinning_index_path,
-        conversion_path=settings.conversion_index_path,
-        histogram_path=settings.histogram_path,
+        rebinning_path={"default": settings.rebinning_index_path},
+        conversion_path={"default": settings.conversion_index_path},
+        histogram_path= settings.histogram_path,
         num_workers=settings.max_workers - 1,
     )
 
@@ -55,6 +55,7 @@ def run():
                             comparison=comparison,
                             reference=threshold,
                             fainder_mode=fainder_mode,
+                            index_name="default",
                         )
                     )
                     log_performance_csv(

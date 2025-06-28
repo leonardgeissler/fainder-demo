@@ -94,8 +94,8 @@ def setup_engine() -> Engine:
         metadata = Metadata(**json.load(file))
 
     fainder_index = FainderIndex(
-        rebinning_path=None,
-        conversion_path=None,
+        rebinning_paths=None,
+        conversion_paths=None,
         histogram_path=None,
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)

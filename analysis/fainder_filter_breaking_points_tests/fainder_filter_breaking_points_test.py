@@ -144,6 +144,7 @@ def test_breaking_point_fainder(
             query["comparison"],
             query["reference"],
             query["fainder_mode"],
+            "default",
             result_keyword_hists,
         )
         result_keyword_filter = col_to_doc_ids(

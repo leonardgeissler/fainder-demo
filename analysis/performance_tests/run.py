@@ -57,8 +57,8 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
         metadata = Metadata(**json.load(file))
 
     fainder_index = FainderIndex(
-        rebinning_path=settings.fainder_rebinning_path_for_config(config.fainder.config_name),
-        conversion_path=settings.fainder_conversion_path_for_config(config.fainder.config_name),
+        rebinning_paths={"default": settings.fainder_rebinning_path_for_config(config.fainder.config_name)},
+        conversion_paths={"default": settings.fainder_conversion_path_for_config(config.fainder.config_name)},
         histogram_path=settings.histogram_path,
         num_workers=config.fainder.max_workers - 1,
         num_chunks=config.fainder.max_workers - 1,

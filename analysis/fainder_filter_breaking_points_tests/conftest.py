@@ -110,8 +110,8 @@ def engines(request) -> tuple[Engine, FainderIndex, Metadata, Settings]:
         settings.fainder_num_workers = num_workers_arg
 
     fainder_index = FainderIndex(
-        rebinning_path=settings.rebinning_index_path,
-        conversion_path=settings.conversion_index_path,
+        rebinning_paths={"default": settings.rebinning_index_path},
+        conversion_paths={"default": settings.conversion_index_path},
         histogram_path=settings.histogram_path,
         num_workers=settings.fainder_num_workers,
         num_chunks=settings.fainder_num_workers,
