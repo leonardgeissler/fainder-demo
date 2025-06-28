@@ -57,8 +57,16 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
         metadata = Metadata(**json.load(file))
 
     fainder_index = FainderIndex(
-        rebinning_paths={"default": settings.fainder_rebinning_path_for_config(config.fainder.config_name)},
-        conversion_paths={"default": settings.fainder_conversion_path_for_config(config.fainder.config_name)},
+        rebinning_paths={
+            "default": settings.fainder_rebinning_path_for_config(
+                config.fainder.config_name
+            )
+        },
+        conversion_paths={
+            "default": settings.fainder_conversion_path_for_config(
+                config.fainder.config_name
+            )
+        },
         histogram_path=settings.histogram_path,
         num_workers=config.fainder.max_workers - 1,
         num_chunks=config.fainder.max_workers - 1,
@@ -302,7 +310,7 @@ def run_test_case(
                 if hasattr(engine.executor, "write_groups_actually_used") and hasattr(
                     engine.executor, "write_groups_used"
                 ):
-                    write_groups_actually_used= getattr(
+                    write_groups_actually_used = getattr(
                         engine.executor, "write_groups_actually_used", {}
                     )
                     write_groups_used = getattr(

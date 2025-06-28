@@ -62,7 +62,7 @@ def generate_keyword_test_cases() -> list[tuple[str, str, str]]:
     Returns:
         List of tuples (test_name, merged_query, unmerged_query)
     """
-    test_cases = []
+    test_cases: list[tuple[str, str, str]] = []
 
     for n in range(1, LENGTH_TERMS + 1):
         i = len(TERMS) // n

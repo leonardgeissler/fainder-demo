@@ -80,12 +80,8 @@ class FainderConfig:
         },
     )
     config_name: str = field(
-        default="default",
-        metadata={
-            "description": "Name of the Fainder configuration"
-        }
+        default="default", metadata={"description": "Name of the Fainder configuration"}
     )
-
 
 
 @dataclass

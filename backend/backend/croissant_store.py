@@ -68,7 +68,6 @@ class CroissantStore(ABC):
             else:
                 raise CroissantError(f"Document with dataset slug {ref} already exists")
 
-
         # Save to file system
         dump_json(doc, file_path)
 

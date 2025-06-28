@@ -17,7 +17,7 @@ from loguru import logger
 from backend.config import ExecutorType, Metadata, Settings
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--num-workers",
         action="store",
@@ -28,8 +28,8 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture
-def num_workers(request):
-    return request.config.getoption("--num-workers")
+def num_workers(request: pytest.FixtureRequest) -> int | None:
+    return request.config.getoption("--num-workers")  # type: ignore[return-value]
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -99,15 +99,17 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
 
 
 @pytest.fixture(scope="module")
-def engines(request) -> tuple[Engine, FainderIndex, Metadata, Settings]:
+def engines(
+    request: pytest.FixtureRequest,
+) -> tuple[Engine, FainderIndex, Metadata, Settings]:
     settings = Settings()  # type: ignore # uses the environment variables
     with settings.metadata_path.open() as file:
         metadata = Metadata(**json.load(file))
 
     # Override num_workers if provided via command line
-    num_workers_arg = request.config.getoption("--num-workers")
+    num_workers_arg = request.config.getoption("--num-workers", default=None)  # type: ignore[return-value]
     if num_workers_arg is not None:
-        settings.fainder_num_workers = num_workers_arg
+        settings.fainder_num_workers = int(num_workers_arg)  # type: ignore[assignment]
 
     fainder_index = FainderIndex(
         rebinning_paths={"default": settings.rebinning_index_path},

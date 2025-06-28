@@ -11,7 +11,6 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 
-
 REFERENCES = [1, 100, 10000, 1000000, 10000000]
 COMPARISONS = ["le"]
 PERCENTILES = [0.1, 0.5, 0.9]
@@ -63,7 +62,7 @@ def log_performance_csv(
     filter_size: int,
     results: NDArray[np.uint32],
     results_size_without_filtering: int,
-    num_workers: int
+    num_workers: int,
 ):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     with csv_path.open("a", newline="") as csvfile:
@@ -100,6 +99,7 @@ def run(
         query["comparison"],
         query["reference"],
         fainder_mode,
+        "default",
         hist_filter,
     )
 
@@ -133,7 +133,7 @@ def test_fainder_filter_performance(
         0,
         result_without_filtering,
         result_without_filtering.size,
-        fainder.num_workers,
+        fainder.parallel_processor.num_workers if fainder.parallel_processor else 1,
     )
 
     for filter_size_right in FILTER_SIZES_RIGHT:
@@ -175,7 +175,9 @@ def test_fainder_filter_performance(
                 np_filter.size,
                 result_with_filtering,
                 result_without_filtering.size,
-                fainder.num_workers,
+                fainder.parallel_processor.num_workers
+                if fainder.parallel_processor
+                else 1,
             )
 
             if time_with_filtering > time_without_filtering:

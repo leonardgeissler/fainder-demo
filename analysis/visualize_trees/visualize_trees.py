@@ -11,7 +11,7 @@ queries = {
     "complex_query_for_keyword_merging": 'kw("cancer") AND col(name("age"; 0) AND pp(1.0;gt;50)) AND (kw("diabetes") OR kw("heart disease"))',
     "query_justifying_column_node_rule": 'col(name("age"; 0)) AND col(pp(1.0;gt;50))',
     "query_example_for_read_write_groups": "kw('cancer') AND NOT col(NOT name('age'; 0) AND (NOT pp(1.0;gt;50) OR pp(1.0;lt;30)))",
-    "query_justifying_junction_spliting": 'col(pp(1.0;ge;100) AND pp(1.0;le;101) AND pp(0.1;ge;1))'
+    "query_justifying_junction_spliting": "col(pp(1.0;ge;100) AND pp(1.0;le;101) AND pp(0.1;ge;1))",
 }
 
 
@@ -37,7 +37,8 @@ class DeleteLeafNodes(Transformer):
         Deletes percentile operation nodes.
         """
         return ParseTree("percentile_op", [])
-    
+
+
 class MergeTokens(Transformer):
     """
     Transformer to merge tokens in the parse tree.

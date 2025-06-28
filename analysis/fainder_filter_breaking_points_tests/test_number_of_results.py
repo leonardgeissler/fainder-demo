@@ -87,8 +87,8 @@ KEYWORDS = [
     "z*",
 ]
 
-def setup_engine() -> Engine:
 
+def setup_engine() -> Engine:
     settings = Settings()  # type: ignore # uses the environment variables
     with settings.metadata_path.open() as file:
         metadata = Metadata(**json.load(file))
@@ -100,43 +100,52 @@ def setup_engine() -> Engine:
     )
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
     return Engine(
-            tantivy_index=TantivyIndex(
-                index_path=str(settings.tantivy_path), recreate=False
-            ),
-            fainder_index=fainder_index,
-            hnsw_index=column_index,
-            metadata=metadata,
-            cache_size=0,
-            executor_type=ExecutorType.SIMPLE,
-        )
+        tantivy_index=TantivyIndex(
+            index_path=str(settings.tantivy_path), recreate=False
+        ),
+        fainder_index=fainder_index,
+        hnsw_index=column_index,
+        metadata=metadata,
+        cache_size=0,
+        executor_type=ExecutorType.SIMPLE,
+    )
+
 
 def setup_logging() -> Path:
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
 
-    number_of_results_log_path = Path("logs")/"number_of_results"
+    number_of_results_log_path = Path("logs") / "number_of_results"
 
     number_of_results_log_path.mkdir(parents=True, exist_ok=True)
 
-    number_of_results_log_path = number_of_results_log_path / f"number_of_results_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+    number_of_results_log_path = (
+        number_of_results_log_path
+        / f"number_of_results_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+    )
 
     with number_of_results_log_path.open("w") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(["timestamp", "keyword", "number_of_results", "time_taken"])
-   
+
     return number_of_results_log_path
 
 
-def log_results(log_path: Path, keyword: str, number_of_results: int, time_taken: float) -> None:
+def log_results(
+    log_path: Path, keyword: str, number_of_results: int, time_taken: float
+) -> None:
     with log_path.open("a") as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerow([time.strftime('%Y-%m-%d %H:%M:%S'), keyword, number_of_results, time_taken])
+        writer.writerow(
+            [time.strftime("%Y-%m-%d %H:%M:%S"), keyword, number_of_results, time_taken]
+        )
+
 
 def run() -> None:
     engine = setup_engine()
     log_path = setup_logging()
     # Add code to run the engine and perform tests
-    number_of_results_list = []
+    number_of_results_list: list[int] = []
     for keyword in KEYWORDS:
         start_time = time.time()
         results, _ = engine.execute(f"kw('{keyword}')")
@@ -147,17 +156,22 @@ def run() -> None:
         time_taken = end_time - start_time
 
         log_results(log_path, keyword, number_of_results, time_taken)
-        print(f"Keyword: {keyword}, Results: {number_of_results}, Time taken: {time_taken:.4f} seconds")
+        print(
+            f"Keyword: {keyword}, Results: {number_of_results}, Time taken: {time_taken:.4f} seconds"
+        )
 
     # sort keywords by number of results
-    sorted_keywords = sorted(zip(KEYWORDS, number_of_results_list), key=lambda x: x[1], reverse=False)
+    sorted_keywords = sorted(
+        zip(KEYWORDS, number_of_results_list), key=lambda x: x[1], reverse=False
+    )
     print("\nSorted keywords by number of results:")
-    kws = []
+    kws: list[str] = []
     for keyword, count in sorted_keywords:
         print(f"{keyword}: {count} results")
         kws.append(keyword)
 
     print("\nSorted keywords:", kws)
+
 
 if __name__ == "__main__":
     run()

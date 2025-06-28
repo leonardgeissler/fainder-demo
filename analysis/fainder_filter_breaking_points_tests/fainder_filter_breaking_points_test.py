@@ -14,7 +14,80 @@ COMPARISONS = ["le", "ge"]
 PERCENTILES = [0.1, 0.5, 0.9]
 FAINDER_MODES = ["full_precision", "exact"]
 
-KEYWORDS =['zeppelin', 'vampire', 'zebra', 'zombie', 'yacht', 'dinosaur', 'ninja', 'wizard', 'pirate', 'quantum', 'volcano', 'unicorn', 'dragon', 'spaceship', 'lung', 'born', 'italy', 'germany', 'q*', 'z*', 'blood', 'zip', 'money', 'phone', 'w*', 'v*', 'f*', 'h*', 'j*', 'family', 'l*', 'usa', 'email', 'water', 'school', 'y*', 'k*', 'x*', 'heart', 'n*', 'music', 'u*', 'p*', 'address', 'c*', 'd*', 'o*', 'r*', 'web', 'bank', 'm*', 'food', 'b*', 'g*', 'age', 'city', 't*', 'work', 'test', 'e*', 'state', 'i*', 'date', 'company', 'name', 'health', 's*', 'time', 'by', 'a', 'a*', 'the'] # sorted by number of results 
+KEYWORDS = [
+    "zeppelin",
+    "vampire",
+    "zebra",
+    "zombie",
+    "yacht",
+    "dinosaur",
+    "ninja",
+    "wizard",
+    "pirate",
+    "quantum",
+    "volcano",
+    "unicorn",
+    "dragon",
+    "spaceship",
+    "lung",
+    "born",
+    "italy",
+    "germany",
+    "q*",
+    "z*",
+    "blood",
+    "zip",
+    "money",
+    "phone",
+    "w*",
+    "v*",
+    "f*",
+    "h*",
+    "j*",
+    "family",
+    "l*",
+    "usa",
+    "email",
+    "water",
+    "school",
+    "y*",
+    "k*",
+    "x*",
+    "heart",
+    "n*",
+    "music",
+    "u*",
+    "p*",
+    "address",
+    "c*",
+    "d*",
+    "o*",
+    "r*",
+    "web",
+    "bank",
+    "m*",
+    "food",
+    "b*",
+    "g*",
+    "age",
+    "city",
+    "t*",
+    "work",
+    "test",
+    "e*",
+    "state",
+    "i*",
+    "date",
+    "company",
+    "name",
+    "health",
+    "s*",
+    "time",
+    "by",
+    "a",
+    "a*",
+    "the",
+]  # sorted by number of results
 
 
 ALL = (
@@ -118,7 +191,7 @@ def test_breaking_point_fainder(
         num_workers=settings.fainder_num_workers,
     )
 
-    keywords = []
+    keywords: list[str] = []
     keyword_query = ""
     # find the breaking point for the filter size of the prefiltering engine by adding keywords with an or operator
     for keyword in KEYWORDS:

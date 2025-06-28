@@ -34,13 +34,20 @@ def run():
     with log_file.open("w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(
-            ["timestamp", "fainder_mode", "threshold", "comparison", "percentile", "result_size"]
+            [
+                "timestamp",
+                "fainder_mode",
+                "threshold",
+                "comparison",
+                "percentile",
+                "result_size",
+            ]
         )
     settings = Settings()  # type: ignore # uses the environment variables
     fainder_index = FainderIndex(
-        rebinning_path={"default": settings.rebinning_index_path},
-        conversion_path={"default": settings.conversion_index_path},
-        histogram_path= settings.histogram_path,
+        rebinning_paths={"default": settings.rebinning_index_path},
+        conversion_paths={"default": settings.conversion_index_path},
+        histogram_path=settings.histogram_path,
         num_workers=settings.max_workers - 1,
     )
 
@@ -48,7 +55,6 @@ def run():
         for percentile in percentiles:
             for fainder_mode in fainder_modes:
                 for comparison in comparisons:
-
                     result_size = len(
                         fainder_index.search(
                             percentile=percentile,

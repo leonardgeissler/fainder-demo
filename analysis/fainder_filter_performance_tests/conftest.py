@@ -86,7 +86,7 @@ def fainder() -> FainderIndex:
     fainder_index = FainderIndex(
         rebinning_paths={"default": settings.rebinning_index_path},
         conversion_paths={"default": settings.conversion_index_path},
-        histogram_path = settings.histogram_path,
+        histogram_path=settings.histogram_path,
         chunk_layout=settings.fainder_chunk_layout,
         num_workers=settings.max_workers - 1,
         num_chunks=settings.max_workers - 1,

@@ -604,7 +604,7 @@ def middle_exit(
         query_counter += 1
         if query_counter > max_terms:
             return queries
-        
+
     return queries
 
 
