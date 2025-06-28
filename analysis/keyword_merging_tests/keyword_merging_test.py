@@ -1,7 +1,6 @@
 import csv
 import time
 from pathlib import Path
-from typing import Any
 
 import pytest
 from loguru import logger
@@ -10,7 +9,7 @@ from backend.engine import Engine
 from .generate_keyword_test_cases import generate_keyword_test_cases
 
 
-def execute_and_time(engine: Engine, query: str) -> tuple[Any, float]:
+def execute_and_time(engine: Engine, query: str) -> tuple[list[int], float]:
     """Execute a query and measure execution time."""
     start_time = time.time()
     result, _ = engine.execute(query)
@@ -20,7 +19,7 @@ def execute_and_time(engine: Engine, query: str) -> tuple[Any, float]:
 
 def run_comparison(
     engines: tuple[Engine, Engine], merged_query: str, unmerged_query: str
-) -> tuple[list, list, float, float, bool, int]:
+) -> tuple[list[int], list[int], float, float, bool, int]:
     """
     Run both merged and unmerged versions of the query and compare results.
     Returns:

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Any, Dict, List
 import os
 from fainder.execution.parallel_processing import FainderChunkLayout
 
@@ -290,7 +290,7 @@ class PerformanceConfig:
     )
 
     @classmethod
-    def from_dict(cls, config_dict: Dict) -> "PerformanceConfig":
+    def from_dict(cls, config_dict: Dict[str, Any]) -> "PerformanceConfig":
         """Create a PerformanceConfig from a dictionary (e.g., from hydra)"""
         # Convert hydra's structured config to dict and handle nested configs
         if hasattr(config_dict, "_target_"):
@@ -322,7 +322,7 @@ class PerformanceConfig:
         engines = EnginesConfig()
         if engines_dict and "scenarios" in engines_dict:
             engines.scenarios = [
-                EngineConfig(**scenario) if isinstance(scenario, dict) else scenario
+                EngineConfig(**scenario) if isinstance(scenario, dict) else scenario  # type: ignore
                 for scenario in engines_dict["scenarios"]
             ]
 

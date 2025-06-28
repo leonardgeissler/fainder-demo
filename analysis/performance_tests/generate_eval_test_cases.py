@@ -418,17 +418,21 @@ def double_expected_form(
     # get 2 keywords (different)
     # get 4 column names (different)
     # get 4 ks (can be the same)
-    def get_unique_pairs(items):
+    def _get_unique_pairs(items: list[str]) -> list[tuple[str, str]]:
+        return [(a, b) for i, a in enumerate(items) for b in items[i + 1 :]]
+
+    # Get unique pairs of keywords
+    def _get_unique_pairs_k(items: list[int]) -> list[tuple[int, int]]:
         return [(a, b) for i, a in enumerate(items) for b in items[i + 1 :]]
 
     # Get unique pairs of keywords, column names
-    for kw1, kw2 in get_unique_pairs(keywords):
+    for kw1, kw2 in _get_unique_pairs(keywords):
         # Get two pairs of unique column names
         for (col1, col2), (col3, col4) in zip(
-            get_unique_pairs(column_names), get_unique_pairs(column_names)
+            _get_unique_pairs(column_names), _get_unique_pairs(column_names)
         ):
             # Get unique k values
-            for k1, k2 in get_unique_pairs(ks):
+            for k1, k2 in _get_unique_pairs_k(ks):
                 # Get unique term combinations
                 for term1, term2, term3, term4 in [
                     (t1, t2, t3, t4)

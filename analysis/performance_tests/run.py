@@ -75,7 +75,7 @@ def initialize_engines(config: PerformanceConfig) -> Dict[str, Engine]:
     column_index = ColumnIndex(path=settings.hnsw_index_path, metadata=metadata)
     tantivy_index = TantivyIndex(index_path=str(settings.tantivy_path), recreate=False)
 
-    engines = {}
+    engines: dict[str, Engine] = {}
     for scenario in config.engines.scenarios:
         # Convert the string executor type from config to the actual enum
         executor = ExecutorType[scenario.executor_type]
@@ -118,7 +118,7 @@ def setup_directories(config: PerformanceConfig) -> Dict[str, Any]:
     git_head_hash = f"{git_branch}_{process.communicate()[0].strip().decode('utf-8')}"
 
     # Create base directories
-    paths = {}
+    paths: dict[str, Path | dict[str, Path]] = {}
     base_log_dir = Path(config.log_dir)
     base_log_dir.mkdir(exist_ok=True)
 
@@ -148,7 +148,7 @@ def setup_directories(config: PerformanceConfig) -> Dict[str, Any]:
     paths["profiling_raw_dir"] = profiling_raw_dir
 
     # Individual test directories
-    individual_log_dirs = {}
+    individual_log_dirs: dict[str, Path] = {}
     for test_name in config.experiment.enabled_tests:
         test_log_dir = git_hash_dir / test_name
         test_log_dir.mkdir(exist_ok=True)
@@ -160,7 +160,7 @@ def setup_directories(config: PerformanceConfig) -> Dict[str, Any]:
 
 def create_csv_files(paths: Dict[str, Any]) -> Dict[str, Any]:
     """Create CSV files for results"""
-    csv_paths = {}
+    csv_paths: dict[str, Any] = {}
     timestamp_str = time.strftime("%Y%m%d_%H%M%S")
 
     # Main performance CSV
@@ -218,7 +218,7 @@ def create_csv_files(paths: Dict[str, Any]) -> Dict[str, Any]:
     csv_paths["profile_csv"] = profile_csv_path
 
     # Individual test CSVs
-    individual_csv_paths = {}
+    individual_csv_paths: dict[str, Path] = {}
     for test_name, test_dir in paths["individual_log_dirs"].items():
         test_csv_path = (
             test_dir / f"performance_metrics_{test_name}_{timestamp_str}.csv"
@@ -282,8 +282,8 @@ def run_test_case(
     for mode in fainder_modes:
         for _ in range(num_runs):
             # Run query with each engine scenario
-            timings = {}
-            results = {}
+            timings: dict[str, float] = {}
+            results: dict[str, Any] = {}
             write_groups_actually_used: dict[int, int] = {}
             write_groups_used: dict[int, int] = {}
 
@@ -318,7 +318,7 @@ def run_test_case(
                     )
 
             # Check result consistency
-            first_result = next(iter(results.values()))
+            first_result: list[Any] = next(iter(results.values()))
             is_consistent = all(
                 set(result) == set(first_result) for result in results.values()
             )
@@ -393,7 +393,7 @@ def main(hydra_config: DictConfig) -> None:
     logger.info(f"Hydra config: {OmegaConf.to_yaml(hydra_config)}")
     # Convert hydra config to pydantic model
     config = PerformanceConfig.from_dict(
-        OmegaConf.to_container(hydra_config, resolve=True)
+        OmegaConf.to_container(hydra_config, resolve=True)  # type: ignore
     )  # type: ignore
     logger.info(f"Performance config: {config}")
 
@@ -437,10 +437,10 @@ def main(hydra_config: DictConfig) -> None:
 
     # Summarize results
     try:
-        results_df = pd.read_csv(csv_paths["main_perf_csv"])
+        results_df = pd.read_csv(csv_paths["main_perf_csv"])  # type: ignore
         summary = results_df.groupby(["category", "scenario", "fainder_mode"])[
             "execution_time"
-        ].mean()
+        ].mean()  # type: ignore
         logger.info(f"Test execution summary:\n{summary}")
     except Exception as e:
         logger.error(f"Failed to generate summary stats: {e}")

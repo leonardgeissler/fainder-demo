@@ -15,7 +15,7 @@ queries = {
 }
 
 
-class DeleteLeafNodes(Transformer):
+class DeleteLeafNodes(Transformer):  # type: ignore
     """
     Transformer to delete leaf nodes from the parse tree.
     """
@@ -39,7 +39,7 @@ class DeleteLeafNodes(Transformer):
         return ParseTree("percentile_op", [])
 
 
-class MergeTokens(Transformer):
+class MergeTokens(Transformer):  # type: ignore
     """
     Transformer to merge tokens in the parse tree.
     """
@@ -85,49 +85,53 @@ def visualize_trees():
     merge_tokens = MergeTokens()
     for query_name, query in queries.items():
         print(f"Visualizing parse tree for query: {query_name}")
-        parsered_tree = parser.parse(query)
+        parsed_tree = parser.parse(query)
         print(f"Parse tree for query: {query}")
         # save the tree to a file
         tree.pydot__tree_to_png(
-            delete_leaf_nodes.transform(parsered_tree),
+            delete_leaf_nodes.transform(parsed_tree),  # ignore[reportUnknownMemberType]
             f"{folder}/parse_tree_{query_name}.png",
             rankdir="TB",
         )
         tree.pydot__tree_to_png(
-            merge_tokens.transform(parsered_tree),
+            merge_tokens.transform(parsed_tree),  # ignore[reportUnknownMemberType]
             f"{folder}/parse_tree_{query_name}_with_leaves.png",
             rankdir="TB",
         )
         tree.pydot__tree_to_dot(
-            delete_leaf_nodes.transform(parsered_tree),
+            delete_leaf_nodes.transform(parsed_tree),  # ignore[reportUnknownMemberType]
             f"{folder2}/parse_tree_{query_name}.dot",
             rankdir="TB",
         )
         tree.pydot__tree_to_dot(
-            merge_tokens.transform(parsered_tree),
+            merge_tokens.transform(parsed_tree),  # ignore[reportUnknownMemberType]
             f"{folder2}/parse_tree_{query_name}_with_leaves.dot",
             rankdir="TB",
         )
-        optimized_tree = optimizer.optimize(parsered_tree)
+        optimized_tree = optimizer.optimize(parsed_tree)
         print(f"Optimized parse tree for query: {query_name}")
         # save the optimized tree to a file
         tree.pydot__tree_to_png(
-            delete_leaf_nodes.transform(optimized_tree),
+            delete_leaf_nodes.transform(
+                optimized_tree
+            ),  # ignore[reportUnknownMemberType]
             f"{folder}/optimized_parse_tree_{query_name}.png",
             rankdir="TB",
         )
         tree.pydot__tree_to_png(
-            merge_tokens.transform(optimized_tree),
+            merge_tokens.transform(optimized_tree),  # ignore[reportUnknownMemberType]
             f"{folder}/optimized_parse_tree_{query_name}_with_leaves.png",
             rankdir="TB",
         )
         tree.pydot__tree_to_dot(
-            delete_leaf_nodes.transform(optimized_tree),
+            delete_leaf_nodes.transform(
+                optimized_tree
+            ),  # ignore[reportUnknownMemberType]
             f"{folder2}/optimized_parse_tree_{query_name}.dot",
             rankdir="TB",
         )
         tree.pydot__tree_to_dot(
-            merge_tokens.transform(optimized_tree),
+            merge_tokens.transform(optimized_tree),  # ignore[reportUnknownMemberType]
             f"{folder2}/optimized_parse_tree_{query_name}_with_leaves.dot",
             rankdir="TB",
         )
