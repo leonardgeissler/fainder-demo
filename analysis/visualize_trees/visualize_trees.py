@@ -3,8 +3,9 @@
 
 from backend.engine.parser import Parser
 from backend.engine.optimizer import Optimizer
-from lark import Token, tree, Transformer, ParseTree
+from lark import Token, tree, Transformer, ParseTree, Tree
 import os
+import pydot
 
 queries = {
     "example_query_excecution": 'kw("cancer") AND col(name("age"; 0) AND (pp(1.0;gt;50) OR pp(1.0;lt;30)))',
@@ -48,21 +49,21 @@ class MergeTokens(Transformer):  # type: ignore
         """
         Merges keyword operation nodes.
         """
-        t = Token("Value", " ; ".join(item.value for item in items))
+        t =  " \n ".join(item.value for item in items)
         return ParseTree("keyword_op", [t])
 
     def name_op(self, items: list[Token]):
         """
         Merges name nodes.
         """
-        t = Token("Value", " ; ".join(item.value for item in items))
+        t = " ; ".join(item.value for item in items)
         return ParseTree("name_op", [t])
 
     def percentile_op(self, items: list[Token]):
         """
         Merges percentile operation nodes.
         """
-        t = Token("Value", " ; ".join(item.value for item in items))
+        t = " ; ".join(item.value for item in items)
         return ParseTree("percentile_op", [t])
 
 
@@ -74,6 +75,57 @@ folder2 = "analysis/visualize_trees/trees_editable"
 if not os.path.exists(folder2):
     os.makedirs(folder2)
 
+
+def create_uniform_tree_visualization(parse_tree, filename, format='png', rankdir='TB'):
+    """
+    Creates a tree visualization with uniform node sizes.
+    Based on lark's pydot__tree_to_graph function with added uniform sizing.
+    """
+    graph = pydot.Dot(graph_type='digraph', rankdir=rankdir, dpi=100, size="8,4")
+    # Set default node attributes for uniform sizing
+    graph.set_node_defaults(
+        shape='oval',
+        width='1.2',
+        height='0.4',
+        fixedsize='true',
+        fontsize='10'
+    )
+    
+    i = [0]
+
+    def new_leaf(leaf):
+        node = pydot.Node(str(i[0]), label=repr(leaf), 
+                         shape='oval', width='1.2', height='0.4', 
+                         fixedsize='true', fontsize='10')
+        i[0] += 1
+        graph.add_node(node)
+        return node
+
+    def _to_pydot(subtree):
+        color = hash(subtree.data) & 0xffffff
+        color |= 0x808080
+
+        subnodes = [_to_pydot(child) if isinstance(child, Tree) else new_leaf(child)
+                    for child in subtree.children]
+        node = pydot.Node(str(i[0]), style="filled", fillcolor="#%x" % color, label=subtree.data,
+                         shape='oval', width='1.2', height='0.4', 
+                         fixedsize='true', fontsize='10')
+        i[0] += 1
+        graph.add_node(node)
+
+        for subnode in subnodes:
+            graph.add_edge(pydot.Edge(node, subnode))
+
+        return node
+
+    _to_pydot(parse_tree)
+    
+    if format == 'png':
+        graph.write_png(filename)
+    elif format == 'dot':
+        graph.write(filename)
+    else:
+        raise ValueError(f"Unsupported format: {format}. Supported formats are 'png' and 'dot'.")
 
 def visualize_trees():
     """
@@ -88,52 +140,48 @@ def visualize_trees():
         parsed_tree = parser.parse(query)
         print(f"Parse tree for query: {query}")
         # save the tree to a file
-        tree.pydot__tree_to_png(
-            delete_leaf_nodes.transform(parsed_tree),  # ignore[reportUnknownMemberType]
+        create_uniform_tree_visualization(
+            delete_leaf_nodes.transform(parsed_tree),
             f"{folder}/parse_tree_{query_name}.png",
-            rankdir="TB",
+            'png'
         )
-        tree.pydot__tree_to_png(
-            merge_tokens.transform(parsed_tree),  # ignore[reportUnknownMemberType]
+        create_uniform_tree_visualization(
+            merge_tokens.transform(parsed_tree),
             f"{folder}/parse_tree_{query_name}_with_leaves.png",
-            rankdir="TB",
+            'png'
         )
-        tree.pydot__tree_to_dot(
-            delete_leaf_nodes.transform(parsed_tree),  # ignore[reportUnknownMemberType]
+        create_uniform_tree_visualization(
+            delete_leaf_nodes.transform(parsed_tree),
             f"{folder2}/parse_tree_{query_name}.dot",
-            rankdir="TB",
+            'dot'
         )
-        tree.pydot__tree_to_dot(
-            merge_tokens.transform(parsed_tree),  # ignore[reportUnknownMemberType]
+        create_uniform_tree_visualization(
+            merge_tokens.transform(parsed_tree),
             f"{folder2}/parse_tree_{query_name}_with_leaves.dot",
-            rankdir="TB",
+            'dot'
         )
         optimized_tree = optimizer.optimize(parsed_tree)
         print(f"Optimized parse tree for query: {query_name}")
         # save the optimized tree to a file
-        tree.pydot__tree_to_png(
-            delete_leaf_nodes.transform(
-                optimized_tree
-            ),  # ignore[reportUnknownMemberType]
+        create_uniform_tree_visualization(
+            delete_leaf_nodes.transform(optimized_tree),
             f"{folder}/optimized_parse_tree_{query_name}.png",
-            rankdir="TB",
+            'png'
         )
-        tree.pydot__tree_to_png(
-            merge_tokens.transform(optimized_tree),  # ignore[reportUnknownMemberType]
+        create_uniform_tree_visualization(
+            merge_tokens.transform(optimized_tree),
             f"{folder}/optimized_parse_tree_{query_name}_with_leaves.png",
-            rankdir="TB",
+            'png'
         )
-        tree.pydot__tree_to_dot(
-            delete_leaf_nodes.transform(
-                optimized_tree
-            ),  # ignore[reportUnknownMemberType]
+        create_uniform_tree_visualization(
+            delete_leaf_nodes.transform(optimized_tree),
             f"{folder2}/optimized_parse_tree_{query_name}.dot",
-            rankdir="TB",
+            'dot'
         )
-        tree.pydot__tree_to_dot(
-            merge_tokens.transform(optimized_tree),  # ignore[reportUnknownMemberType]
+        create_uniform_tree_visualization(
+            merge_tokens.transform(optimized_tree),
             f"{folder2}/optimized_parse_tree_{query_name}_with_leaves.dot",
-            rankdir="TB",
+            'dot'
         )
 
 
