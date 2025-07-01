@@ -34,7 +34,13 @@ def execute_with_profiling(
     pr.enable()
 
     start_time = time.time()
-    result, _ = evaluator.execute(query, fainder_mode=mode)
+    result: list[int] = []
+    try:
+        result, _ = evaluator.execute(query, fainder_mode=mode)
+    except Exception as e:
+        logger.error(f"Error executing query '{query}' in mode '{mode}': {e!s}")
+        result = []
+
     end_time = time.time()
 
     pr.disable()
