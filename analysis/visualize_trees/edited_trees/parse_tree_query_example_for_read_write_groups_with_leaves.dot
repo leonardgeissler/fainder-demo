@@ -1,5 +1,6 @@
 digraph G {
 rankdir=TB;
+dpi=50;
 0 [label="Token('Value', \"'cancer'\") \nread=[0]"];
 1 [style=filled, fillcolor="#d3e9b7", label="keyword_op\nread=[0]"];
 1 -> 0 [label="write=0"];

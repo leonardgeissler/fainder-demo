@@ -1,6 +1,7 @@
 # requires pydot and graphviz to be installed in the environment
 # and sudo apt install graphviz
 
+import cairosvg
 import glob
 from backend.engine.parser import Parser
 from backend.engine.optimizer import Optimizer
@@ -86,7 +87,6 @@ def create_uniform_tree_visualization(parse_tree, filename, format="png", rankdi
         height="0.4",
         fixedsize="true",
         fontsize="10",
-        size="8,4",
     )
 
     i = [0]
@@ -138,12 +138,14 @@ def create_uniform_tree_visualization(parse_tree, filename, format="png", rankdi
     _to_pydot(parse_tree)
 
     if format == "png":
-        graph.write_png(filename)
+        graph.write(filename, format='png')
     elif format == "dot":
         graph.write(filename)
+    elif format == "svg":
+        graph.write(filename, format='svg')
     else:
         raise ValueError(
-            f"Unsupported format: {format}. Supported formats are 'png' and 'dot'."
+            f"Unsupported format: {format}. Supported formats are 'png', 'dot', and 'svg'."
         )
 
 
@@ -172,6 +174,16 @@ def visualize_trees():
         )
         create_uniform_tree_visualization(
             delete_leaf_nodes.transform(parsed_tree),
+            f"{folder}/parse_tree_{query_name}.svg",
+            "svg",
+        )  
+        create_uniform_tree_visualization(
+            merge_tokens.transform(parsed_tree),
+            f"{folder}/parse_tree_{query_name}_with_leaves.svg",
+            "svg",
+        )
+        create_uniform_tree_visualization(
+            delete_leaf_nodes.transform(parsed_tree),
             f"{folder}/parse_tree_{query_name}.dot",
             "dot",
         )
@@ -195,6 +207,11 @@ def visualize_trees():
         )
         create_uniform_tree_visualization(
             delete_leaf_nodes.transform(optimized_tree),
+            f"{folder}/optimized_parse_tree_{query_name}.svg",      
+            "svg",
+        )
+        create_uniform_tree_visualization(
+            delete_leaf_nodes.transform(optimized_tree),
             f"{folder}/optimized_parse_tree_{query_name}.dot",
             "dot",
         )
@@ -204,42 +221,90 @@ def visualize_trees():
             "dot",
         )
 
+    # load the edited trees from the edited_trees folder
+    edited_trees = glob.glob("analysis/visualize_trees/edited_trees/*.dot")
+    for edited_tree in edited_trees:
+        os.system(f"dot -Tpng {edited_tree} -o {edited_tree.replace('.dot', '.png')}")
+        os.system(f"dot -Tsvg {edited_tree} -o {edited_tree.replace('.dot', '.svg')}")
 
-def format_trees(width=300):
-    # collect all pngs and scale them to a target width with the same factor for all images
+
+def create_normalized_pngs(width=300):
     from PIL import Image
-
-    png_files = glob.glob(f"{folder}/*.png")
-    png_files += glob.glob("analysis/visualize_trees/edited_trees/*.png")
-    heights = [Image.open(png).size[1] for png in png_files]
-    widths = [Image.open(png).size[0] for png in png_files]
-    print(f"Found {len(png_files)} PNG files with widths: {widths}")
-    max_width = max(widths)
+    import re
+    
+    # Get SVG files first since we're processing those
+    svg_files = glob.glob(f"{folder}/*.svg")
+    svg_files += glob.glob("analysis/visualize_trees/edited_trees/*.svg")
+    print(f"Found {len(svg_files)} SVG files to compile.")
+    
+    if not svg_files:
+        print("No SVG files found to process.")
+        return
+    
+    # Get dimensions from corresponding PNG files or calculate from SVG
+    svg_dimensions = []
+    max_width = 0
+    
+    for svg_file in svg_files:
+        # Try to get dimensions from corresponding PNG file first
+        png_file = svg_file.replace('.svg', '.png')
+        if os.path.exists(png_file):
+            img = Image.open(png_file)
+            width_val, height_val = img.size
+        else:
+            # If PNG doesn't exist, try to parse SVG dimensions
+            with open(svg_file, 'r') as f:
+                content = f.read()
+            # Extract width and height from SVG
+            width_match = re.search(r'width="(\d+(?:\.\d+)?)', content)
+            height_match = re.search(r'height="(\d+(?:\.\d+)?)', content)
+            if width_match and height_match:
+                width_val = float(width_match.group(1))
+                height_val = float(height_match.group(1))
+            else:
+                # Default fallback dimensions
+                width_val, height_val = 800, 600
+        
+        svg_dimensions.append((width_val, height_val))
+        max_width = max(max_width, width_val)
+    
     scale_factor = width / max_width if max_width > width else 1.0
     print(f"Scaling factor: {scale_factor}")
-
-    dot_files = glob.glob(f"{folder}/*.dot")
-    dot_files += glob.glob("analysis/visualize_trees/edited_trees/*.dot")
-    print(f"Found {len(dot_files)} DOT files to compile.")
-
-    # add new size to each dot file then compile them
-
-    for i, dot_file in enumerate(dot_files):
-        with open(dot_file, "r") as f:
+    
+    for i, svg_file in enumerate(svg_files):
+        with open(svg_file, "r") as f:
             content = f.read()
-        # add dpi and size to the dot file
-        height = int((heights[i] * scale_factor) / 100)
-        width = int((widths[i] * scale_factor) / 100)
+        
+        # Calculate scaled dimensions
+        orig_width, orig_height = svg_dimensions[i]
+        scaled_height = max(1, round(orig_height * scale_factor))
+        scaled_width = max(1, round(orig_width * scale_factor))
+        
+        # Update SVG content with new dimensions
+        content = re.sub(r'width="\d+(\.\d+)?(px|%|pt)?"', f'width="{scaled_width}px"', content)
+        content = re.sub(r'height="\d+(\.\d+)?(px|%|pt)?"', f'height="{scaled_height}px"', content)
 
-        content = content.replace('size="8,4";', f"size={width},{height};")
-        with open(dot_file, "w") as f:
+        # Remove scale(..) transformation if present
+        content = re.sub(r'scale\(\s*[^)]+\s*\)', '', content)
+
+        print(f"Processing {svg_file}: {orig_width}x{orig_height} -> {scaled_width}x{scaled_height}")
+        
+        # Save the modified SVG content back to the file
+        with open(svg_file, "w") as f:
             f.write(content)
-        print(f"Updated {dot_file} with new size and dpi.")
 
-        os.system(f"dot -Tpng {dot_file} -o {dot_file.replace('.dot', '.png')}")
+        # Convert SVG to PNG
+        try:
+            cairosvg.svg2png(
+                url=svg_file,
+                write_to=svg_file.replace('.svg', '_small.png'),
+            )
+        except Exception as e:
+            print(f"Error converting {svg_file} to PNG: {e}")
 
 
 if __name__ == "__main__":
     visualize_trees()
-    format_trees()
+    create_normalized_pngs()
+    # format_trees()
     print("Parse trees have been visualized and saved as PNG files.")

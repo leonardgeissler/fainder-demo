@@ -1,6 +1,6 @@
 digraph G {
 rankdir=TB;
-dpi=100;
+dpi=50;
 node [shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
 0 [label="'cancer' \nread=[0]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
 1 [style=filled, fillcolor="#d3e9b7", label="keyword_op\nread=[0]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
