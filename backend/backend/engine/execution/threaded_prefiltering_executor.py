@@ -110,7 +110,7 @@ class IntermediateResultFuture:
         hist_ids: list[ColumnArray] = []
         first = True
         for kw_future in self.kw_result_futures:
-            doc_ids, _ = kw_future.result()
+            doc_ids, _ = kw_future.result(timeout=300)
             if exceeds_filtering_limit(
                 doc_ids[0], "num_doc_ids", self.fainder_mode, self.num_workers
             ):
@@ -124,7 +124,7 @@ class IntermediateResultFuture:
                 hist_ids.append(new_hist_ids)
 
         for col_future in self.col_result_futures:
-            col_ids, _ = col_future.result()
+            col_ids, _ = col_future.result(timeout=300)
             if exceeds_filtering_limit(
                 col_ids, "num_col_ids", self.fainder_mode, self.num_workers
             ):
@@ -434,7 +434,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         clean_item: list[TResult] = []
         write_group = 0
         for item in items:
-            resolved_item = item.result() if isinstance(item, Future) else item
+            resolved_item = item.result(timeout=300) if isinstance(item, Future) else item
             clean_item.append(resolved_item[0])
             # NOTE: The write group is the same for all items in the input sequence
             write_group = resolved_item[1]
@@ -445,7 +445,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
         self, item: tuple[TResult, int] | Future[tuple[TResult, int]]
     ) -> tuple[TResult, int]:
         """Resolve item from future."""
-        return item.result() if isinstance(item, Future) else item
+        return item.result(timeout=300) if isinstance(item, Future) else item
 
     ##########################
     # Operator implementations
@@ -543,7 +543,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
             if len(items) != 1:
                 raise ValueError("Column term must have exactly one item")
             if isinstance(items[0], Future):
-                col_ids, write_group = items[0].result()
+                col_ids, write_group = items[0].result(timeout=300)
             else:
                 col_ids = items[0][0]
                 write_group = items[0][1]
@@ -660,7 +660,7 @@ class ThreadedPrefilteringExecutor(Transformer[Token, DocResult], Executor):
     ) -> DocResult:
         logger.trace(f"Evaluating query with {len(items)} items")
 
-        clean_item = items[0].result() if isinstance(items[0], Future) else items[0]
+        clean_item = items[0].result(timeout=300) if isinstance(items[0], Future) else items[0]
 
         if len(items) != 1:
             raise ValueError("Query must have exactly one item")

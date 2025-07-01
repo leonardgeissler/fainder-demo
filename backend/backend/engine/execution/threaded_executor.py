@@ -70,7 +70,7 @@ class ThreadedExecutor(Transformer[Token, DocResult], Executor):
 
     def _resolve_item(self, item: TResult | Future[TResult]) -> TResult:
         """Resolve item if it's a Future, otherwise return the item itself."""
-        return item.result() if isinstance(item, Future) else item
+        return item.result(timeout=300) if isinstance(item, Future) else item
 
     def _resolve_items(self, items: Sequence[TResult | Future[TResult]]) -> list[TResult]:
         """Resolve all items in the list if they are futures."""
