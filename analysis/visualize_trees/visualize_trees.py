@@ -175,6 +175,11 @@ def visualize_trees():
             f"{folder}/parse_tree_{query_name}.dot",
             "dot",
         )
+        create_uniform_tree_visualization(
+            merge_tokens.transform(parsed_tree),
+            f"{folder}/parse_tree_{query_name}_with_leaves.dot",
+            "dot",
+        )
         optimized_tree = optimizer.optimize(parsed_tree)
         print(f"Optimized parse tree for query: {query_name}")
         # save the optimized tree to a file
@@ -191,6 +196,11 @@ def visualize_trees():
         create_uniform_tree_visualization(
             delete_leaf_nodes.transform(optimized_tree),
             f"{folder}/optimized_parse_tree_{query_name}.dot",
+            "dot",
+        )
+        create_uniform_tree_visualization(
+            merge_tokens.transform(optimized_tree),
+            f"{folder}/optimized_parse_tree_{query_name}_with_leaves.dot",
             "dot",
         )
 
