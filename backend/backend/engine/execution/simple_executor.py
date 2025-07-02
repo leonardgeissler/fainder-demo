@@ -2,7 +2,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 
 import numpy as np
-from lark import ParseTree, Token, Transformer
+from lark import ParseTree, Token, Transformer_NonRecursive
 from loguru import logger
 
 from backend.config import ColumnHighlights, DocumentHighlights, FainderMode, Metadata
@@ -13,7 +13,7 @@ from .common import ColResult, DocResult, TResult, junction, negate_array
 from .executor import Executor
 
 
-class SimpleExecutor(Transformer[Token, DocResult], Executor):
+class SimpleExecutor(Transformer_NonRecursive[Token, DocResult], Executor):
     """This transformer evaluates a parse tree bottom-up and computes the query result."""
 
     fainder_mode: FainderMode
@@ -40,7 +40,13 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
 
         self.reset(fainder_mode, enable_highlighting)
 
-    def reset(self, fainder_mode: FainderMode, enable_highlighting: bool = False) -> None:
+    def reset(
+        self,
+        fainder_mode: FainderMode,
+        enable_highlighting: bool = False,
+        fainder_index_name: str = "default",
+    ) -> None:
+        self.fainder_index_name = fainder_index_name
         self.scores = defaultdict(float)
         self.fainder_mode = fainder_mode
         self.enable_highlighting = enable_highlighting
@@ -93,7 +99,9 @@ class SimpleExecutor(Transformer[Token, DocResult], Executor):
         comparison: str = items[1]
         reference = float(items[2])
 
-        return self.fainder_index.search(percentile, comparison, reference, self.fainder_mode)
+        return self.fainder_index.search(
+            percentile, comparison, reference, self.fainder_mode, self.fainder_index_name
+        )
 
     def conjunction(self, items: Sequence[TResult]) -> TResult:
         logger.trace("Evaluating conjunction with items of length: {}", len(items))

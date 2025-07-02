@@ -1,0 +1,36 @@
+digraph G {
+rankdir=TB;
+dpi=50;
+node [shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+0 [label="'cancer' \nread=[0]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+1 [style=filled, fillcolor="#d3e9b7", label="keyword_op\nread=[0]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+1 -> 0 [label="write=0"];
+2 [label="'age' ; 0 \n read=[0,1,2]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+3 [style=filled, fillcolor="#febbb1", label="name_op\nread=[0,1,2]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+3 -> 2 [label="write=2"];
+4 [style=filled, fillcolor="#b5c381", label="negation\nread=[0,1,2]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+4 -> 3 [label="write=2"];
+5 [label="1.0 ; gt ; 50 \nread=[0,1,3,4]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+6 [style=filled, fillcolor="#bb85d5", label="percentile_op\nread=[0,1,3,4]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+6 -> 5 [label="write=4"];
+7 [style=filled, fillcolor="#b5c381", label="negation\nread=[0,1,3,4]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+7 -> 6 [label="write=4"];
+8 [label="1.0 ; lt ; 30 \nread=[0,1,3]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+9 [style=filled, fillcolor="#bb85d5", label="percentile_op\nread=[0,1,3]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+9 -> 8 [label="write=3"];
+10 [style=filled, fillcolor="#aaf5c8", label="disjunction\nread=[0,1,3]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+10 -> 7 [label="write=3"];
+10 -> 9 [label="write=3"];
+11 [style=filled, fillcolor="#c0b1f5", label="conjunction\nread=[0,1]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+11 -> 4 [label="write=1"];
+11 -> 10 [label="write=1"];
+12 [style=filled, fillcolor="#f78e95", label="col_op\nread=[0,1]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+12 -> 11 [label="write=1"];
+13 [style=filled, fillcolor="#b5c381", label="negation\nread=[0,1]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+13 -> 12 [label="write=1"];
+14 [style=filled, fillcolor="#c0b1f5", label="conjunction\nread=[0]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+14 -> 1 [label="write=0"];
+14 -> 13 [label="write=0"];
+15 [style=filled, fillcolor="#90b986", label="query\nread=[0]", shape=oval, width=1.2, height=0.4, fixedsize=true, fontsize=10];
+15 -> 14 [label="write=0"];
+}

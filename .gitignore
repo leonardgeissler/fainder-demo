@@ -55,3 +55,11 @@ logs/
 
 # tantivy lock
 *.lock
+/analysis/performance_tests/figures/regression
+/analysis/fainder_filter_breaking_points_tests/excecution
+/analysis/performance_tests/figures/analysis
+/analysis/visualize_trees/trees
+/analysis/visualize_trees/trees_editable
+/multirun
+/outputs
+/test_cases

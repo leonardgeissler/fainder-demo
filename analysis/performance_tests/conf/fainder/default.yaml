@@ -1,0 +1,4 @@
+max_workers: 12
+chunk_layout: round_robin
+parallel: true
+config_name: default
