@@ -14,6 +14,7 @@ The repository is structured as follows:
 
 ```bash
 fainder-demo/
+├── analysis  # performance tests, benchmarks, and analysis tools
 ├── backend  # main component for query parsing, optimization, and execution
 ├── docs  # documentation about system design and implementation
 ├── scripts  # scripts for installing and starting components
@@ -139,3 +140,18 @@ components in development mode:
 ```bash
 COMPOSE_BAKE=true FASTAPI_MODE=dev NUXT_MODE=dev docker compose up --build --watch
 ```
+
+## Analysis and Benchmarking
+
+The `analysis/` directory contains comprehensive testing and benchmarking tools for evaluating
+Fainder's performance and behavior. This includes:
+
+- **Performance Tests**: Benchmarks for comparing Fainder against other search engines
+- **Filter Breaking Points**: Tests to identify edge cases and breaking points in filtering
+- **Result Size Analysis**: Tools for analyzing result set sizes under different conditions
+- **Keyword Merging Tests**: Benchmarks for keyword optimization functionality
+- **Visualization Tools**: Utilities for visualizing query parse trees and transformations
+
+Each analysis subdirectory contains its own documentation and can be run independently.
+See the [analysis README](analysis/README.MD) for detailed information about available tools
+and how to use them.
