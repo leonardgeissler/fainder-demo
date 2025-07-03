@@ -1,0 +1,10 @@
+enabled_tests:
+  - base_keyword_queries_with_multiple_elements
+
+
+fainder_modes:
+  - full_precision
+  - exact
+
+# Number of times to run each query for more reliable timing measurements
+num_runs: 3
