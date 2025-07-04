@@ -96,7 +96,7 @@ Comprehensive analysis notebook for query optimizer performance evaluation:
 - Analyzes the impact of different optimizer components (keyword merging, cost sorting, split-up junctions)
 - Compares execution times with optimizer features enabled/disabled
 - Generates detailed performance improvement statistics
-- Creates heatmaps and visualizations showing optimization effectiveness
+- Creates visualizations showing optimization effectiveness
 - Exports detailed statistics to CSV files for further analysis
 - Provides logging and timestamped analysis results
 

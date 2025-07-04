@@ -63,3 +63,4 @@ logs/
 /multirun
 /outputs
 /test_cases
+/analysis/performance_tests/figures/optimizer
