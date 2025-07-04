@@ -195,12 +195,13 @@ class FainderIndex:
                     )
 
         logger.info(
-            "Query '{}' ({} mode) returned {} histograms in {} seconds. With filter size: {}",
+            "Query '{}' ({} mode) returned {} histograms in {} seconds. With filter size: {}. Using num_workers: {}",
             query,
             fainder_mode,
             len(result),
             f"{runtime:.2f}",
             hist_filter.size if hist_filter is not None else "no filter",
+            self.num_workers
         )
 
         return result
