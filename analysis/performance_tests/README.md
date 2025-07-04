@@ -91,6 +91,15 @@ Advanced notebooks for comparing performance across multiple data sources:
 - Multi-source regression testing
 - Comparative performance benchmarking
 
+#### `analysis_optimizer.ipynb`
+Comprehensive analysis notebook for query optimizer performance evaluation:
+- Analyzes the impact of different optimizer components (keyword merging, cost sorting, split-up junctions)
+- Compares execution times with optimizer features enabled/disabled
+- Generates detailed performance improvement statistics
+- Creates heatmaps and visualizations showing optimization effectiveness
+- Exports detailed statistics to CSV files for further analysis
+- Provides logging and timestamped analysis results
+
 ### Generated Outputs
 
 Analysis results are saved in:
