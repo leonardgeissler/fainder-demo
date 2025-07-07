@@ -17,7 +17,7 @@ Analysis of result set sizes under different query conditions and thresholds.
 Tests and benchmarks for keyword merging optimization functionality.
 
 ### [performance_tests/](./performance_tests/)
-Comprehensive performance testing framework with Hydra configuration support.
+Comprehensive performance testing framework with Hydra configuration support. Includes specialized analysis notebooks for optimizer evaluation, regression testing, and multi-threading performance analysis.
 
 ### [visualize_trees/](./visualize_trees/)
 Tools for visualizing query parse trees and optimization transformations.

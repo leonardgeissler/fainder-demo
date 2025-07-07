@@ -343,6 +343,7 @@ def run_test_case(
                 config.fainder.chunk_layout,
                 config.optimizer.cost_sorting,
                 config.optimizer.keyword_merging,
+                config.optimizer.split_up_junctions,
             )
 
             # Log to individual test CSV
@@ -366,6 +367,7 @@ def run_test_case(
                     config.fainder.chunk_layout,
                     config.optimizer.cost_sorting,
                     config.optimizer.keyword_merging,
+                    config.optimizer.split_up_junctions,
                 )
 
             # Log to console

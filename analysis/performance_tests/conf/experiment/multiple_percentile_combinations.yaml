@@ -1,8 +1,8 @@
 enabled_tests:
-  - base_percentile_queries
+  - Multiple_Percentile_Combinations
 
 fainder_modes:
-  - full_recall
+  - full_precision
   - exact
 
 # Number of times to run each query for more reliable timing measurements

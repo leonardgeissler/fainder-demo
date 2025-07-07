@@ -1,5 +1,6 @@
 enabled_tests:
-  - Middle_exit_Results
+  - base_keyword_queries_with_multiple_elements
+
 
 fainder_modes:
   - full_precision
