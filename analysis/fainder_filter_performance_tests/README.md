@@ -6,13 +6,12 @@ This directory contains performance benchmarks specifically focused on Fainder's
 
 - `fainder_filter_performance_test.py` - Main performance test suite for filter operations
 - `analysis.ipynb` - Jupyter notebook for performance analysis and visualization
-- `conftest.py` - Pytest configuration and fixtures
 
 ## Test Parameters
 
 The performance tests evaluate:
 - **References**: `[1, 100, 10000, 1000000, 10000000]` - Different reference values
-- **Comparisons**: `["le"]` - Less than/equal operations
+- **Comparisons**: `["le" ,"ge"]` - Less than/equal operations
 - **Percentiles**: `[0.1, 0.5, 0.9]` - Different percentile thresholds
 - **Fainder Modes**: `[FULL_RECALL, EXACT]` - Different precision modes
 - **Filter Sizes**: Various filter sizes to test scalability
@@ -26,7 +25,7 @@ The performance tests evaluate:
 
 ```bash
 # Run all performance tests
-pytest analysis/fainder_filter_performance_tests/
+uv run analysis/fainder_filter_performance_tests/fainder_filter_performance_test.py
 
 ```
 
@@ -41,9 +40,6 @@ The `analysis.ipynb` notebook provides:
 ## Metrics Collected
 
 - **Execution Time**: Time taken for filter operations
-- **Memory Usage**: Peak memory consumption during filtering
-- **Result Accuracy**: Comparison between different precision modes
-- **Throughput**: Operations per second under sustained load
 
 ## Use Cases
 
