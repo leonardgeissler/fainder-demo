@@ -12,9 +12,9 @@ from numpy.typing import ArrayLike, NDArray
 
 
 REFERENCES = [1, 100, 10000, 1000000, 10000000]
-COMPARISONS = ["le"]
+COMPARISONS = ["le", "ge"]
 PERCENTILES = [0.1, 0.5, 0.9]
-FAINDER_MODES = [FainderMode.FULL_RECALL, FainderMode.EXACT]
+FAINDER_MODES = [FainderMode.FULL_PRECISION, FainderMode.EXACT]
 
 FILTER_SIZES_RIGHT = [100, 10000, 100000, 1000000, 10000000, 30000000, 50000000]
 
@@ -179,9 +179,3 @@ def test_fainder_filter_performance(
                 if fainder.parallel_processor
                 else 1,
             )
-
-            if time_with_filtering > time_without_filtering:
-                return
-
-            # check result with filtering is a subset of result without filtering
-            # assert len(result_with_filtering) == filter_size_right
