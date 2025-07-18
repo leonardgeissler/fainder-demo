@@ -14,6 +14,21 @@ from loguru import logger
 from backend.config import Metadata, Settings
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--num-workers",
+        action="store",
+        default=None,
+        type=int,
+        help="Number of workers for Fainder index",
+    )
+
+
+@pytest.fixture
+def num_workers(request: pytest.FixtureRequest) -> int | None:
+    return request.config.getoption("--num-workers")  # type: ignore[return-value]
+
+
 @pytest.fixture(autouse=True, scope="module")
 def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[reportUnusedFunction]
     """
@@ -83,13 +98,18 @@ def _setup_and_teardown() -> Generator[None, Any, None]:  # pyright: ignore[repo
 def fainder() -> FainderIndex:
     settings = Settings()  # type: ignore # uses the environment variables
 
+    # Override num_workers if provided via command line
+    num_workers_arg = request.config.getoption("--num-workers", default=None)  # type: ignore
+    if num_workers_arg is not None:
+        settings.fainder_num_workers = int(num_workers_arg)
+
     fainder_index = FainderIndex(
         rebinning_paths={"default": settings.rebinning_index_path},
         conversion_paths={"default": settings.conversion_index_path},
         histogram_path=settings.histogram_path,
         chunk_layout=settings.fainder_chunk_layout,
-        num_workers=settings.max_workers - 1,
-        num_chunks=settings.max_workers - 1,
+        num_workers=settings.fainder_num_workers,
+        num_chunks=settings.fainder_num_workers,
     )
     return fainder_index
 
