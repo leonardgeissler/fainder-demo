@@ -38,6 +38,8 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from loguru import logger
 
+from fainder.execution.parallel_processing import FainderChunkLayout
+
 
 # Test parameters - Full test suite
 REFERENCES = [1, 100, 10000, 1000000, 10000000]
@@ -155,7 +157,7 @@ def create_fainder_index(num_workers: int | None = None) -> FainderIndex:
         rebinning_paths={"default": settings.rebinning_index_path},
         conversion_paths={"default": settings.conversion_index_path},
         histogram_path=settings.histogram_path,
-        chunk_layout=settings.fainder_chunk_layout,
+        chunk_layout=FainderChunkLayout.ROUND_ROBIN,
         num_workers=settings.fainder_num_workers,
         num_chunks=settings.fainder_num_workers,
     )
