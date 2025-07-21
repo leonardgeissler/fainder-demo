@@ -64,3 +64,5 @@ logs/
 /outputs
 /test_cases
 /analysis/performance_tests/figures/optimizer
+/analysis/fainder_filter_performance_tests/figures
+/analysis/fainder_filter_performance_tests/performance

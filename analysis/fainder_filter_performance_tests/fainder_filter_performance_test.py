@@ -6,10 +6,21 @@ This script runs performance tests for Fainder filtering without requiring pytes
 It combines the functionality from the original pytest-based test files.
 
 Usage:
-    python standalone_performance_test.py [--num-workers N]
+    python fainder_filter_performance_test.py [--num-workers N] [--small-test]
 
 Options:
     --num-workers N    Number of workers for Fainder index (optional)
+    --small-test       Run a smaller set of test parameters for quick testing
+
+Examples:
+    # Run full test suite
+    python fainder_filter_performance_test.py
+
+    # Run small test with 4 workers
+    python fainder_filter_performance_test.py --num-workers 4 --small-test
+
+    # Run full test with 8 workers
+    python fainder_filter_performance_test.py --num-workers 8
 """
 
 import argparse
@@ -27,24 +38,53 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from loguru import logger
 
+from fainder.execution.parallel_processing import FainderChunkLayout
 
-# Test parameters
+
+# Test parameters - Full test suite
 REFERENCES = [1, 100, 10000, 1000000, 10000000]
 COMPARISONS = ["le", "ge"]
 PERCENTILES = [0.1, 0.5, 0.9]
 FAINDER_MODES = [FainderMode.FULL_PRECISION, FainderMode.EXACT]
 
-FILTER_SIZES_RIGHT = [100, 10000, 100000, 1000000, 10000000, 30000000, 50000000]
-FILTER_SIZES_WRONG = [0, 1000, 10000, 100000, 1000000, 10000000, 30000000, 50000000]
+FILTER_SIZES_RIGHT = [
+    100,
+    10000,
+    100000,
+    1000000,
+    2000000,
+    3000000,
+]
+FILTER_SIZES_WRONG = [0, 1000, 10000, 100000, 1000000, 2000000, 3000000]
+
+# Small test parameters - Reduced for quick testing
+REFERENCES_SMALL = [100, 10000]
+COMPARISONS_SMALL = ["le", "ge"]
+PERCENTILES_SMALL = [0.5]
+FAINDER_MODES_SMALL = [FainderMode.FULL_PRECISION]
+
+FILTER_SIZES_RIGHT_SMALL = [100, 10000, 100000]
+FILTER_SIZES_WRONG_SMALL = [0, 1000, 10000]
 
 
-def create_fainder_queries() -> list[dict[str, Any]]:
+def create_fainder_queries(small_test: bool = False) -> list[dict[str, Any]]:
     """Create all combinations of test parameters."""
+    if small_test:
+        references = REFERENCES_SMALL
+        comparisons = COMPARISONS_SMALL
+        percentiles = PERCENTILES_SMALL
+        fainder_modes = FAINDER_MODES_SMALL
+    else:
+        references = REFERENCES
+        comparisons = COMPARISONS
+        percentiles = PERCENTILES
+        fainder_modes = FAINDER_MODES
+
     fainder_queries: list[dict[str, Any]] = []
-    for reference in REFERENCES:
-        for comparison in COMPARISONS:
-            for percentile in PERCENTILES:
-                for fainder_mode in FAINDER_MODES:
+    for reference in references:
+        for comparison in comparisons:
+            for percentile in percentiles:
+                for fainder_mode in fainder_modes:
                     fainder_queries.append(
                         {
                             "percentile": percentile,
@@ -117,7 +157,7 @@ def create_fainder_index(num_workers: int | None = None) -> FainderIndex:
         rebinning_paths={"default": settings.rebinning_index_path},
         conversion_paths={"default": settings.conversion_index_path},
         histogram_path=settings.histogram_path,
-        chunk_layout=settings.fainder_chunk_layout,
+        chunk_layout=FainderChunkLayout.ROUND_ROBIN,
         num_workers=settings.fainder_num_workers,
         num_chunks=settings.fainder_num_workers,
     )
@@ -193,10 +233,19 @@ def run_performance_test(
     metadata: Metadata,
     query: dict[str, Any],
     csv_path: Path,
+    small_test: bool = False,
 ) -> None:
     """Run performance test for a single query configuration."""
     logger.info(f"Running test for query: {query}")
-    
+
+    # Use small or full filter sizes based on test mode
+    if small_test:
+        filter_sizes_right = FILTER_SIZES_RIGHT_SMALL
+        filter_sizes_wrong = FILTER_SIZES_WRONG_SMALL
+    else:
+        filter_sizes_right = FILTER_SIZES_RIGHT
+        filter_sizes_wrong = FILTER_SIZES_WRONG
+
     # Test without filtering first
     start_time = time.perf_counter()
     result_without_filtering = run_fainder_search(
@@ -223,11 +272,13 @@ def run_performance_test(
         fainder.parallel_processor.num_workers if fainder.parallel_processor else 1,
     )
 
-    logger.info(f"Baseline test completed in {time_without_filtering:.4f}s, {result_without_filtering.size} results")
+    logger.info(
+        f"Baseline test completed in {time_without_filtering:.4f}s, {result_without_filtering.size} results"
+    )
 
     # Test with different filter sizes
-    for filter_size_right in FILTER_SIZES_RIGHT:
-        for filter_size_wrong in FILTER_SIZES_WRONG:
+    for filter_size_right in filter_sizes_right:
+        for filter_size_wrong in filter_sizes_wrong:
             filter_size_right = min(filter_size_right, len(result_without_filtering))
             filter_size_wrong = min(filter_size_wrong, num_of_hists - filter_size_right)
 
@@ -270,8 +321,10 @@ def run_performance_test(
                 else 1,
             )
 
-            logger.debug(f"Filter test: right={filter_size_right}, wrong={filter_size_wrong}, "
-                        f"time={time_with_filtering:.4f}s, results={result_with_filtering.size}")
+            logger.debug(
+                f"Filter test: right={filter_size_right}, wrong={filter_size_wrong}, "
+                f"time={time_with_filtering:.4f}s, results={result_with_filtering.size}"
+            )
 
 
 def main() -> None:
@@ -283,39 +336,62 @@ def main() -> None:
         default=None,
         help="Number of workers for Fainder index",
     )
+    parser.add_argument(
+        "--small-test",
+        action="store_true",
+        help="Run a smaller set of test parameters for quick testing",
+    )
     args = parser.parse_args()
 
     # Set up logging and directories
     performance_log_dir_fainder = Path("logs/performance_filters_fainder")
+    test_suffix = "_small" if args.small_test else ""
     csv_log_path = (
         performance_log_dir_fainder
-        / f"performance_metrics_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+        / f"performance_metrics{test_suffix}_{time.strftime('%Y%m%d_%H%M%S')}.csv"
     )
-    
+
     setup_logging_and_directories(csv_log_path)
-    
-    logger.info("Starting Fainder filter performance tests")
+
+    test_mode = "small test" if args.small_test else "full test"
+    logger.info(f"Starting Fainder filter performance tests ({test_mode})")
     logger.info(f"Results will be logged to: {csv_log_path}")
-    
+
     # Initialize Fainder and metadata
     logger.info("Initializing Fainder index...")
     fainder = create_fainder_index(args.num_workers)
     metadata = load_metadata()
-    
-    logger.info(f"Fainder index initialized with {fainder.parallel_processor.num_workers if fainder.parallel_processor else 1} workers")
+
+    logger.info(
+        f"Fainder index initialized with {fainder.parallel_processor.num_workers if fainder.parallel_processor else 1} workers"
+    )
     logger.info(f"Metadata loaded: {metadata.num_hists} histograms")
 
     # Generate all test queries
-    fainder_queries = create_fainder_queries()
+    fainder_queries = create_fainder_queries(small_test=args.small_test)
     total_queries = len(fainder_queries)
-    
-    logger.info(f"Running {total_queries} query configurations...")
+
+    if args.small_test:
+        logger.info(
+            f"Running {total_queries} query configurations (small test mode)..."
+        )
+        logger.info("Small test parameters:")
+        logger.info(f"  References: {REFERENCES_SMALL}")
+        logger.info(f"  Comparisons: {COMPARISONS_SMALL}")
+        logger.info(f"  Percentiles: {PERCENTILES_SMALL}")
+        logger.info(f"  Fainder modes: {[mode.value for mode in FAINDER_MODES_SMALL]}")
+        logger.info(f"  Filter sizes (right): {FILTER_SIZES_RIGHT_SMALL}")
+        logger.info(f"  Filter sizes (wrong): {FILTER_SIZES_WRONG_SMALL}")
+    else:
+        logger.info(f"Running {total_queries} query configurations (full test mode)...")
 
     # Run all tests
     for i, query in enumerate(fainder_queries, 1):
         logger.info(f"Progress: {i}/{total_queries} - Testing query {i}")
         try:
-            run_performance_test(fainder, metadata, query, csv_log_path)
+            run_performance_test(
+                fainder, metadata, query, csv_log_path, small_test=args.small_test
+            )
         except Exception as e:
             logger.error(f"Error running test for query {query}: {e}")
             continue
